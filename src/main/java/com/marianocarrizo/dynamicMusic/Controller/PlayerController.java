@@ -299,6 +299,13 @@ public class PlayerController implements SceneHost {
 
         moodSeekBar.setOnSeek(musicService::seekCurrentTrack);
         previewSeekBar.setOnSeek(musicService::seekPreview);
+
+        musicService.setOnPreviewInterrupted(() -> setPreviewButtonIcon("▶"));
+        musicService.setOnModeInterrupted(() -> {
+            setMoodButtonIcon("▶");
+            if (btnOnDemandPlayPause != null) btnOnDemandPlayPause.setText("▶");
+            if (btnPlaylistPlayPause != null) btnPlaylistPlayPause.setText("▶");
+        });
         onDemandSeekBar.setOnSeek(musicService::seekOnDemand);
         playlistSeekBar.setOnSeek(musicService::seekPlaylist);
 
@@ -559,6 +566,19 @@ public class PlayerController implements SceneHost {
     @FXML private void onSwitchToNormal()   { switchTrack(TrackType.NORMAL); }
     @FXML private void onSwitchToRaged()    { switchTrack(TrackType.RAGED); }
     @FXML private void onSwitchToAdvantage(){ switchTrack(TrackType.ADVANTAGE); }
+
+    /** Plays or pauses the player of the current playback mode, the one used last. */
+    public void togglePlayback() {
+        if (musicService.previewOwnsAudio()) {
+            onTogglePreviewPlayPause();
+            return;
+        }
+        switch (musicService.getPlaybackMode()) {
+            case MOOD -> onTogglePlayPause();
+            case PLAYLIST -> onPlaylistPlayPause();
+            case ON_DEMAND -> onToggleOnDemandPlayPause();
+        }
+    }
 
     public void switchTrack(TrackType type) {
         if (type == null || !musicService.isLoaded(type)) return;

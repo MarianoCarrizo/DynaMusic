@@ -13,7 +13,9 @@ import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.image.Image;
+import javafx.scene.control.TextInputControl;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 import javafx.stage.StageStyle;
@@ -121,6 +123,18 @@ public class MusicServiceStarter extends Application {
 
         scene.setOnKeyReleased(e -> heldKeys.remove(e.getCode()));
 
+        // Space: filtro en vez de handler para ganarle al botón con foco, que también reacciona a Space
+        scene.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
+            if (!isPlaybackShortcut(e, scene)) return;
+            e.consume();
+            if (heldKeys.add(KeyCode.SPACE)) controller.togglePlayback();
+        });
+        scene.addEventFilter(KeyEvent.KEY_RELEASED, e -> {
+            if (!isPlaybackShortcut(e, scene)) return;
+            e.consume();
+            heldKeys.remove(KeyCode.SPACE);
+        });
+
         addResizeSupport(stage, root);
 
         stage.setMinWidth(820);
@@ -133,6 +147,10 @@ public class MusicServiceStarter extends Application {
         stage.centerOnScreen();
 
         stage.show();
+    }
+
+    private static boolean isPlaybackShortcut(KeyEvent e, Scene scene) {
+        return e.getCode() == KeyCode.SPACE && !(scene.getFocusOwner() instanceof TextInputControl);
     }
 
     private void addResizeSupport(Stage stage, Parent root) {
