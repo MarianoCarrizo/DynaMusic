@@ -56,7 +56,7 @@ jobs:
 
       - name: Package application jars
         shell: bash
-        run: ./mvnw -B package -DskipTests -DskipInstaller=true
+        run: ./mvnw -B package -DskipTests
 
       - name: Download JavaFX jmods
         shell: pwsh

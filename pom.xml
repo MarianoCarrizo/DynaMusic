@@ -6,24 +6,24 @@
 
     <groupId>com.marianocarrizo</groupId>
     <artifactId>dynamicMusic</artifactId>
-    <version>1.0.0</version>
+    <version>1.3.0</version>
     <name>dynamicMusic</name>
 
     <properties>
-        <java.version>21</java.version>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
         <javafx.version>21.0.13</javafx.version>
-        <!--
-            Directorio de jmods de JavaFX 21.0.13 (requerido por jpackage/jlink).
-            Descargar de https://gluonhq.com/products/javafx/ → SDK → jmods para Windows.
-            Sobreescribir con: mvn package -Djavafx.jmods=C:/ruta/a/javafx-jmods-21.0.13
-        -->
-        <javafx.jmods>C:/javafx-jmods-21.0.13</javafx.jmods>
+        <jflac.version>1.5.2</jflac.version>
+        <tarsos.version>2.5</tarsos.version>
+        <gson.version>2.14.0</gson.version>
+        <junit.version>5.12.2</junit.version>
+
         <excludedGroups>corpus</excludedGroups>
     </properties>
 
     <repositories>
+        <!-- Central first, so the third-party Tarsos repo only serves what Central lacks -->
         <repository>
             <id>central</id>
             <url>https://repo.maven.apache.org/maven2</url>
@@ -38,6 +38,7 @@
     </repositories>
 
     <dependencies>
+        <!-- UI -->
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
@@ -54,75 +55,42 @@
             <version>${javafx.version}</version>
         </dependency>
 
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <version>1.18.36</version>
-            <scope>provided</scope>
-        </dependency>
+        <!-- Audio decoding + analysis -->
         <dependency>
             <groupId>org.jflac</groupId>
             <artifactId>jflac-codec</artifactId>
-            <version>1.5.2</version>
+            <version>${jflac.version}</version>
         </dependency>
         <dependency>
             <groupId>be.tarsos.dsp</groupId>
             <artifactId>core</artifactId>
-            <version>2.5</version>
+            <version>${tarsos.version}</version>
         </dependency>
         <dependency>
             <groupId>be.tarsos.dsp</groupId>
             <artifactId>jvm</artifactId>
-            <version>2.5</version>
+            <version>${tarsos.version}</version>
         </dependency>
 
-        <!-- Gson: serialización JSON para persistencia de sesión (G3) -->
+        <!-- persistence of a play session-->
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
-            <version>2.14.0</version>
+            <version>${gson.version}</version>
         </dependency>
 
+        <!-- Testing -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <version>5.12.2</version>
+            <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
 
     <build>
         <plugins>
-            <!-- Compilador Java 21 con soporte completo para módulos (JPMS) -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.14.0</version>
-                <executions>
-                    <execution>
-                        <id>default-testCompile</id>
-                        <configuration>
-                            <compilerArgs>
-                                <arg>--add-modules</arg>
-                                <arg>jdk.httpserver</arg>
-                                <arg>--add-reads</arg>
-                                <arg>com.marianocarrizo.dynamicMusic=jdk.httpserver</arg>
-                            </compilerArgs>
-                        </configuration>
-                    </execution>
-                </executions>
-                <configuration>
-                    <release>${maven.compiler.release}</release>
-                    <!--
-                        Lombok 1.18.x accede a TypeTag.UNKNOWN que fue eliminado en JDK 24,
-                        lo cual rompe su inicialización como annotation processor.
-                        Como @UtilityClass fue reemplazado por código explícito, deshabilitamos
-                        el annotation processing para evitar la carga del LombokProcessor.
-                    -->
-                    <proc>none</proc>
-                </configuration>
-            </plugin>
-
+            <!-- Code quality -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-checkstyle-plugin</artifactId>
@@ -153,6 +121,29 @@
                 </executions>
             </plugin>
 
+            <!-- Compilation and tests -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.14.0</version>
+                <configuration>
+                    <release>${maven.compiler.release}</release>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>default-testCompile</id>
+                        <configuration>
+                            <compilerArgs>
+                                <arg>--add-modules</arg>
+                                <arg>jdk.httpserver</arg>
+                                <arg>--add-reads</arg>
+                                <arg>com.marianocarrizo.dynamicMusic=jdk.httpserver</arg>
+                            </compilerArgs>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
@@ -162,22 +153,7 @@
                 </configuration>
             </plugin>
 
-            <!-- Plugin de desarrollo para mvn javafx:run -->
-            <plugin>
-                <groupId>org.openjfx</groupId>
-                <artifactId>javafx-maven-plugin</artifactId>
-                <version>0.0.8</version>
-                <configuration>
-                    <!-- Formato módulo/clase requerido cuando existe module-info.java -->
-                    <mainClass>com.marianocarrizo.dynamicMusic/com.marianocarrizo.dynamicMusic.MusicServiceStarter</mainClass>
-                </configuration>
-            </plugin>
-
-            <!--
-                maven-dependency-plugin: copia las dependencias runtime (excluyendo JavaFX y jflac)
-                a target/deps para que jpackage/jlink las encuentre en el module-path.
-                JavaFX se provee vía jmods; jflac se provee vía moditect → target/modules.
-            -->
+            <!-- Packaging: module path inputs for the jpackage step in release.yml -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
@@ -198,13 +174,6 @@
                 </executions>
             </plugin>
 
-            <!--
-                moditect: genera descriptores de módulo sintéticos para JARs no modulares.
-                Solo jflac-codec lo necesita porque TarsosDSP 2.5 ya incluye module-info.class.
-                Los providers SPI de javax.sound.sampled se declaran con 'provides' para que
-                ServiceLoader los encuentre correctamente dentro del runtime image de jlink.
-                Nombres de clase obtenidos de META-INF/services en jflac-codec-1.5.2.jar.
-            -->
             <plugin>
                 <groupId>org.moditect</groupId>
                 <artifactId>moditect-maven-plugin</artifactId>
@@ -224,7 +193,7 @@
                                     <artifact>
                                         <groupId>org.jflac</groupId>
                                         <artifactId>jflac-codec</artifactId>
-                                        <version>1.5.2</version>
+                                        <version>${jflac.version}</version>
                                     </artifact>
                                     <moduleInfoSource>
                                         module jflac.codec {
@@ -248,62 +217,18 @@
                 </executions>
             </plugin>
 
-            <!--
-                jpackage: genera el instalador MSI de Windows con JRE embebido vía jlink.
-                Pre-requisitos en la máquina de build:
-                  - JDK 21 (jpackage incluido desde JDK 14)
-                  - WiX Toolset 3.x (requerido por jpackage para tipo MSI en Windows)
-                  - JavaFX 21.0.13 jmods descargados y path configurado en javafx.jmods
-                Omitir el instalador en builds de desarrollo: mvn package -DskipInstaller
-            -->
+            <!-- Local run: mvn javafx:run -->
             <plugin>
-                <groupId>org.panteleyev</groupId>
-                <artifactId>jpackage-maven-plugin</artifactId>
-                <version>1.6.0</version>
-                <executions>
-                    <execution>
-                        <id>jpackage-msi</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>jpackage</goal>
-                        </goals>
-                        <configuration>
-                            <skip>${skipInstaller}</skip>
-                        </configuration>
-                    </execution>
-                </executions>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-maven-plugin</artifactId>
+                <version>0.0.8</version>
                 <configuration>
-                    <name>DynamicMusic</name>
-                    <appVersion>1.0.0</appVersion>
-                    <vendor>marianocarrizo</vendor>
-                    <type>MSI</type>
-                    <!-- Formato módulo/clase principal para jlink interno de jpackage -->
-                    <module>com.marianocarrizo.dynamicMusic/com.marianocarrizo.dynamicMusic.MusicServiceStarter</module>
-                    <addModules>
-                        <addModule>jdk.crypto.ec</addModule>
-                    </addModules>
-                    <modulePaths>
-                        <!-- jflac con descriptor sintético generado por moditect -->
-                        <modulePath>${project.build.directory}/modules</modulePath>
-                        <!-- TarsosDSP (ya modular) + Gson copiados por maven-dependency-plugin -->
-                        <modulePath>${project.build.directory}/deps</modulePath>
-                        <!-- JAR principal de la aplicación -->
-                        <modulePath>${project.build.directory}/${project.artifactId}-${project.version}.jar</modulePath>
-                        <!-- jmods de JavaFX 21.0.13 (requeridos por jlink) -->
-                        <modulePath>${javafx.jmods}</modulePath>
-                    </modulePaths>
-                    <destination>${project.build.directory}/dist</destination>
-                    <icon>${project.basedir}/icon.ico</icon>
-                    <winMenu>true</winMenu>
-                    <winShortcut>true</winShortcut>
-                    <winDirChooser>true</winDirChooser>
-                    <javaOptions>
-                        <javaOption>--enable-native-access=javafx.graphics</javaOption>
-                    </javaOptions>
+                    <mainClass>com.marianocarrizo.dynamicMusic/com.marianocarrizo.dynamicMusic.MusicServiceStarter</mainClass>
                 </configuration>
             </plugin>
         </plugins>
     </build>
+
     <profiles>
         <profile>
             <id>debug</id>
