@@ -4,6 +4,7 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.media.MediaView?>
 <?import javafx.scene.image.ImageView?>
+<?import com.marianocarrizo.dynamicMusic.component.SeekBar?>
 
 <VBox xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.marianocarrizo.dynamicMusic.Controller.PlayerController"
@@ -84,11 +85,7 @@
                         <Button text="■" onAction="#onPreviewStop" styleClass="btn-spotify-flat, btn-stop"/>
                         <Button fx:id="btnPreviewPlayPause" text="▶" onAction="#onTogglePreviewPlayPause" styleClass="btn-spotify-circle"/>
                     </HBox>
-                    <HBox spacing="8" alignment="CENTER" styleClass="progress-container">
-                        <Label fx:id="lblPreviewCurrentTime" text="0:00" styleClass="lbl-time"/>
-                        <Slider fx:id="previewSlider" HBox.hgrow="ALWAYS" styleClass="spotify-slider"/>
-                        <Label fx:id="lblPreviewTotalTime" text="0:00" styleClass="lbl-time"/>
-                    </HBox>
+                    <SeekBar fx:id="previewSeekBar"/>
                 </VBox>
 
                 <VBox fx:id="onDemandPanel" spacing="6" alignment="CENTER"
@@ -105,11 +102,7 @@
                         <Button text="■" onAction="#onOnDemandStop" styleClass="btn-spotify-flat, btn-stop"/>
                         <Button fx:id="btnOnDemandPlayPause" text="▶" onAction="#onToggleOnDemandPlayPause" styleClass="btn-spotify-circle"/>
                     </HBox>
-                    <HBox spacing="8" alignment="CENTER" styleClass="progress-container">
-                        <Label fx:id="lblOnDemandCurrentTime" text="0:00" styleClass="lbl-time"/>
-                        <Slider fx:id="onDemandSlider" HBox.hgrow="ALWAYS" styleClass="spotify-slider"/>
-                        <Label fx:id="lblOnDemandTotalTime" text="0:00" styleClass="lbl-time"/>
-                    </HBox>
+                    <SeekBar fx:id="onDemandSeekBar"/>
                 </VBox>
 
                 <HBox spacing="8" alignment="CENTER_LEFT">
@@ -179,11 +172,7 @@
                                         <Button text="■" onAction="#onStop" styleClass="btn-spotify-flat, btn-stop"/>
                                         <Button fx:id="btnPlayPause" text="▶" onAction="#onTogglePlayPause" styleClass="btn-spotify-circle"/>
                                     </HBox>
-                                    <HBox spacing="10" alignment="CENTER" styleClass="progress-container">
-                                        <Label fx:id="lblCurrentTime" text="0:00" styleClass="lbl-time"/>
-                                        <Slider fx:id="progressSlider" HBox.hgrow="ALWAYS" styleClass="spotify-slider"/>
-                                        <Label fx:id="lblTotalTime" text="0:00" styleClass="lbl-time"/>
-                                    </HBox>
+                                    <SeekBar fx:id="moodSeekBar"/>
                                 </VBox>
 
                             </VBox>
@@ -230,12 +219,7 @@
                                         <Button fx:id="btnNext" text="▷|" onAction="#onNext" styleClass="btn-spotify-flat"/>
                                         <ToggleButton fx:id="btnPlaylistLoop" text="↺" onAction="#onTogglePlaylistLoop" styleClass="btn-spotify-flat"/>
                                     </HBox>
-                                    <!-- Barra de progreso del playlist -->
-                                    <HBox spacing="6" alignment="CENTER" styleClass="progress-container">
-                                        <Label fx:id="lblPlCurrentTime" text="0:00" styleClass="lbl-time"/>
-                                        <Slider fx:id="plProgressSlider" HBox.hgrow="ALWAYS" styleClass="spotify-slider"/>
-                                        <Label fx:id="lblPlTotalTime" text="0:00" styleClass="lbl-time"/>
-                                    </HBox>
+                                    <SeekBar fx:id="playlistSeekBar"/>
                                 </VBox>
 
                             </VBox>
