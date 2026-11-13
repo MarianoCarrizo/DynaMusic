@@ -144,6 +144,20 @@ class SceneTest {
     }
 
     @Test
+    void setBackgroundForSlotReplacesTheExistingOverride() {
+        Scene scene = new Scene("S");
+        BackgroundConfig first = new BackgroundConfig();
+        first.setPath("C:/first.png");
+        BackgroundConfig second = new BackgroundConfig();
+        second.setPath("C:/second.png");
+        scene.setBackground(AuraSlot.RAGED, first);
+
+        scene.setBackground(AuraSlot.RAGED, second);
+
+        assertSame(second, scene.backgroundFor(AuraSlot.RAGED));
+    }
+
+    @Test
     void copyDuplicatesSlotOverridesIndependently() {
         Scene a = new Scene("S");
         BackgroundConfig override = new BackgroundConfig();

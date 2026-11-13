@@ -46,6 +46,17 @@ class BackgroundConfigTest {
     }
 
     @Test
+    void sameLookTreatsDefaultsAsEqualToUnset() {
+        BackgroundConfig unset = new BackgroundConfig();
+        BackgroundConfig explicit = new BackgroundConfig();
+        explicit.setPlaybackRate(1.0);
+        explicit.setBoomerangEnabled(false);
+
+        assertTrue(unset.sameLook(explicit));
+        assertTrue(explicit.sameLook(unset));
+    }
+
+    @Test
     void sameLookIsFalseForNull() {
         assertFalse(full().sameLook(null));
     }

@@ -1,10 +1,6 @@
-package com.marianocarrizo.dynamicMusic.Controller;
+package com.marianocarrizo.dynamicMusic.model;
 
-import com.marianocarrizo.dynamicMusic.model.AuraSlot;
-import com.marianocarrizo.dynamicMusic.model.BackgroundConfig;
-import com.marianocarrizo.dynamicMusic.model.Scene;
-
-enum BackgroundTarget {
+public enum BackgroundTarget {
     SCENE_DEFAULT("Scene default", null),
     PAUSED("Paused", AuraSlot.PAUSED),
     NORMAL("Normal", AuraSlot.NORMAL),
@@ -20,23 +16,23 @@ enum BackgroundTarget {
         this.slot = slot;
     }
 
-    static BackgroundTarget of(AuraSlot slot) {
+    public static BackgroundTarget of(AuraSlot slot) {
         for (BackgroundTarget target : values()) {
             if (target.slot == slot) return target;
         }
         return SCENE_DEFAULT;
     }
 
-    String label() { return label; }
+    public String label() { return label; }
 
-    AuraSlot slot() { return slot; }
+    public AuraSlot slot() { return slot; }
 
-    BackgroundConfig configIn(Scene scene) {
+    public BackgroundConfig configIn(Scene scene) {
         if (slot == null) return scene.getBackground();
         return scene.hasOwnBackground(slot) ? scene.backgroundFor(slot) : null;
     }
 
-    BackgroundConfig editableIn(Scene scene) {
+    public BackgroundConfig getOrCreateIn(Scene scene) {
         BackgroundConfig existing = configIn(scene);
         if (existing != null) return existing;
         BackgroundConfig created = new BackgroundConfig();
@@ -45,7 +41,7 @@ enum BackgroundTarget {
         return created;
     }
 
-    void clearIn(Scene scene) {
+    public void clearIn(Scene scene) {
         if (slot == null) {
             BackgroundConfig cleared = new BackgroundConfig();
             cleared.setFitMode(scene.getBackground().getFitMode());

@@ -37,8 +37,12 @@ public class BackgroundConfig {
                 && Objects.equals(fitMode, other.fitMode)
                 && Objects.equals(segmentStartMs, other.segmentStartMs)
                 && Objects.equals(segmentEndMs, other.segmentEndMs)
-                && Objects.equals(playbackRate, other.playbackRate)
-                && Objects.equals(boomerangEnabled, other.boomerangEnabled);
+                && effectiveRate() == other.effectiveRate()
+                && Boolean.TRUE.equals(boomerangEnabled) == Boolean.TRUE.equals(other.boomerangEnabled);
+    }
+
+    private double effectiveRate() {
+        return playbackRate != null ? playbackRate : 1.0;
     }
 
     public BackgroundConfig copy() {

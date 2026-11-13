@@ -11,6 +11,8 @@ import com.marianocarrizo.dynamicMusic.model.AuraConfig;
 import com.marianocarrizo.dynamicMusic.model.AuraPreset;
 import com.marianocarrizo.dynamicMusic.model.AuraSlot;
 import com.marianocarrizo.dynamicMusic.model.BackgroundConfig;
+import com.marianocarrizo.dynamicMusic.model.BackgroundResolver;
+import com.marianocarrizo.dynamicMusic.model.BackgroundTarget;
 import com.marianocarrizo.dynamicMusic.model.PlaylistItem;
 import com.marianocarrizo.dynamicMusic.model.Scene;
 import com.marianocarrizo.dynamicMusic.service.MusicService;
@@ -535,7 +537,7 @@ public class PlayerController implements SceneHost {
         FileChooser chooser = BackgroundEditorController.newBackgroundChooser(sessionConfig.getLastImageFolderPath());
         File file = chooser.showOpenDialog(mainRoot.getScene().getWindow());
         if (file == null) return;
-        BackgroundConfig cfg = BackgroundTarget.of(slot).editableIn(sessionConfig.getActiveScene());
+        BackgroundConfig cfg = BackgroundTarget.of(slot).getOrCreateIn(sessionConfig.getActiveScene());
         cfg.setPath(file.getAbsolutePath());
         cfg.setSegmentStartMs(null);
         cfg.setSegmentEndMs(null);
@@ -947,7 +949,7 @@ public class PlayerController implements SceneHost {
             }
         }
 
-        applyBackgroundToAmbiance();
+        showLiveBackground();
 
         if (ambianceStage != null) {
             Map<AuraSlot, AuraConfig> auras = new EnumMap<>(AuraSlot.class);
@@ -1052,19 +1054,19 @@ public class PlayerController implements SceneHost {
 
     @Override
     public void applyBackground() {
-        applyBackgroundToAmbiance();
+        applyBackgroundIfChanged(liveSlot());
     }
 
     @Override
     public void applyFitMode() {
         if (ambianceStage == null) return;
-        BackgroundConfig bg = currentBackground();
-        ambianceStage.setBackgroundFitMode(BackgroundFitMode.fromString(bg.getFitMode()));
-        if (appliedBackground != null) appliedBackground.setFitMode(bg.getFitMode());
+        BackgroundConfig live = resolveBackground(liveSlot());
+        ambianceStage.setBackgroundFitMode(BackgroundFitMode.fromString(live.getFitMode()));
+        if (appliedBackground != null) appliedBackground.setFitMode(live.getFitMode());
     }
 
     private BackgroundConfig currentBackground() {
-        return sessionConfig.getActiveScene().backgroundFor(ambianceStage.getActiveSlot());
+        return sessionConfig.getActiveScene().backgroundFor(liveSlot());
     }
 
     private void activateSlot(AuraSlot slot) {
@@ -1076,33 +1078,21 @@ public class PlayerController implements SceneHost {
     private void applyBackgroundIfChanged(AuraSlot slot) {
         if (ambianceStage == null) return;
         BackgroundConfig next = resolveBackground(slot);
-        if (appliedBackground == null || !appliedBackground.sameLook(next)) showBackground(next);
+        if (BackgroundResolver.needsShow(appliedBackground, next)) showBackground(next);
     }
 
-    private void applyBackgroundToAmbiance() {
+    private void showLiveBackground() {
         if (ambianceStage == null) return;
         showBackground(resolveBackground(liveSlot()));
     }
 
     private BackgroundConfig resolveBackground(AuraSlot slot) {
-        Scene scene = sessionConfig.getActiveScene();
-        BackgroundConfig first = scene.backgroundFor(slot);
-        dropUnusableMedia(first);
-        BackgroundConfig effective = scene.backgroundFor(slot);
-        if (effective != first) dropUnusableMedia(effective);
-        return effective;
+        return BackgroundResolver.resolve(
+                sessionConfig.getActiveScene(), slot, this::isUsableMedia, ffmpegAvailable);
     }
 
-    private void dropUnusableMedia(BackgroundConfig bg) {
-        String bgPath = bg.getPath();
-        if (bgPath != null && boomerangBaker.isCachePath(bgPath)) {
-            bg.setPath(null);
-            bg.setSegmentStartMs(null);
-            bg.setSegmentEndMs(null);
-            bg.setBoomerangEnabled(false);
-        } else if (bgPath != null && !new File(bgPath).exists()) {
-            bg.setPath(null);
-        }
+    private boolean isUsableMedia(String path) {
+        return !boomerangBaker.isCachePath(path) && new File(path).exists();
     }
 
     private void showBackground(BackgroundConfig bg) {
@@ -1114,11 +1104,11 @@ public class PlayerController implements SceneHost {
 
         ambianceStage.resetBoomerang();
         ambianceStage.setBackgroundFitMode(BackgroundFitMode.fromString(bg.getFitMode()));
+        appliedBackground = bg;
 
         if (bgPath == null) {
             ambianceStage.clearVideoSegment();
             ambianceStage.setBackground(null);
-            appliedBackground = bg.copy();
             return;
         }
 
@@ -1126,27 +1116,19 @@ public class PlayerController implements SceneHost {
         if (isVideo && segStart != null && segEnd != null) {
             ambianceStage.setVideoSegment(Duration.millis(segStart), Duration.millis(segEnd));
         } else {
-            if (!isVideo) {
-                bg.setSegmentStartMs(null);
-                bg.setSegmentEndMs(null);
-            }
             ambianceStage.clearVideoSegment();
         }
         ambianceStage.setVideoRate(rate);
         ambianceStage.setBackground(bgPath);
 
-        boolean wantBoomerang = Boolean.TRUE.equals(bg.getBoomerangEnabled());
-        if (wantBoomerang && isVideo && segStart != null && segEnd != null && ffmpegAvailable) {
+        if (isVideo && Boolean.TRUE.equals(bg.getBoomerangEnabled())) {
             if (boomerangBaker.isCached(bgPath, segStart, segEnd)) {
                 ambianceStage.activateBoomerang(
                         boomerangBaker.cacheKeyPath(bgPath, segStart, segEnd).toString());
             } else {
                 startBake(bgPath, segStart, segEnd);
             }
-        } else {
-            bg.setBoomerangEnabled(false);
         }
-        appliedBackground = bg.copy();
     }
 
     /**
@@ -1166,9 +1148,10 @@ public class PlayerController implements SceneHost {
     }
 
     private boolean isBakeStillWanted(String src, long s, long e) {
-        BackgroundConfig bg = currentBackground();
+        BackgroundConfig bg = appliedBackground;
         return
-                src.equals(bg.getPath())
+                bg != null
+                && src.equals(bg.getPath())
                 && bg.getSegmentStartMs() != null
                 && s == bg.getSegmentStartMs()
                 && bg.getSegmentEndMs() != null
@@ -1187,7 +1170,9 @@ public class PlayerController implements SceneHost {
         System.err.println(stderrTail);
         if (!isBakeStillWanted(src, s, e)) return;
         if (ambianceStage != null) ambianceStage.deactivateBoomerang();
-        currentBackground().setBoomerangEnabled(false);
+        appliedBackground.setBoomerangEnabled(false);
+        BackgroundConfig persisted = currentBackground();
+        if (src.equals(persisted.getPath())) persisted.setBoomerangEnabled(false);
         manager.save(sessionConfig);
     }
 

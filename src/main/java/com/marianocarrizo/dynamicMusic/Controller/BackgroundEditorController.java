@@ -3,6 +3,7 @@ package com.marianocarrizo.dynamicMusic.Controller;
 import com.marianocarrizo.dynamicMusic.ambiance.BackgroundFitMode;
 import com.marianocarrizo.dynamicMusic.ambiance.BoomerangBaker;
 import com.marianocarrizo.dynamicMusic.model.BackgroundConfig;
+import com.marianocarrizo.dynamicMusic.model.BackgroundTarget;
 import com.marianocarrizo.dynamicMusic.model.Scene;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
@@ -585,7 +586,7 @@ public class BackgroundEditorController {
     @FXML
     private void onApplyBackground() {
         if (pendingBgPath == null) return;
-        BackgroundConfig cfg = cmbBackgroundTarget.getValue().editableIn(scene());
+        BackgroundConfig cfg = cmbBackgroundTarget.getValue().getOrCreateIn(scene());
         cfg.setPath(pendingBgPath);
         host.session().setLastImageFolderPath(new File(pendingBgPath).getParent());
         cfg.setSegmentStartMs(pendingBgStart == null ? null : (long) pendingBgStart.toMillis());
@@ -647,11 +648,16 @@ public class BackgroundEditorController {
             lblBackgroundType.setText("");
             btnEditBackground.setDisable(true);
             btnRemoveBackground.setDisable(true);
-        } else if (path == null || !new File(path).exists()) {
+        } else if (path == null) {
             lblBackgroundFile.setText("No background set");
             lblBackgroundType.setText("");
             btnEditBackground.setDisable(true);
             btnRemoveBackground.setDisable(true);
+        } else if (!new File(path).exists()) {
+            lblBackgroundFile.setText("File missing: " + new File(path).getName());
+            lblBackgroundType.setText("");
+            btnEditBackground.setDisable(true);
+            btnRemoveBackground.setDisable(false);
         } else {
             lblBackgroundFile.setText(new File(path).getName());
             lblBackgroundType.setText(mediaType(path));

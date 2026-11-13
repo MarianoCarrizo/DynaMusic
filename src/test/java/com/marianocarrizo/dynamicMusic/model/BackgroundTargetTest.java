@@ -1,12 +1,10 @@
-package com.marianocarrizo.dynamicMusic.Controller;
+package com.marianocarrizo.dynamicMusic.model;
 
-import com.marianocarrizo.dynamicMusic.model.AuraSlot;
-import com.marianocarrizo.dynamicMusic.model.BackgroundConfig;
-import com.marianocarrizo.dynamicMusic.model.Scene;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -34,7 +32,7 @@ class BackgroundTargetTest {
     void sceneDefaultTargetEditsTheSceneBackground() {
         Scene scene = new Scene("S");
         assertSame(scene.getBackground(), BackgroundTarget.SCENE_DEFAULT.configIn(scene));
-        assertSame(scene.getBackground(), BackgroundTarget.SCENE_DEFAULT.editableIn(scene));
+        assertSame(scene.getBackground(), BackgroundTarget.SCENE_DEFAULT.getOrCreateIn(scene));
     }
 
     @Test
@@ -44,7 +42,7 @@ class BackgroundTargetTest {
 
         assertNull(BackgroundTarget.RAGED.configIn(scene));
 
-        BackgroundConfig created = BackgroundTarget.RAGED.editableIn(scene);
+        BackgroundConfig created = BackgroundTarget.RAGED.getOrCreateIn(scene);
         created.setPath("C:/raged.png");
 
         assertEquals("FIT", created.getFitMode());
@@ -53,10 +51,24 @@ class BackgroundTargetTest {
     }
 
     @Test
+    void getOrCreateReplacesAnOverrideWithABlankPath() {
+        Scene scene = new Scene("S");
+        BackgroundConfig blank = new BackgroundConfig();
+        blank.setPath(" ");
+        scene.setBackground(AuraSlot.NORMAL, blank);
+
+        BackgroundConfig created = BackgroundTarget.NORMAL.getOrCreateIn(scene);
+
+        assertNotSame(blank, created);
+        created.setPath("C:/normal.png");
+        assertSame(created, scene.backgroundFor(AuraSlot.NORMAL));
+    }
+
+    @Test
     void clearingASlotFallsBackToTheSceneDefault() {
         Scene scene = new Scene("S");
         scene.getBackground().setPath("C:/default.png");
-        BackgroundTarget.PAUSED.editableIn(scene).setPath("C:/paused.png");
+        BackgroundTarget.PAUSED.getOrCreateIn(scene).setPath("C:/paused.png");
 
         BackgroundTarget.PAUSED.clearIn(scene);
 
@@ -69,7 +81,7 @@ class BackgroundTargetTest {
         Scene scene = new Scene("S");
         scene.getBackground().setPath("C:/default.png");
         scene.getBackground().setFitMode("STRETCH");
-        BackgroundTarget.NORMAL.editableIn(scene).setPath("C:/normal.png");
+        BackgroundTarget.NORMAL.getOrCreateIn(scene).setPath("C:/normal.png");
 
         BackgroundTarget.SCENE_DEFAULT.clearIn(scene);
 
