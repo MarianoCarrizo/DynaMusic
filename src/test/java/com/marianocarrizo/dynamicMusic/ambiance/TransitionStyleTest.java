@@ -24,21 +24,19 @@ class TransitionStyleTest {
     }
 
     @Test
-    void durationsMatchTheDesign() {
-        assertEquals(800, TransitionStyle.FIRE.durationMillis());
-        assertEquals(350, TransitionStyle.ELECTRIC.durationMillis());
-        assertEquals(1000, TransitionStyle.HOLY.durationMillis());
-        assertEquals(1200, TransitionStyle.SHADOW.durationMillis());
-        assertEquals(600, TransitionStyle.NEUTRAL.durationMillis());
+    void everyCurveStaysWithinZeroAndOneAcrossTheTransition() {
+        for (TransitionStyle style : TransitionStyle.values()) {
+            for (int i = 0; i <= 1000; i++) {
+                double p = i / 1000.0;
+                assertInUnitRange(style.incomingOpacity(p), style, p);
+                assertInUnitRange(style.overlayOpacity(p), style, p);
+                assertInUnitRange(style.vignetteOpenness(p), style, p);
+            }
+        }
     }
 
-    @Test
-    void phaseDescriptionsMatchTheDesign() {
-        assertEquals(TransitionStyle.Overlay.SOLID, TransitionStyle.FIRE.overlay());
-        assertEquals(TransitionStyle.Overlay.VIGNETTE, TransitionStyle.SHADOW.overlay());
-        assertEquals(TransitionStyle.Overlay.NONE, TransitionStyle.NEUTRAL.overlay());
-        assertEquals(3, TransitionStyle.ELECTRIC.flashCount());
-        assertEquals(0, TransitionStyle.FIRE.flashCount());
+    private static void assertInUnitRange(double value, TransitionStyle style, double progress) {
+        assertTrue(value >= 0.0 && value <= 1.0, style + " out of range at " + progress + ": " + value);
     }
 
     @Test

@@ -950,14 +950,13 @@ public class PlayerController implements SceneHost {
             }
         }
 
-        showLiveBackground();
-
         if (ambianceStage != null) {
             Map<AuraSlot, AuraConfig> auras = new EnumMap<>(AuraSlot.class);
             for (AuraSlot slot : AuraSlot.values()) auras.put(slot, scene.getAura(slot));
             ambianceStage.setAuras(auras);
+            ambianceStage.setActiveSlot(liveSlot());
         }
-        activateSlot(liveSlot());
+        showLiveBackground();
 
         refreshCards();
         updateButtons();
