@@ -4,7 +4,7 @@
 <?import javafx.geometry.Insets?>
 
 <VBox xmlns:fx="http://javafx.com/fxml/1"
-      fx:controller="com.marianocarrizo.dynamicMusic.Controller.SceneEditorController"
+      fx:controller="com.marianocarrizo.dynamusic.controller.SceneEditorController"
       styleClass="window-root-transparent"
       spacing="0">
 
@@ -25,7 +25,12 @@
                 <content>
                     <ScrollPane fitToWidth="true" hbarPolicy="NEVER" styleClass="editor-scroll">
                         <content>
-                            <fx:include fx:id="backgroundEditor" source="background_editor.fxml"/>
+                            <VBox>
+                                <padding>
+                                    <Insets top="14" right="14" bottom="14" left="14"/>
+                                </padding>
+                                <fx:include fx:id="backgroundEditor" source="background_editor.fxml"/>
+                            </VBox>
                         </content>
                     </ScrollPane>
                 </content>

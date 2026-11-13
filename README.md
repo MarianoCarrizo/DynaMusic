@@ -1,6 +1,6 @@
-<p align="center"><img src="docs/logo/dynamicmusic.svg" width="128" alt="DynamicMusic logo"></p>
+<p align="center"><img src="docs/logo/logo-256.png" width="128" alt="DynaMusic logo"></p>
 
-# DynamicMusic
+# DynaMusic
 
 Reproductor de música y ambientación para sesiones de rol de mesa. Cada **escena** tiene cuatro moods (PAUSED, NORMAL, RAGED, ADVANTAGE) con su track, un fondo de imagen o video y un **aura** visual que reacciona a la música. Durante la partida cambiás de mood con el teclado y todo acompaña el momento.
 
@@ -20,7 +20,7 @@ Proyecto personal, sin fines comerciales.
 
 ## Instalar
 
-Bajá `DynamicMusic-Setup-X.Y.Z.exe` desde [Releases](https://github.com/MarianoCarrizo/DynamicMusic/releases) y seguí el instalador. Trae todo lo necesario (Java y ffmpeg), no pide administrador y se actualiza solo: cuando hay una versión nueva aparece un aviso para instalarla ahora o al cerrar.
+Bajá `DynaMusic-Setup-X.Y.Z.exe` desde [Releases](https://github.com/MarianoCarrizo/DynaMusic/releases) y seguí el instalador. Trae todo lo necesario (Java y ffmpeg), no pide administrador y se actualiza solo: cuando hay una versión nueva aparece un aviso para instalarla ahora o al cerrar.
 
 Opcional: **Node.js** o **Deno** mejoran la descarga desde YouTube.
 
@@ -43,7 +43,7 @@ Opcional: **Node.js** o **Deno** mejoran la descarga desde YouTube.
 
 **Soportados:** MP3, WAV y FLAC. **No soportados:** OGG, Opus, M4A/AAC, WMA, AIFF y otros (no aparecen en la biblioteca). Lo que se baja de YouTube se guarda como MP3.
 
-Tus escenas y descargas se guardan en `%APPDATA%\DynamicMusic` y no se borran al actualizar ni desinstalar.
+Tus escenas y descargas se guardan en `%APPDATA%\DynaMusic` y no se borran al actualizar ni desinstalar.
 
 ## Correr desde el código
 
@@ -53,13 +53,17 @@ Con JDK 21 y ffmpeg en el PATH:
 ./mvnw javafx:run
 ```
 
+## Estado del proyecto
+
+El código está en un refactor gradual, módulo por módulo, para mejorar su estructura y legibilidad. El plan y el avance están en [#28](https://github.com/MarianoCarrizo/DynaMusic/issues/28).
+
 ## Aviso sobre YouTube
 
 La descarga de audio de YouTube es para uso personal. Respetar los derechos de autor y los términos de servicio de YouTube es responsabilidad de quien usa la app.
 
 ## Apoyar el proyecto
 
-DynamicMusic es gratis y open source. Si te sirve en tus partidas, podés invitarme un cafecito:
+DynaMusic es gratis y open source. Si te sirve en tus partidas, podés invitarme un cafecito:
 
 [![Invitame un café en cafecito.app](https://cdn.cafecito.app/imgs/buttons/button_5.svg)](https://cafecito.app/duhonha)
 

@@ -1,4 +1,4 @@
-module com.marianocarrizo.dynamicMusic {
+module com.marianocarrizo.dynamusic {
     requires java.net.http;
 
     // Dependencias de JavaFX
@@ -20,17 +20,17 @@ module com.marianocarrizo.dynamicMusic {
     requires com.google.gson;
 
     // Punto de entrada de la aplicación (Application.launch lo necesita)
-    exports com.marianocarrizo.dynamicMusic;
+    exports com.marianocarrizo.dynamusic;
 
     // Reflective access para JavaFX Application en el arranque
-    opens com.marianocarrizo.dynamicMusic to javafx.graphics;
+    opens com.marianocarrizo.dynamusic to javafx.graphics;
 
     // Reflective access para inyección FXML (@FXML) en el controlador
-    opens com.marianocarrizo.dynamicMusic.Controller to javafx.fxml;
+    opens com.marianocarrizo.dynamusic.controller to javafx.fxml;
 
     // Reflective access para Gson sobre el POJO de configuración de sesión
-    opens com.marianocarrizo.dynamicMusic.config to com.google.gson;
+    opens com.marianocarrizo.dynamusic.config to com.google.gson;
 
     // Reflective access para Gson sobre las POJOs del modelo (Playlist, etc.)
-    opens com.marianocarrizo.dynamicMusic.model to com.google.gson;
+    opens com.marianocarrizo.dynamusic.model to com.google.gson;
 }
