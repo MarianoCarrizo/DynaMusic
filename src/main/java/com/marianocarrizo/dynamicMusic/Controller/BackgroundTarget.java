@@ -20,6 +20,13 @@ enum BackgroundTarget {
         this.slot = slot;
     }
 
+    static BackgroundTarget of(AuraSlot slot) {
+        for (BackgroundTarget target : values()) {
+            if (target.slot == slot) return target;
+        }
+        return SCENE_DEFAULT;
+    }
+
     String label() { return label; }
 
     AuraSlot slot() { return slot; }

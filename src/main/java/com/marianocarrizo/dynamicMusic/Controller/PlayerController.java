@@ -62,6 +62,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.stage.DirectoryChooser;
+import javafx.stage.FileChooser;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.util.Duration;
@@ -514,8 +515,45 @@ public class PlayerController implements SceneHost {
             e.consume();
         });
 
+        button.setContextMenu(backgroundMenu(AuraSlot.of(type)));
+
         moodButtons.put(type, button);
         moodCards.put(type, card);
+    }
+
+    private ContextMenu backgroundMenu(AuraSlot slot) {
+        MenuItem choose = new MenuItem("Choose...");
+        choose.setOnAction(e -> chooseBackgroundFor(slot));
+        MenuItem useScene = new MenuItem("Use scene background");
+        useScene.setOnAction(e -> useSceneBackgroundFor(slot));
+        ContextMenu menu = new ContextMenu(new Menu("Background", null, choose, useScene));
+        menu.setOnShowing(e -> useScene.setDisable(!sessionConfig.getActiveScene().hasOwnBackground(slot)));
+        return menu;
+    }
+
+    private void chooseBackgroundFor(AuraSlot slot) {
+        FileChooser chooser = BackgroundEditorController.newBackgroundChooser(sessionConfig.getLastImageFolderPath());
+        File file = chooser.showOpenDialog(mainRoot.getScene().getWindow());
+        if (file == null) return;
+        BackgroundConfig cfg = BackgroundTarget.of(slot).editableIn(sessionConfig.getActiveScene());
+        cfg.setPath(file.getAbsolutePath());
+        cfg.setSegmentStartMs(null);
+        cfg.setSegmentEndMs(null);
+        cfg.setPlaybackRate(1.0);
+        cfg.setBoomerangEnabled(false);
+        sessionConfig.setLastImageFolderPath(file.getParent());
+        onSlotBackgroundEdited();
+    }
+
+    private void useSceneBackgroundFor(AuraSlot slot) {
+        sessionConfig.getActiveScene().clearBackground(slot);
+        onSlotBackgroundEdited();
+    }
+
+    private void onSlotBackgroundEdited() {
+        manager.save(sessionConfig);
+        applyBackgroundIfChanged(liveSlot());
+        if (sceneEditor != null) sceneEditor.refreshBackground();
     }
 
     private File audioFileIn(Dragboard db) {
@@ -1032,6 +1070,11 @@ public class PlayerController implements SceneHost {
     private void activateSlot(AuraSlot slot) {
         if (ambianceStage == null) return;
         ambianceStage.setActiveSlot(slot);
+        applyBackgroundIfChanged(slot);
+    }
+
+    private void applyBackgroundIfChanged(AuraSlot slot) {
+        if (ambianceStage == null) return;
         BackgroundConfig next = resolveBackground(slot);
         if (appliedBackground == null || !appliedBackground.sameLook(next)) showBackground(next);
     }

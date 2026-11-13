@@ -23,6 +23,14 @@ class BackgroundTargetTest {
     }
 
     @Test
+    void ofMapsEachSlotToItsTargetAndNullToTheSceneDefault() {
+        for (AuraSlot slot : AuraSlot.values()) {
+            assertEquals(slot, BackgroundTarget.of(slot).slot());
+        }
+        assertEquals(BackgroundTarget.SCENE_DEFAULT, BackgroundTarget.of(null));
+    }
+
+    @Test
     void sceneDefaultTargetEditsTheSceneBackground() {
         Scene scene = new Scene("S");
         assertSame(scene.getBackground(), BackgroundTarget.SCENE_DEFAULT.configIn(scene));

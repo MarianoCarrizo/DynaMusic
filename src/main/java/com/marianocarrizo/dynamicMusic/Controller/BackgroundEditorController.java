@@ -184,18 +184,7 @@ public class BackgroundEditorController {
 
     @FXML
     private void onSetBackground() {
-        FileChooser chooser = new FileChooser();
-        chooser.setTitle("Select background for ambiance");
-        chooser.getExtensionFilters().add(
-                new FileChooser.ExtensionFilter("Background (images/video)",
-                        "*.png", "*.jpg", "*.jpeg", "*.bmp", "*.gif", "*.mp4", "*.avi"));
-
-        String lastImgDir = host.session().getLastImageFolderPath();
-        if (lastImgDir != null) {
-            File dir = new File(lastImgDir);
-            if (dir.isDirectory()) chooser.setInitialDirectory(dir);
-        }
-
+        FileChooser chooser = newBackgroundChooser(host.session().getLastImageFolderPath());
         File file = chooser.showOpenDialog(bgPreviewPanel.getScene().getWindow());
         if (file == null) return;
 
@@ -208,6 +197,19 @@ public class BackgroundEditorController {
         pendingBgRate = 1.0;
         resetPendingControls();
         loadBgPreview(pendingBgPath);
+    }
+
+    static FileChooser newBackgroundChooser(String lastImageFolder) {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Select background for ambiance");
+        chooser.getExtensionFilters().add(
+                new FileChooser.ExtensionFilter("Background (images/video)",
+                        "*.png", "*.jpg", "*.jpeg", "*.bmp", "*.gif", "*.mp4", "*.avi"));
+        if (lastImageFolder != null) {
+            File dir = new File(lastImageFolder);
+            if (dir.isDirectory()) chooser.setInitialDirectory(dir);
+        }
+        return chooser;
     }
 
     private void resetPendingControls() {
