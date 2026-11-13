@@ -13,6 +13,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 public final class DataFolderMigration {
 
     static final String LEGACY_FOLDER_NAME = "DynamicMusic";
+    private static final String SESSION_FILE = "session.json";
 
     private DataFolderMigration() {
     }
@@ -31,21 +32,44 @@ public final class DataFolderMigration {
     }
 
     static boolean migrate(Path oldDir, Path newDir) {
-        if (Files.exists(newDir) || !Files.isDirectory(oldDir)) {
+        if (!Files.isDirectory(oldDir)) {
             return false;
+        }
+        if (Files.exists(newDir)) {
+            return hasSession(newDir) ? false : mergeInto(oldDir, newDir);
         }
         try {
             Files.move(oldDir, newDir);
             return true;
         } catch (IOException moveFailure) {
+            System.err.println("[migration] could not move " + oldDir + ", copying instead: " + moveFailure);
             return copyThenDelete(oldDir, newDir);
         }
+    }
+
+    private static boolean hasSession(Path dir) {
+        return Files.exists(dir.resolve(SESSION_FILE));
+    }
+
+    private static boolean mergeInto(Path oldDir, Path newDir) {
+        if (!hasSession(oldDir)) {
+            return false;
+        }
+        try {
+            copyTree(oldDir, newDir);
+        } catch (IOException | UncheckedIOException copyFailure) {
+            System.err.println("[migration] could not merge " + oldDir + " into " + newDir + ": " + copyFailure);
+            return false;
+        }
+        deleteQuietly(oldDir);
+        return true;
     }
 
     private static boolean copyThenDelete(Path oldDir, Path newDir) {
         try {
             copyTree(oldDir, newDir);
         } catch (IOException | UncheckedIOException copyFailure) {
+            System.err.println("[migration] could not copy " + oldDir + ", keeping it in place: " + copyFailure);
             deleteQuietly(newDir);
             return false;
         }
@@ -63,8 +87,10 @@ public final class DataFolderMigration {
 
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                Files.copy(file, target.resolve(source.relativize(file).toString()),
-                        StandardCopyOption.COPY_ATTRIBUTES);
+                Path destination = target.resolve(source.relativize(file).toString());
+                if (!Files.exists(destination)) {
+                    Files.copy(file, destination, StandardCopyOption.COPY_ATTRIBUTES);
+                }
                 return FileVisitResult.CONTINUE;
             }
         });

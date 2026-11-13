@@ -56,6 +56,22 @@ class DataFolderMigrationTest {
     }
 
     @Test
+    void mergesOldDataIntoANewFolderThatHasNoSession() throws IOException {
+        Path oldDir = populate(root.resolve("DynamicMusic"));
+        Path newDir = Files.createDirectories(root.resolve("DynaMusic").resolve("bin"));
+        Files.writeString(newDir.resolve("yt-dlp.exe"), "fresh");
+        Files.writeString(oldDir.resolve("bin").resolve("yt-dlp.exe"), "stale");
+        Path newRoot = newDir.getParent();
+
+        assertTrue(DataFolderMigration.migrate(oldDir, newRoot));
+
+        assertFalse(Files.exists(oldDir));
+        assertEquals("{}", Files.readString(newRoot.resolve("session.json")));
+        assertEquals("audio", Files.readString(newRoot.resolve("library").resolve("a.mp3")));
+        assertEquals("fresh", Files.readString(newRoot.resolve("bin").resolve("yt-dlp.exe")));
+    }
+
+    @Test
     void doesNothingWhenNeitherExists() {
         Path oldDir = root.resolve("DynamicMusic");
         Path newDir = root.resolve("DynaMusic");
