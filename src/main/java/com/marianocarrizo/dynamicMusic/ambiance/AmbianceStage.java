@@ -7,8 +7,11 @@ import com.marianocarrizo.dynamicMusic.service.AudioFeatures;
 import javafx.animation.Interpolator;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
+import javafx.animation.PauseTransition;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
+import javafx.beans.property.DoubleProperty;
+import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.geometry.Rectangle2D;
@@ -24,6 +27,9 @@ import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
 import javafx.scene.media.MediaView;
 import javafx.scene.paint.Color;
+import javafx.scene.paint.CycleMethod;
+import javafx.scene.paint.RadialGradient;
+import javafx.scene.paint.Stop;
 import javafx.scene.shape.Rectangle;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
@@ -34,6 +40,7 @@ import java.io.File;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -48,6 +55,11 @@ import java.util.function.Supplier;
 public class AmbianceStage {
 
     private static final boolean DEBUG_MODE = Boolean.getBoolean("dynamicmusic.debug");
+
+    private static final double READY_TIMEOUT_MILLIS = 4000;
+    private static final double VIGNETTE_MAX_RADIUS = 1.2;
+    private static final double VIGNETTE_CLEAR_STOP = 0.6;
+    private static final double VIGNETTE_MIN_RADIUS = 0.001;
 
     private static final Set<String> STATIC_IMAGE_EXT = Set.of("png", "jpg", "jpeg", "bmp");
     private static final Set<String> VIDEO_EXT        = Set.of("mp4", "avi");
@@ -66,6 +78,18 @@ public class AmbianceStage {
     private ProgressIndicator  loadingIndicator;
 
     private MediaPlayer currentPlayer;
+
+    private StackPane layer;
+    private StackPane outgoingLayer;
+    private MediaPlayer outgoingPlayer;
+    private Rectangle transitionOverlay;
+    private Timeline transition;
+    private TransitionStyle pendingStyle = TransitionStyle.NEUTRAL;
+    private Color pendingOverlayColor = Color.BLACK;
+    private boolean incomingReady = false;
+    private int transitionToken = 0;
+    private PauseTransition readyWatchdog;
+    private boolean reloadPending = false;
 
     private final AuraRenderer auraRenderer = new AuraRenderer(this::applyBackgroundPulse);
     private final Map<AuraSlot, AuraConfig> auras = new EnumMap<>(AuraSlot.class);
@@ -135,29 +159,15 @@ public class AmbianceStage {
     private void buildScene() {
         root          = new StackPane();
         scene         = new Scene(root);
-        imageView     = new ImageView();
-        defaultBase   = new ImageView();
-        defaultTop    = new ImageView();
-        mediaView     = new MediaView();
         auraCanvas    = new Canvas();
 
-        root.getChildren().addAll(defaultBase, defaultTop, imageView, mediaView);
-
-        imageView.setPreserveRatio(false);
-        imageView.fitWidthProperty().bind(scene.widthProperty());
-        imageView.fitHeightProperty().bind(scene.heightProperty());
-
-        mediaView.fitWidthProperty().bind(scene.widthProperty());
-        mediaView.fitHeightProperty().bind(scene.heightProperty());
-
-        imageView.setVisible(false);
-        mediaView.setVisible(false);
-        defaultBase.setVisible(false);
-        defaultTop.setVisible(false);
-        userBackgroundActive = false;
-        targetPreset = null;
-        shownPreset  = null;
-        topPreset    = null;
+        outgoingLayer = null;
+        outgoingPlayer = null;
+        transition = null;
+        incomingReady = false;
+        layer = buildBackgroundLayer();
+        transitionOverlay = buildTransitionOverlay();
+        root.getChildren().addAll(layer, transitionOverlay);
 
         auraCanvas.setMouseTransparent(true);
         auraCanvas.widthProperty().bind(scene.widthProperty());
@@ -235,6 +245,41 @@ public class AmbianceStage {
         refreshDefaultBackground();
     }
 
+    private StackPane buildBackgroundLayer() {
+        imageView   = new ImageView();
+        defaultBase = new ImageView();
+        defaultTop  = new ImageView();
+        mediaView   = new MediaView();
+
+        imageView.setPreserveRatio(false);
+        imageView.fitWidthProperty().bind(scene.widthProperty());
+        imageView.fitHeightProperty().bind(scene.heightProperty());
+
+        mediaView.fitWidthProperty().bind(scene.widthProperty());
+        mediaView.fitHeightProperty().bind(scene.heightProperty());
+
+        imageView.setVisible(false);
+        mediaView.setVisible(false);
+        defaultBase.setVisible(false);
+        defaultTop.setVisible(false);
+        userBackgroundActive = false;
+        targetPreset = null;
+        shownPreset  = null;
+        topPreset    = null;
+        defaultGeneration++;
+
+        return new StackPane(defaultBase, defaultTop, imageView, mediaView);
+    }
+
+    private Rectangle buildTransitionOverlay() {
+        Rectangle overlay = new Rectangle();
+        overlay.widthProperty().bind(scene.widthProperty());
+        overlay.heightProperty().bind(scene.heightProperty());
+        overlay.setMouseTransparent(true);
+        overlay.setVisible(false);
+        return overlay;
+    }
+
     // --- Apertura del stage ---
 
     /**
@@ -278,6 +323,7 @@ public class AmbianceStage {
         if (!visible) return;
         visible = false;
         auraRenderer.stop();
+        settleTransition();
         if (currentPlayer != null) currentPlayer.pause();
         stage.hide();
         notifyVisibility();
@@ -331,6 +377,7 @@ public class AmbianceStage {
      */
     private void rebuildStage(StageStyle newStyle, Screen target) {
         auraRenderer.stop();
+        cancelTransition();
         imageView.setEffect(null);
         mediaView.setEffect(null);
         defaultBase.setEffect(null);
@@ -377,7 +424,7 @@ public class AmbianceStage {
 
     private void applyCurrentStateToNewStage() {
         if (currentBackgroundPath != null) {
-            setBackground(currentBackgroundPath);
+            loadBackground(currentBackgroundPath);
         }
     }
 
@@ -455,6 +502,25 @@ public class AmbianceStage {
      * Sets a single background for the whole window:
      */
     public void setBackground(String path) {
+        setBackground(path, activeTransitionStyle());
+    }
+
+    public TransitionStyle activeTransitionStyle() {
+        AuraConfig aura = auras.get(activeSlot);
+        return TransitionStyle.forPreset(aura != null ? aura.getPreset() : null);
+    }
+
+    public void setBackground(String path, TransitionStyle style) {
+        boolean changed = !Objects.equals(path, currentBackgroundPath);
+        if (changed) {
+            reloadPending = false;
+            if (currentStyle != null && visible) beginTransition(style);
+            else settleTransition();
+        }
+        loadBackground(path);
+    }
+
+    private void loadBackground(String path) {
         currentBackgroundPath = path;
 
         if (path == null) {
@@ -576,11 +642,15 @@ public class AmbianceStage {
             defaultBase.setVisible(false);
             defaultBase.setImage(null);
             shownPreset = null;
+            if (wanted != null) markIncomingReady(transitionToken);
             return;
         }
         final AuraPreset preset = wanted;
-        whenLoaded(img, () -> {
-            if (gen == defaultGeneration) showDefault(preset, img);
+        final int token = transitionToken;
+        whenSettled(img, () -> {
+            if (gen != defaultGeneration) return;
+            if (img.isError()) markIncomingReady(token);
+            else showDefault(preset, img);
         });
     }
 
@@ -592,6 +662,7 @@ public class AmbianceStage {
             defaultBase.setVisible(true);
             applyFitToImageView(defaultBase);
             shownPreset = preset;
+            markIncomingReady(transitionToken);
             return;
         }
         topPreset = preset;
@@ -631,23 +702,6 @@ public class AmbianceStage {
         topPreset = null;
         defaultTop.setVisible(false);
         defaultTop.setImage(null);
-    }
-
-    private static void whenLoaded(Image img, Runnable action) {
-        if (img.isError()) return;
-        if (img.getProgress() >= 1.0) {
-            action.run();
-            return;
-        }
-        img.progressProperty().addListener(new ChangeListener<Number>() {
-            @Override
-            public void changed(ObservableValue<? extends Number> obs, Number o, Number n) {
-                if (n.doubleValue() >= 1.0) {
-                    img.progressProperty().removeListener(this);
-                    if (!img.isError()) action.run();
-                }
-            }
-        });
     }
 
     // --- Fit mode (public API) ---
@@ -799,6 +853,182 @@ public class AmbianceStage {
         applyFitToDefaultViews();
     }
 
+    // --- Background transitions ---
+
+    private void beginTransition(TransitionStyle style) {
+        if (transition != null) settleTransition();
+        if (outgoingLayer == null) handOverLiveLayer();
+        else discardPendingIncoming();
+        installIncomingLayer(style);
+    }
+
+    private void handOverLiveLayer() {
+        stopDefaultFade();
+        loadingIndicator.setVisible(false);
+        outgoingLayer = layer;
+        outgoingPlayer = currentPlayer;
+        if (outgoingPlayer != null) outgoingPlayer.setOnError(null);
+        currentPlayer = null;
+    }
+
+    private void discardPendingIncoming() {
+        stopReadyWatchdog();
+        stopDefaultFade();
+        disposePlayer();
+        loadingIndicator.setVisible(false);
+        root.getChildren().remove(layer);
+    }
+
+    private void installIncomingLayer(TransitionStyle style) {
+        layer = buildBackgroundLayer();
+        layer.setOpacity(0.0);
+        root.getChildren().add(root.getChildren().indexOf(outgoingLayer) + 1, layer);
+        pendingStyle = style;
+        pendingOverlayColor = overlayColorFor(style);
+        incomingReady = false;
+        transitionToken++;
+        armReadyWatchdog();
+    }
+
+    private void armReadyWatchdog() {
+        final int token = transitionToken;
+        stopReadyWatchdog();
+        readyWatchdog = new PauseTransition(Duration.millis(READY_TIMEOUT_MILLIS));
+        readyWatchdog.setOnFinished(e -> {
+            if (token != transitionToken || outgoingLayer == null || incomingReady) return;
+            loadingIndicator.setVisible(false);
+            finishTransition();
+        });
+        readyWatchdog.play();
+    }
+
+    private void stopReadyWatchdog() {
+        if (readyWatchdog != null) {
+            readyWatchdog.stop();
+            readyWatchdog = null;
+        }
+    }
+
+    private void reloadBackground() {
+        if (currentBackgroundPath == null) return;
+        if (transition != null) {
+            reloadPending = true;
+            return;
+        }
+        if (outgoingLayer == null && currentStyle != null && visible) beginTransition(TransitionStyle.NEUTRAL);
+        loadBackground(currentBackgroundPath);
+    }
+
+    private void markIncomingReady(int token) {
+        if (token != transitionToken || outgoingLayer == null || incomingReady) return;
+        incomingReady = true;
+        stopReadyWatchdog();
+        startTransition();
+    }
+
+    private void startTransition() {
+        TransitionStyle style = pendingStyle;
+        transitionOverlay.setFill(pendingOverlayColor);
+        transitionOverlay.setVisible(style.overlay() != TransitionStyle.Overlay.NONE);
+        DoubleProperty progress = new SimpleDoubleProperty(0.0);
+        progress.addListener((obs, o, n) -> applyTransitionFrame(style, n.doubleValue()));
+        applyTransitionFrame(style, 0.0);
+        transition = new Timeline(
+                new KeyFrame(Duration.ZERO, new KeyValue(progress, 0.0)),
+                new KeyFrame(Duration.millis(style.durationMillis()),
+                        new KeyValue(progress, 1.0, Interpolator.LINEAR)));
+        transition.setOnFinished(e -> {
+            boolean reload = reloadPending;
+            finishTransition();
+            if (reload) reloadBackground();
+        });
+        transition.play();
+    }
+
+    private void applyTransitionFrame(TransitionStyle style, double progress) {
+        layer.setOpacity(style.incomingOpacity(progress));
+        transitionOverlay.setOpacity(style.overlayOpacity(progress));
+        if (style.overlay() == TransitionStyle.Overlay.VIGNETTE) {
+            transitionOverlay.setFill(vignetteFill(pendingOverlayColor, style.vignetteOpenness(progress)));
+        }
+    }
+
+    private Color overlayColorFor(TransitionStyle style) {
+        AuraConfig aura = auras.get(activeSlot);
+        String primary = aura != null ? aura.getPrimaryColor() : null;
+        String secondary = aura != null ? aura.getSecondaryColor() : null;
+        int rgb = style.overlayRgb(primary, secondary);
+        return Color.rgb((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
+    }
+
+    private static RadialGradient vignetteFill(Color edge, double openness) {
+        double radius = Math.max(openness * VIGNETTE_MAX_RADIUS, VIGNETTE_MIN_RADIUS);
+        return new RadialGradient(0, 0, 0.5, 0.5, radius, true, CycleMethod.NO_CYCLE,
+                new Stop(0.0, Color.TRANSPARENT),
+                new Stop(VIGNETTE_CLEAR_STOP, Color.TRANSPARENT),
+                new Stop(1.0, edge));
+    }
+
+    private void settleTransition() {
+        if (outgoingLayer == null) return;
+        finishTransition();
+    }
+
+    private void finishTransition() {
+        stopReadyWatchdog();
+        reloadPending = false;
+        if (transition != null) {
+            transition.stop();
+            transition = null;
+        }
+        disposeOutgoing();
+        layer.setOpacity(1.0);
+        transitionOverlay.setVisible(false);
+    }
+
+    private void cancelTransition() {
+        stopReadyWatchdog();
+        reloadPending = false;
+        if (transition != null) {
+            transition.stop();
+            transition = null;
+        }
+        disposeOutgoing();
+    }
+
+    private void disposeOutgoing() {
+        if (outgoingPlayer != null) {
+            outgoingPlayer.stop();
+            outgoingPlayer.dispose();
+            outgoingPlayer = null;
+        }
+        if (outgoingLayer != null) {
+            root.getChildren().remove(outgoingLayer);
+            outgoingLayer.getChildren().clear();
+            outgoingLayer = null;
+        }
+        incomingReady = false;
+    }
+
+    private static void whenSettled(Image img, Runnable action) {
+        boolean[] fired = { false };
+        Runnable fireOnce = () -> {
+            if (fired[0]) return;
+            fired[0] = true;
+            action.run();
+        };
+        if (img.isError() || img.getProgress() >= 1.0) {
+            fireOnce.run();
+            return;
+        }
+        img.progressProperty().addListener((obs, o, n) -> {
+            if (n.doubleValue() >= 1.0) fireOnce.run();
+        });
+        img.errorProperty().addListener((obs, o, failed) -> {
+            if (failed) fireOnce.run();
+        });
+    }
+
     // --- Internal helpers ---
 
     private void disposePlayer() {
@@ -818,6 +1048,7 @@ public class AmbianceStage {
         mediaView.setVisible(false);
         userBackgroundActive = false;
         refreshDefaultBackground();
+        if (targetPreset == null) markIncomingReady(transitionToken);
     }
 
     private void setImage(File f) {
@@ -830,25 +1061,24 @@ public class AmbianceStage {
         imageView.setVisible(true);
         userBackgroundActive = true;
         refreshDefaultBackground();
-        // Aplicar modo de ajuste de inmediato; para FILL con imagen async las dimensiones
-        // pueden ser 0 todavía — el listener de width las aplica cuando estén disponibles.
+        final int token = transitionToken;
+        whenSettled(img, () -> markIncomingReady(token));
         applyFitToImageView(imageView);
-        if (currentFitMode == BackgroundFitMode.FILL) {
-            // Listener de un solo disparo: aplica el viewport FILL cuando la imagen termine de cargar
-            javafx.beans.value.ChangeListener<Number>[] listenerRef = new javafx.beans.value.ChangeListener[1];
-            listenerRef[0] = (obs, oldW, newW) -> {
-                if (newW.doubleValue() > 0 && imageView.getImage() == img) {
-                    // Re-verificar el modo: pudo cambiar mientras la imagen cargaba
-                    if (currentFitMode == BackgroundFitMode.FILL) {
-                        imageView.setViewport(computeFillViewport(
-                                img.getWidth(), img.getHeight(),
-                                scene.getWidth(), scene.getHeight()));
-                    }
-                    img.widthProperty().removeListener(listenerRef[0]);
+        applyFillViewportOnLoad(imageView, img);
+    }
+
+    private void applyFillViewportOnLoad(ImageView view, Image img) {
+        if (img.getWidth() > 0) return;
+        img.widthProperty().addListener(new ChangeListener<Number>() {
+            @Override
+            public void changed(ObservableValue<? extends Number> obs, Number oldW, Number newW) {
+                if (newW.doubleValue() <= 0) return;
+                img.widthProperty().removeListener(this);
+                if (view.getImage() == img && currentFitMode == BackgroundFitMode.FILL) {
+                    applyFitToImageView(view);
                 }
-            };
-            img.widthProperty().addListener(listenerRef[0]);
-        }
+            }
+        });
     }
 
     private void setVideo(File f) {
@@ -857,6 +1087,7 @@ public class AmbianceStage {
 
         // Incrementar generación ANTES de cualquier trabajo en background
         final int gen = ++mediaGeneration;
+        final int token = transitionToken;
 
         imageView.setVisible(false);
         imageView.setImage(null);
@@ -874,7 +1105,7 @@ public class AmbianceStage {
             try {
                 media = new Media(uri);    // sondeo nativo pesado — fuera del hilo FX
             } catch (Exception ex) {
-                Platform.runLater(this::onMediaError);
+                Platform.runLater(() -> onMediaError(gen));
                 return;
             }
             // Volver al hilo FX para construir el player y asignarlo al scene graph
@@ -885,7 +1116,13 @@ public class AmbianceStage {
                     new MediaPlayer(media).dispose(); // evitar fuga del Media ya inicializado
                     return;
                 }
-                MediaPlayer player = new MediaPlayer(media);
+                MediaPlayer player;
+                try {
+                    player = new MediaPlayer(media);
+                } catch (Exception ex) {
+                    onMediaError(gen);
+                    return;
+                }
                 currentPlayer = player;
                 player.setCycleCount(MediaPlayer.INDEFINITE);
                 player.setMute(true);
@@ -899,7 +1136,7 @@ public class AmbianceStage {
                 // al momento de ejecución — nunca capturados como locales antes del submit,
                 // para que rebuildStage() pueda reasignar los campos sin romper este callback
                 mediaView.setMediaPlayer(player);
-                player.setOnError(this::onMediaError);
+                player.setOnError(() -> onMediaError(gen));
                 // El Media ya viene parseado del hilo de fondo: el player puede llegar a READY
                 // ANTES de registrar el handler, y setOnReady no se dispara retroactivamente.
                 // Registrar y luego verificar el estado actual, con guardia de ejecución única.
@@ -911,6 +1148,7 @@ public class AmbianceStage {
                     if (currentPlayer == player && gen == mediaGeneration) {
                         loadingIndicator.setVisible(false);
                         applyFitToMediaView();
+                        markIncomingReady(token);
                         // Re-afirmar segmento en READY cuando el boomerang NO está activo
                         if (!bakedActive && segmentStart != null && segmentEnd != null) {
                             player.setStartTime(segmentStart);
@@ -927,7 +1165,8 @@ public class AmbianceStage {
         });
     }
 
-    private void onMediaError() {
+    private void onMediaError(int gen) {
+        if (gen != mediaGeneration) return;
         loadingIndicator.setVisible(false);
         clearMedia();
     }
@@ -1000,9 +1239,7 @@ public class AmbianceStage {
     public void activateBoomerang(String bakedPath) {
         this.boomerangActive = true;
         this.bakedVideoPath  = bakedPath;
-        if (currentBackgroundPath != null) {
-            setBackground(currentBackgroundPath);
-        }
+        reloadBackground();
     }
 
     /**
@@ -1011,9 +1248,7 @@ public class AmbianceStage {
     public void deactivateBoomerang() {
         this.boomerangActive = false;
         this.bakedVideoPath  = null;
-        if (currentBackgroundPath != null) {
-            setBackground(currentBackgroundPath);
-        }
+        reloadBackground();
     }
 
     /**
@@ -1043,6 +1278,7 @@ public class AmbianceStage {
 
     public void dispose() {
         auraRenderer.stop();
+        cancelTransition();
         stopDefaultFade();
         mediaInit.shutdownNow();
         disposePlayer();

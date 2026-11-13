@@ -4,9 +4,12 @@ import com.marianocarrizo.dynamicMusic.Enums.TrackType;
 import com.marianocarrizo.dynamicMusic.model.AuraConfig;
 import com.marianocarrizo.dynamicMusic.model.AuraPreset;
 import com.marianocarrizo.dynamicMusic.model.AuraSlot;
+import com.marianocarrizo.dynamicMusic.model.BackgroundTarget;
 import com.marianocarrizo.dynamicMusic.model.Scene;
+import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Parent;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ColorPicker;
@@ -21,6 +24,8 @@ import javafx.scene.paint.Color;
 import javafx.stage.FileChooser;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.EnumMap;
 import java.util.Map;
 
@@ -30,6 +35,7 @@ final class MoodTabContent extends VBox {
     private final TrackType trackType;
     private final SceneHost host;
 
+    private final BackgroundEditorController backgroundEditor;
     private boolean updating = false;
 
     private Label lblTrack;
@@ -59,6 +65,24 @@ final class MoodTabContent extends VBox {
         getChildren().add(buildColorSection());
         getChildren().add(buildLayerSection());
         getChildren().add(buildLevelSection());
+        backgroundEditor = loadBackgroundEditor();
+    }
+
+    BackgroundEditorController backgroundEditor() {
+        return backgroundEditor;
+    }
+
+    private BackgroundEditorController loadBackgroundEditor() {
+        try {
+            FXMLLoader loader = new FXMLLoader(MoodTabContent.class.getResource("/views/background_editor.fxml"));
+            Parent root = loader.load();
+            BackgroundEditorController controller = loader.getController();
+            controller.init(host, BackgroundTarget.of(slot));
+            getChildren().add(root);
+            return controller;
+        } catch (IOException e) {
+            throw new UncheckedIOException("Could not load background editor", e);
+        }
     }
 
     private VBox buildTrackSection() {

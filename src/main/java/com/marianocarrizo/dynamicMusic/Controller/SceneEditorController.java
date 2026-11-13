@@ -1,6 +1,7 @@
 package com.marianocarrizo.dynamicMusic.Controller;
 
 import com.marianocarrizo.dynamicMusic.model.AuraSlot;
+import com.marianocarrizo.dynamicMusic.model.BackgroundTarget;
 import com.marianocarrizo.dynamicMusic.model.Scene;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -8,6 +9,7 @@ import javafx.scene.Parent;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TextField;
@@ -31,6 +33,8 @@ public class SceneEditorController {
     private SceneHost host;
     private Stage stage;
     private final List<MoodTabContent> moodTabs = new ArrayList<>();
+    private final List<BackgroundEditorController> backgroundEditors = new ArrayList<>();
+    private boolean revertingTab = false;
 
     static SceneEditorController create(Window owner, SceneHost host) {
         try {
@@ -53,18 +57,27 @@ public class SceneEditorController {
                 AuraSlot.ADVANTAGE, AuraSlot.ON_DEMAND}) {
             MoodTabContent content = new MoodTabContent(slot, host);
             moodTabs.add(content);
-            Tab tab = new Tab(tabTitle(slot), content);
+            backgroundEditors.add(content.backgroundEditor());
+            ScrollPane scroll = new ScrollPane(content);
+            scroll.setFitToWidth(true);
+            scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+            scroll.getStyleClass().add("editor-scroll");
+            Tab tab = new Tab(tabTitle(slot), scroll);
             tab.setClosable(false);
+            tab.setUserData(content.backgroundEditor());
             tabPane.getTabs().add(index++, tab);
         }
+        tabBackground.setUserData(backgroundEditorController);
+        backgroundEditors.add(backgroundEditorController);
         tabPane.getSelectionModel().select(0);
+        tabPane.getSelectionModel().selectedItemProperty().addListener((o, previous, current) -> onTabChanged(previous));
 
         txtSceneName.setOnAction(e -> commitName());
         txtSceneName.focusedProperty().addListener((o, had, has) -> {
             if (had && !has) commitName();
         });
 
-        backgroundEditorController.init(host);
+        backgroundEditorController.init(host, BackgroundTarget.SCENE_DEFAULT);
 
         javafx.scene.Scene scene = new javafx.scene.Scene(root, 620, 700);
         scene.setFill(Color.web("#1e1e24"));
@@ -79,7 +92,10 @@ public class SceneEditorController {
         stage.setScene(scene);
         stage.setMinWidth(520);
         stage.setMinHeight(520);
-        stage.setOnHidden(e -> backgroundEditorController.dispose());
+        stage.setOnCloseRequest(e -> {
+            if (!confirmDiscardAll()) e.consume();
+        });
+        stage.setOnHidden(e -> backgroundEditors.forEach(BackgroundEditorController::dispose));
     }
 
     void show() {
@@ -94,7 +110,7 @@ public class SceneEditorController {
     }
 
     void dispose() {
-        backgroundEditorController.dispose();
+        backgroundEditors.forEach(BackgroundEditorController::dispose);
         if (stage != null) stage.hide();
     }
 
@@ -104,7 +120,7 @@ public class SceneEditorController {
         txtSceneName.setText(scene.getName());
         btnDeleteScene.setDisable(host.session().getScenes().size() <= 1);
         for (MoodTabContent tab : moodTabs) tab.refresh(scene);
-        backgroundEditorController.refresh();
+        backgroundEditors.forEach(BackgroundEditorController::refresh);
     }
 
     void refreshAuras() {
@@ -118,7 +134,38 @@ public class SceneEditorController {
     }
 
     void refreshBackground() {
-        backgroundEditorController.refreshLabel();
+        backgroundEditors.forEach(BackgroundEditorController::refreshLabel);
+    }
+
+    private void onTabChanged(Tab previous) {
+        if (revertingTab) return;
+        BackgroundEditorController leaving = (BackgroundEditorController) previous.getUserData();
+        if (leaving.hasUnappliedChanges() && !confirmDiscard(leaving)) {
+            revertingTab = true;
+            try {
+                tabPane.getSelectionModel().select(previous);
+            } finally {
+                revertingTab = false;
+            }
+            return;
+        }
+        leaving.discardChanges();
+    }
+
+    private boolean confirmDiscardAll() {
+        for (BackgroundEditorController editor : backgroundEditors) {
+            if (editor.hasUnappliedChanges() && !confirmDiscard(editor)) return false;
+        }
+        return true;
+    }
+
+    private boolean confirmDiscard(BackgroundEditorController editor) {
+        return ThemedDialog.confirm(
+                stage,
+                "Unapplied changes",
+                "You have unapplied background changes for " + editor.targetLabel() + ". Discard them?",
+                "Discard",
+                "Cancel");
     }
 
     private void commitName() {
