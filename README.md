@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/logo/dynamicmusic.svg" width="128" alt="DynaMusic logo"></p>
+<p align="center"><img src="docs/logo/logo-256.png" width="128" alt="DynaMusic logo"></p>
 
 # DynaMusic
 
