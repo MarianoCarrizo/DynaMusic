@@ -83,6 +83,108 @@ class SceneTest {
     }
 
     @Test
+    void backgroundForFallsBackToTheSceneDefault() {
+        Scene scene = new Scene("S");
+        scene.getBackground().setPath("C:/default.png");
+
+        for (AuraSlot slot : AuraSlot.values()) {
+            assertSame(scene.getBackground(), scene.backgroundFor(slot));
+            assertFalse(scene.hasOwnBackground(slot));
+        }
+    }
+
+    @Test
+    void backgroundForReturnsTheSlotOverrideOnlyForThatSlot() {
+        Scene scene = new Scene("S");
+        scene.getBackground().setPath("C:/default.png");
+        BackgroundConfig raged = new BackgroundConfig();
+        raged.setPath("C:/raged.mp4");
+
+        scene.setBackground(AuraSlot.RAGED, raged);
+
+        assertSame(raged, scene.backgroundFor(AuraSlot.RAGED));
+        assertTrue(scene.hasOwnBackground(AuraSlot.RAGED));
+        assertSame(scene.getBackground(), scene.backgroundFor(AuraSlot.NORMAL));
+    }
+
+    @Test
+    void blankPathOverrideFallsBack() {
+        Scene scene = new Scene("S");
+        BackgroundConfig blank = new BackgroundConfig();
+        blank.setPath(" ");
+        scene.setBackground(AuraSlot.PAUSED, blank);
+        scene.setBackground(AuraSlot.NORMAL, new BackgroundConfig());
+
+        assertFalse(scene.hasOwnBackground(AuraSlot.PAUSED));
+        assertSame(scene.getBackground(), scene.backgroundFor(AuraSlot.PAUSED));
+        assertSame(scene.getBackground(), scene.backgroundFor(AuraSlot.NORMAL));
+    }
+
+    @Test
+    void clearBackgroundRemovesTheOverride() {
+        Scene scene = new Scene("S");
+        BackgroundConfig override = new BackgroundConfig();
+        override.setPath("C:/a.png");
+        scene.setBackground(AuraSlot.ADVANTAGE, override);
+
+        scene.clearBackground(AuraSlot.ADVANTAGE);
+
+        assertFalse(scene.hasOwnBackground(AuraSlot.ADVANTAGE));
+        assertSame(scene.getBackground(), scene.backgroundFor(AuraSlot.ADVANTAGE));
+        assertDoesNotThrow(() -> scene.clearBackground(AuraSlot.ADVANTAGE));
+        assertDoesNotThrow(() -> scene.clearBackground(null));
+    }
+
+    @Test
+    void setBackgroundIgnoresNulls() {
+        Scene scene = new Scene("S");
+        scene.setBackground(null, new BackgroundConfig());
+        scene.setBackground(AuraSlot.RAGED, null);
+        assertFalse(scene.hasOwnBackground(AuraSlot.RAGED));
+    }
+
+    @Test
+    void setBackgroundForSlotReplacesTheExistingOverride() {
+        Scene scene = new Scene("S");
+        BackgroundConfig first = new BackgroundConfig();
+        first.setPath("C:/first.png");
+        BackgroundConfig second = new BackgroundConfig();
+        second.setPath("C:/second.png");
+        scene.setBackground(AuraSlot.RAGED, first);
+
+        scene.setBackground(AuraSlot.RAGED, second);
+
+        assertSame(second, scene.backgroundFor(AuraSlot.RAGED));
+    }
+
+    @Test
+    void copyDuplicatesSlotOverridesIndependently() {
+        Scene a = new Scene("S");
+        BackgroundConfig override = new BackgroundConfig();
+        override.setPath("C:/raged.png");
+        a.setBackground(AuraSlot.RAGED, override);
+
+        Scene b = a.copy();
+
+        assertNotSame(override, b.backgroundFor(AuraSlot.RAGED));
+        assertEquals("C:/raged.png", b.backgroundFor(AuraSlot.RAGED).getPath());
+        b.backgroundFor(AuraSlot.RAGED).setPath("C:/other.png");
+        b.clearBackground(AuraSlot.RAGED);
+        assertEquals("C:/raged.png", a.backgroundFor(AuraSlot.RAGED).getPath());
+    }
+
+    @Test
+    void sceneWithoutBackgroundsFieldFallsBackEverywhere() {
+        Scene scene = new Gson().fromJson("{\"background\":{\"path\":\"C:/old.png\"}}", Scene.class);
+
+        for (AuraSlot slot : AuraSlot.values()) {
+            assertFalse(scene.hasOwnBackground(slot));
+            assertEquals("C:/old.png", scene.backgroundFor(slot).getPath());
+        }
+        assertDoesNotThrow(scene::copy);
+    }
+
+    @Test
     void assignmentsRoundTripAndNullClears() {
         Scene scene = new Scene("S");
         scene.setAssignment(TrackType.PAUSED, "C:/m/p.mp3");

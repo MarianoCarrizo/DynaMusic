@@ -17,6 +17,8 @@ public class Scene {
 
     private BackgroundConfig background;
 
+    private Map<String, BackgroundConfig> backgrounds;
+
     private Map<String, AuraConfig> auras;
 
     public Scene() {
@@ -69,6 +71,27 @@ public class Scene {
     }
     public void setBackground(BackgroundConfig b) { this.background = b; }
 
+    public BackgroundConfig backgroundFor(AuraSlot slot) {
+        return hasOwnBackground(slot) ? backgrounds.get(slot.name()) : getBackground();
+    }
+
+    public boolean hasOwnBackground(AuraSlot slot) {
+        if (slot == null || backgrounds == null) return false;
+        BackgroundConfig own = backgrounds.get(slot.name());
+        return own != null && own.getPath() != null && !own.getPath().isBlank();
+    }
+
+    public void setBackground(AuraSlot slot, BackgroundConfig cfg) {
+        if (slot == null || cfg == null) return;
+        if (backgrounds == null) backgrounds = new LinkedHashMap<>();
+        backgrounds.put(slot.name(), cfg);
+    }
+
+    public void clearBackground(AuraSlot slot) {
+        if (slot == null || backgrounds == null) return;
+        backgrounds.remove(slot.name());
+    }
+
     public AuraConfig getAura(AuraSlot slot) {
         if (auras == null) auras = new LinkedHashMap<>();
         AuraConfig a = auras.get(slot.name());
@@ -105,6 +128,10 @@ public class Scene {
         s.name = name;
         s.assignments = assignments != null ? new LinkedHashMap<>(assignments) : new LinkedHashMap<>();
         s.background = background != null ? background.copy() : new BackgroundConfig();
+        s.backgrounds = new LinkedHashMap<>();
+        if (backgrounds != null) {
+            backgrounds.forEach((k, v) -> { if (v != null) s.backgrounds.put(k, v.copy()); });
+        }
         s.auras = new LinkedHashMap<>();
         if (auras != null) {
             auras.forEach((k, v) -> { if (v != null) s.auras.put(k, v.copy()); });

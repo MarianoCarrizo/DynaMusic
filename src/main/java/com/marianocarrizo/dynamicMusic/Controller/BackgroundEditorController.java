@@ -2,7 +2,9 @@ package com.marianocarrizo.dynamicMusic.Controller;
 
 import com.marianocarrizo.dynamicMusic.ambiance.BackgroundFitMode;
 import com.marianocarrizo.dynamicMusic.ambiance.BoomerangBaker;
-import com.marianocarrizo.dynamicMusic.config.SessionConfig;
+import com.marianocarrizo.dynamicMusic.model.BackgroundConfig;
+import com.marianocarrizo.dynamicMusic.model.BackgroundTarget;
+import com.marianocarrizo.dynamicMusic.model.Scene;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -35,6 +37,7 @@ public class BackgroundEditorController {
 
     @FXML private Label lblBackgroundFile;
     @FXML private Label lblBackgroundType;
+    @FXML private Button btnSetBackground;
     @FXML private Button btnEditBackground;
     @FXML private Button btnRemoveBackground;
     @FXML private ComboBox<BackgroundFitMode> cmbFitMode;
@@ -61,6 +64,7 @@ public class BackgroundEditorController {
 
     private SceneHost host;
     private boolean refreshingUI = false;
+    private BackgroundTarget target = BackgroundTarget.SCENE_DEFAULT;
 
     private final BoomerangBaker boomerangBaker = new BoomerangBaker();
 
@@ -120,25 +124,53 @@ public class BackgroundEditorController {
         bgMarkBand.widthProperty().addListener((obs, o, n) -> updateBgMarkOverlay());
     }
 
-    void init(SceneHost host) {
+    void init(SceneHost host, BackgroundTarget target) {
         this.host = host;
+        this.target = target;
+        if (target.slot() != null) btnSetBackground.setText("Choose...");
         refresh();
     }
 
     void refresh() {
         onCancelBackground();
-        SessionConfig session = host.session();
-        updateBackgroundLabel(session.getBackgroundImagePath());
-        refreshingUI = true;
-        try {
-            cmbFitMode.setValue(BackgroundFitMode.fromString(session.getBackgroundFitMode()));
-        } finally {
-            refreshingUI = false;
-        }
+        refreshTargetView();
     }
 
     void refreshLabel() {
-        updateBackgroundLabel(host.session().getBackgroundImagePath());
+        refreshTargetView();
+    }
+
+    private Scene scene() {
+        return host.session().getActiveScene();
+    }
+
+    private BackgroundConfig targetConfig() {
+        return target.configIn(scene());
+    }
+
+    private void refreshTargetView() {
+        BackgroundConfig cfg = targetConfig();
+        updateBackgroundLabel(cfg);
+        BackgroundConfig shown = cfg != null ? cfg : scene().getBackground();
+        refreshingUI = true;
+        try {
+            cmbFitMode.setValue(BackgroundFitMode.fromString(shown.getFitMode()));
+        } finally {
+            refreshingUI = false;
+        }
+        cmbFitMode.setDisable(cfg == null);
+    }
+
+    boolean hasUnappliedChanges() {
+        return pendingBgPath != null;
+    }
+
+    String targetLabel() {
+        return target.label();
+    }
+
+    void discardChanges() {
+        onCancelBackground();
     }
 
     void dispose() {
@@ -147,18 +179,7 @@ public class BackgroundEditorController {
 
     @FXML
     private void onSetBackground() {
-        FileChooser chooser = new FileChooser();
-        chooser.setTitle("Select background for ambiance");
-        chooser.getExtensionFilters().add(
-                new FileChooser.ExtensionFilter("Background (images/video)",
-                        "*.png", "*.jpg", "*.jpeg", "*.bmp", "*.gif", "*.mp4", "*.avi"));
-
-        String lastImgDir = host.session().getLastImageFolderPath();
-        if (lastImgDir != null) {
-            File dir = new File(lastImgDir);
-            if (dir.isDirectory()) chooser.setInitialDirectory(dir);
-        }
-
+        FileChooser chooser = newBackgroundChooser(host.session().getLastImageFolderPath());
         File file = chooser.showOpenDialog(bgPreviewPanel.getScene().getWindow());
         if (file == null) return;
 
@@ -171,6 +192,19 @@ public class BackgroundEditorController {
         pendingBgRate = 1.0;
         resetPendingControls();
         loadBgPreview(pendingBgPath);
+    }
+
+    static FileChooser newBackgroundChooser(String lastImageFolder) {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Select background for ambiance");
+        chooser.getExtensionFilters().add(
+                new FileChooser.ExtensionFilter("Background (images/video)",
+                        "*.png", "*.jpg", "*.jpeg", "*.bmp", "*.gif", "*.mp4", "*.avi"));
+        if (lastImageFolder != null) {
+            File dir = new File(lastImageFolder);
+            if (dir.isDirectory()) chooser.setInitialDirectory(dir);
+        }
+        return chooser;
     }
 
     private void resetPendingControls() {
@@ -356,7 +390,9 @@ public class BackgroundEditorController {
         if (refreshingUI) return;
         BackgroundFitMode mode = cmbFitMode.getValue();
         if (mode == null) return;
-        host.session().setBackgroundFitMode(mode.name());
+        BackgroundConfig cfg = targetConfig();
+        if (cfg == null) return;
+        cfg.setFitMode(mode.name());
         host.saveSession();
         host.applyFitMode();
     }
@@ -544,42 +580,43 @@ public class BackgroundEditorController {
     @FXML
     private void onApplyBackground() {
         if (pendingBgPath == null) return;
-        SessionConfig session = host.session();
-        session.setBackgroundImagePath(pendingBgPath);
-        session.setLastImageFolderPath(new File(pendingBgPath).getParent());
-        session.setVideoSegmentStartMs(pendingBgStart == null ? null : (long) pendingBgStart.toMillis());
-        session.setVideoSegmentEndMs(pendingBgEnd == null ? null : (long) pendingBgEnd.toMillis());
-        session.setVideoPlaybackRate(pendingBgRate);
-        session.setBoomerangEnabled(pendingBoomerangOn);
+        BackgroundConfig cfg = target.getOrCreateIn(scene());
+        cfg.setPath(pendingBgPath);
+        host.session().setLastImageFolderPath(new File(pendingBgPath).getParent());
+        cfg.setSegmentStartMs(pendingBgStart == null ? null : (long) pendingBgStart.toMillis());
+        cfg.setSegmentEndMs(pendingBgEnd == null ? null : (long) pendingBgEnd.toMillis());
+        cfg.setPlaybackRate(pendingBgRate);
+        cfg.setBoomerangEnabled(pendingBoomerangOn);
         host.saveSession();
         host.applyBackground();
-        updateBackgroundLabel(session.getBackgroundImagePath());
+        refreshTargetView();
         onCancelBackground();
     }
 
     @FXML
     private void onRemoveBackground() {
         onCancelBackground();
-        host.session().clearBackground();
+        target.clearIn(scene());
         host.saveSession();
         host.applyBackground();
-        updateBackgroundLabel(null);
+        refreshTargetView();
     }
 
     @FXML
     private void onEditBackground() {
-        SessionConfig session = host.session();
-        String applied = session.getBackgroundImagePath();
+        BackgroundConfig cfg = targetConfig();
+        if (cfg == null) return;
+        String applied = cfg.getPath();
         if (applied == null || !new File(applied).exists()) return;
         disposeBgPreview();
         pendingBgPath = applied;
-        Long sMs = session.getVideoSegmentStartMs();
-        Long eMs = session.getVideoSegmentEndMs();
+        Long sMs = cfg.getSegmentStartMs();
+        Long eMs = cfg.getSegmentEndMs();
         pendingBgStart = sMs == null ? null : Duration.millis(sMs);
         pendingBgEnd   = eMs == null ? null : Duration.millis(eMs);
-        double savedRate = session.getVideoPlaybackRate();
-        pendingBgRate  = savedRate != 0 ? savedRate : 1.0;
-        boolean boomOn = Boolean.TRUE.equals(session.getBoomerangEnabled());
+        Double savedRate = cfg.getPlaybackRate();
+        pendingBgRate  = savedRate != null && savedRate != 0 ? savedRate : 1.0;
+        boolean boomOn = Boolean.TRUE.equals(cfg.getBoomerangEnabled());
         pendingBoomerangOn = boomOn;
         if (boomOn && sMs != null && eMs != null
                 && boomerangBaker.isCached(applied, sMs, eMs)) {
@@ -598,12 +635,23 @@ public class BackgroundEditorController {
         updateBgSegmentLabel();
     }
 
-    private void updateBackgroundLabel(String path) {
-        if (path == null || !new File(path).exists()) {
+    private void updateBackgroundLabel(BackgroundConfig cfg) {
+        String path = cfg == null ? null : cfg.getPath();
+        if (cfg == null) {
+            lblBackgroundFile.setText("Using scene background");
+            lblBackgroundType.setText("");
+            btnEditBackground.setDisable(true);
+            btnRemoveBackground.setDisable(true);
+        } else if (path == null) {
             lblBackgroundFile.setText("No background set");
             lblBackgroundType.setText("");
             btnEditBackground.setDisable(true);
             btnRemoveBackground.setDisable(true);
+        } else if (!new File(path).exists()) {
+            lblBackgroundFile.setText("File missing: " + new File(path).getName());
+            lblBackgroundType.setText("");
+            btnEditBackground.setDisable(true);
+            btnRemoveBackground.setDisable(false);
         } else {
             lblBackgroundFile.setText(new File(path).getName());
             lblBackgroundType.setText(mediaType(path));

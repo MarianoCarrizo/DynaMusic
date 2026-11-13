@@ -4,6 +4,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.marianocarrizo.dynamicMusic.Enums.TrackType;
 import com.marianocarrizo.dynamicMusic.model.AuraSlot;
+import com.marianocarrizo.dynamicMusic.model.BackgroundConfig;
 import com.marianocarrizo.dynamicMusic.model.Scene;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -52,6 +53,43 @@ class SessionConfigManagerTest {
         assertEquals("C:/music/n.mp3", loaded.getScenes().get(0).getAssignments().get(TrackType.NORMAL));
         assertEquals(0.3, loaded.getMasterVolume(), 1e-9);
         assertFalse(Files.exists(file.resolveSibling("session.json.tmp")));
+    }
+
+    @Test
+    void saveAndLoadRoundTripsSlotBackgroundOverrides(@TempDir Path dir) {
+        SessionConfigManager mgr = new SessionConfigManager(dir.resolve("session.json"));
+        SessionConfig cfg = new SessionConfig();
+        Scene scene = cfg.getActiveScene();
+        scene.getBackground().setPath("C:/default.png");
+        BackgroundConfig raged = new BackgroundConfig();
+        raged.setPath("C:/raged.mp4");
+        raged.setPlaybackRate(1.5);
+        raged.setBoomerangEnabled(true);
+        scene.setBackground(AuraSlot.RAGED, raged);
+
+        mgr.save(cfg);
+        Scene loaded = mgr.load().getActiveScene();
+
+        assertTrue(loaded.hasOwnBackground(AuraSlot.RAGED));
+        assertEquals("C:/raged.mp4", loaded.backgroundFor(AuraSlot.RAGED).getPath());
+        assertEquals(1.5, loaded.backgroundFor(AuraSlot.RAGED).getPlaybackRate(), 1e-9);
+        assertEquals(Boolean.TRUE, loaded.backgroundFor(AuraSlot.RAGED).getBoomerangEnabled());
+        assertEquals("C:/default.png", loaded.backgroundFor(AuraSlot.NORMAL).getPath());
+    }
+
+    @Test
+    void sessionWithoutBackgroundsFieldLoadsAndFallsBack(@TempDir Path dir) throws IOException {
+        Path file = dir.resolve("session.json");
+        Files.writeString(file, """
+                {"scenes":[{"id":"s1","name":"Old","background":{"path":"C:/old.png"}}],"activeSceneId":"s1"}
+                """);
+
+        Scene scene = new SessionConfigManager(file).load().getActiveScene();
+
+        for (AuraSlot slot : AuraSlot.values()) {
+            assertFalse(scene.hasOwnBackground(slot));
+            assertEquals("C:/old.png", scene.backgroundFor(slot).getPath());
+        }
     }
 
     @Test
