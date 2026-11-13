@@ -44,6 +44,11 @@ jobs:
               echo "Tag '$GITHUB_REF_NAME' is not vX.Y.Z" >&2
               exit 1
             fi
+            POM_VERSION=$(sed -n 's:.*<version>\(.*\)</version>.*:\1:p' pom.xml | head -1)
+            if [[ "$POM_VERSION" != "$VERSION" ]]; then
+              echo "Tag version $VERSION does not match pom.xml version $POM_VERSION" >&2
+              exit 1
+            fi
           else
             VERSION="0.0.${GITHUB_RUN_NUMBER}"
           fi
