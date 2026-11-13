@@ -64,6 +64,7 @@ public class BackgroundEditorController {
 
     private SceneHost host;
     private boolean refreshingUI = false;
+    private BackgroundTarget shownTarget = BackgroundTarget.SCENE_DEFAULT;
 
     private final BoomerangBaker boomerangBaker = new BoomerangBaker();
 
@@ -175,8 +176,35 @@ public class BackgroundEditorController {
     @FXML
     private void onSelectTarget() {
         if (refreshingUI || host == null) return;
+        if (hasUnappliedChanges() && !confirmDiscardChanges()) {
+            restoreShownTarget();
+            return;
+        }
+        shownTarget = cmbBackgroundTarget.getValue();
         onCancelBackground();
         refreshTargetView();
+    }
+
+    private boolean hasUnappliedChanges() {
+        return pendingBgPath != null;
+    }
+
+    private boolean confirmDiscardChanges() {
+        return ThemedDialog.confirm(
+                bgPreviewPanel.getScene().getWindow(),
+                "Unapplied changes",
+                "You have unapplied background changes for " + shownTarget.label() + ". Discard them?",
+                "Discard",
+                "Cancel");
+    }
+
+    private void restoreShownTarget() {
+        refreshingUI = true;
+        try {
+            cmbBackgroundTarget.setValue(shownTarget);
+        } finally {
+            refreshingUI = false;
+        }
     }
 
     void dispose() {
