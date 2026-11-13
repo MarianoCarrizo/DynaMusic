@@ -2,29 +2,38 @@ package com.marianocarrizo.dynamicMusic.ambiance;
 
 import com.marianocarrizo.dynamicMusic.model.AuraPreset;
 
+import java.util.regex.Pattern;
+
 public enum TransitionStyle {
-    FIRE(800, Overlay.SOLID, 0xFF7A1A, 0, 0.4, 0.6),
-    ELECTRIC(350, Overlay.SOLID, 0xCFF6FF, 3, 0.0, 0.9),
-    HOLY(1000, Overlay.SOLID, 0xFFF8E0, 0, 0.5, 0.75),
-    SHADOW(1200, Overlay.VIGNETTE, 0x000000, 0, 0.5, 1.0),
-    NEUTRAL(600, Overlay.NONE, 0xFFFFFF, 0, 0.0, 0.0);
+    FIRE(800, Overlay.SOLID, ColorSource.PRIMARY, 0.0, 0xFF7A1A, 0, 0.4, 0.6),
+    ELECTRIC(350, Overlay.SOLID, ColorSource.PRIMARY_LIGHTENED, 0.6, 0xCFF6FF, 3, 0.0, 0.9),
+    HOLY(1000, Overlay.SOLID, ColorSource.PRIMARY_LIGHTENED, 0.6, 0xFFF8E0, 0, 0.5, 0.75),
+    SHADOW(1200, Overlay.VIGNETTE, ColorSource.SECONDARY, 0.0, 0x000000, 0, 0.5, 1.0),
+    NEUTRAL(600, Overlay.NONE, ColorSource.NONE, 0.0, 0xFFFFFF, 0, 0.0, 0.0);
 
     public enum Overlay { NONE, SOLID, VIGNETTE }
 
+    public enum ColorSource { NONE, PRIMARY, PRIMARY_LIGHTENED, SECONDARY }
+
     private static final double CROSSFADE_HALF_WIDTH = 0.25;
+    private static final Pattern HEX_DIGITS = Pattern.compile("[0-9A-Fa-f]{6}");
 
     private final int durationMillis;
     private final Overlay overlay;
-    private final int overlayRgb;
+    private final ColorSource colorSource;
+    private final double lighten;
+    private final int fallbackRgb;
     private final int flashCount;
     private final double peakAt;
     private final double peakOpacity;
 
-    TransitionStyle(int durationMillis, Overlay overlay, int overlayRgb,
-                    int flashCount, double peakAt, double peakOpacity) {
+    TransitionStyle(int durationMillis, Overlay overlay, ColorSource colorSource, double lighten,
+                    int fallbackRgb, int flashCount, double peakAt, double peakOpacity) {
         this.durationMillis = durationMillis;
         this.overlay = overlay;
-        this.overlayRgb = overlayRgb;
+        this.colorSource = colorSource;
+        this.lighten = lighten;
+        this.fallbackRgb = fallbackRgb;
         this.flashCount = flashCount;
         this.peakAt = peakAt;
         this.peakOpacity = peakOpacity;
@@ -45,7 +54,35 @@ public enum TransitionStyle {
 
     public Overlay overlay() { return overlay; }
 
-    public int overlayRgb() { return overlayRgb; }
+    public ColorSource colorSource() { return colorSource; }
+
+    public int overlayRgb(String primaryHex, String secondaryHex) {
+        return switch (colorSource) {
+            case NONE              -> fallbackRgb;
+            case PRIMARY           -> parseHex(primaryHex, fallbackRgb);
+            case PRIMARY_LIGHTENED -> lightened(parseHex(primaryHex, -1));
+            case SECONDARY         -> parseHex(secondaryHex, fallbackRgb);
+        };
+    }
+
+    private int lightened(int rgb) {
+        if (rgb < 0) return fallbackRgb;
+        int red = mixTowardWhite((rgb >> 16) & 0xFF);
+        int green = mixTowardWhite((rgb >> 8) & 0xFF);
+        int blue = mixTowardWhite(rgb & 0xFF);
+        return (red << 16) | (green << 8) | blue;
+    }
+
+    private int mixTowardWhite(int channel) {
+        return (int) Math.round(channel + (255 - channel) * lighten);
+    }
+
+    private static int parseHex(String hex, int fallback) {
+        if (hex == null) return fallback;
+        String digits = hex.startsWith("#") ? hex.substring(1) : hex;
+        if (!HEX_DIGITS.matcher(digits).matches()) return fallback;
+        return Integer.parseInt(digits, 16);
+    }
 
     public int flashCount() { return flashCount; }
 

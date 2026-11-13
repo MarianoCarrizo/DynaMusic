@@ -85,6 +85,7 @@ public class AmbianceStage {
     private Rectangle transitionOverlay;
     private Timeline transition;
     private TransitionStyle pendingStyle = TransitionStyle.NEUTRAL;
+    private Color pendingOverlayColor = Color.BLACK;
     private boolean incomingReady = false;
     private int transitionToken = 0;
     private PauseTransition readyWatchdog;
@@ -883,6 +884,7 @@ public class AmbianceStage {
         layer.setOpacity(0.0);
         root.getChildren().add(root.getChildren().indexOf(outgoingLayer) + 1, layer);
         pendingStyle = style;
+        pendingOverlayColor = overlayColorFor(style);
         incomingReady = false;
         transitionToken++;
         armReadyWatchdog();
@@ -926,8 +928,7 @@ public class AmbianceStage {
 
     private void startTransition() {
         TransitionStyle style = pendingStyle;
-        int rgb = style.overlayRgb();
-        transitionOverlay.setFill(Color.rgb((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF));
+        transitionOverlay.setFill(pendingOverlayColor);
         transitionOverlay.setVisible(style.overlay() != TransitionStyle.Overlay.NONE);
         DoubleProperty progress = new SimpleDoubleProperty(0.0);
         progress.addListener((obs, o, n) -> applyTransitionFrame(style, n.doubleValue()));
@@ -948,16 +949,24 @@ public class AmbianceStage {
         layer.setOpacity(style.incomingOpacity(progress));
         transitionOverlay.setOpacity(style.overlayOpacity(progress));
         if (style.overlay() == TransitionStyle.Overlay.VIGNETTE) {
-            transitionOverlay.setFill(vignetteFill(style.vignetteOpenness(progress)));
+            transitionOverlay.setFill(vignetteFill(pendingOverlayColor, style.vignetteOpenness(progress)));
         }
     }
 
-    private static RadialGradient vignetteFill(double openness) {
+    private Color overlayColorFor(TransitionStyle style) {
+        AuraConfig aura = auras.get(activeSlot);
+        String primary = aura != null ? aura.getPrimaryColor() : null;
+        String secondary = aura != null ? aura.getSecondaryColor() : null;
+        int rgb = style.overlayRgb(primary, secondary);
+        return Color.rgb((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
+    }
+
+    private static RadialGradient vignetteFill(Color edge, double openness) {
         double radius = Math.max(openness * VIGNETTE_MAX_RADIUS, VIGNETTE_MIN_RADIUS);
         return new RadialGradient(0, 0, 0.5, 0.5, radius, true, CycleMethod.NO_CYCLE,
                 new Stop(0.0, Color.TRANSPARENT),
                 new Stop(VIGNETTE_CLEAR_STOP, Color.TRANSPARENT),
-                new Stop(1.0, Color.BLACK));
+                new Stop(1.0, edge));
     }
 
     private void settleTransition() {
