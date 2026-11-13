@@ -1,5 +1,7 @@
 package com.marianocarrizo.dynamicMusic.model;
 
+import java.util.Objects;
+
 public class BackgroundConfig {
 
     private String path;
@@ -28,6 +30,16 @@ public class BackgroundConfig {
 
     public Boolean getBoomerangEnabled() { return boomerangEnabled; }
     public void setBoomerangEnabled(Boolean v) { this.boomerangEnabled = v; }
+
+    public boolean sameLook(BackgroundConfig other) {
+        return other != null
+                && Objects.equals(path, other.path)
+                && Objects.equals(fitMode, other.fitMode)
+                && Objects.equals(segmentStartMs, other.segmentStartMs)
+                && Objects.equals(segmentEndMs, other.segmentEndMs)
+                && Objects.equals(playbackRate, other.playbackRate)
+                && Objects.equals(boomerangEnabled, other.boomerangEnabled);
+    }
 
     public BackgroundConfig copy() {
         BackgroundConfig c = new BackgroundConfig();
