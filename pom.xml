@@ -5,9 +5,9 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.marianocarrizo</groupId>
-    <artifactId>dynamicMusic</artifactId>
+    <artifactId>dynamusic</artifactId>
     <version>1.3.0</version>
-    <name>dynamicMusic</name>
+    <name>DynaMusic</name>
 
     <properties>
         <maven.compiler.release>21</maven.compiler.release>
@@ -137,7 +137,7 @@
                                 <arg>--add-modules</arg>
                                 <arg>jdk.httpserver</arg>
                                 <arg>--add-reads</arg>
-                                <arg>com.marianocarrizo.dynamicMusic=jdk.httpserver</arg>
+                                <arg>com.marianocarrizo.dynamusic=jdk.httpserver</arg>
                             </compilerArgs>
                         </configuration>
                     </execution>
@@ -223,7 +223,7 @@
                 <artifactId>javafx-maven-plugin</artifactId>
                 <version>0.0.8</version>
                 <configuration>
-                    <mainClass>com.marianocarrizo.dynamicMusic/com.marianocarrizo.dynamicMusic.MusicServiceStarter</mainClass>
+                    <mainClass>com.marianocarrizo.dynamusic/com.marianocarrizo.dynamusic.MusicServiceStarter</mainClass>
                 </configuration>
             </plugin>
         </plugins>
@@ -239,7 +239,7 @@
                         <artifactId>javafx-maven-plugin</artifactId>
                         <configuration>
                             <options>
-                                <option>-Ddynamicmusic.debug=true</option>
+                                <option>-Ddynamusic.debug=true</option>
                             </options>
                         </configuration>
                     </plugin>

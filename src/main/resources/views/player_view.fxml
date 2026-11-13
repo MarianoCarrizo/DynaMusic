@@ -6,7 +6,7 @@
 <?import javafx.scene.image.ImageView?>
 
 <VBox xmlns:fx="http://javafx.com/fxml/1"
-      fx:controller="com.marianocarrizo.dynamicMusic.Controller.PlayerController"
+      fx:controller="com.marianocarrizo.dynamusic.controller.PlayerController"
       styleClass="window-root-transparent"
       spacing="0">
 
@@ -20,7 +20,7 @@
             <padding>
                 <Insets top="8" right="12" bottom="8" left="12"/>
             </padding>
-            <Label text="Dynamic Music" styleClass="window-title"/>
+            <Label text="DynaMusic" styleClass="window-title"/>
             <Region HBox.hgrow="ALWAYS" />
             <Button text="—" onAction="#onMinimizeWindow" styleClass="btn-window-control"/>
             <Button fx:id="btnMaximize" text="▢" onAction="#onMaximizeRestoreWindow" styleClass="btn-window-control"/>

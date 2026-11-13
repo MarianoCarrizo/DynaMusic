@@ -73,21 +73,21 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $jar = (Get-ChildItem target -Filter 'dynamicMusic-*.jar' |
+          $jar = (Get-ChildItem target -Filter 'dynamusic-*.jar' |
                   Where-Object { $_.Name -notmatch 'sources|javadoc|original' } |
                   Select-Object -First 1).FullName
           if (-not $jar) { throw 'Application jar not found in target/' }
           $modulePath = @((Resolve-Path target/modules).Path, (Resolve-Path target/deps).Path, $jar, $env:JAVAFX_JMODS_DIR) -join ';'
           & jpackage --type app-image `
-            --name DynamicMusic `
+            --name DynaMusic `
             --app-version $env:APP_VERSION `
             --vendor marianocarrizo `
             --icon icon.ico `
             --module-path $modulePath `
-            --module com.marianocarrizo.dynamicMusic/com.marianocarrizo.dynamicMusic.MusicServiceStarter `
+            --module com.marianocarrizo.dynamusic/com.marianocarrizo.dynamusic.MusicServiceStarter `
             --add-modules jdk.crypto.ec `
             --java-options '--enable-native-access=javafx.graphics' `
-            --java-options "-Ddynamicmusic.version=$env:APP_VERSION" `
+            --java-options "-Ddynamusic.version=$env:APP_VERSION" `
             --dest target/app-image
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
@@ -95,9 +95,9 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $root = 'target/app-image/DynamicMusic'
-          if (-not (Test-Path "$root/DynamicMusic.exe")) { throw 'DynamicMusic.exe missing from the app image' }
-          Get-Content "$root/app/DynamicMusic.cfg"
+          $root = 'target/app-image/DynaMusic'
+          if (-not (Test-Path "$root/DynaMusic.exe")) { throw 'DynaMusic.exe missing from the app image' }
+          Get-Content "$root/app/DynaMusic.cfg"
           $line = Select-String -Path "$root/runtime/release" -Pattern '^MODULES=' | Select-Object -First 1
           if (-not $line) { throw 'Runtime image has no MODULES entry in its release file' }
           $modules = $line.Line.Substring('MODULES='.Length).Trim('"').Split(' ')
@@ -157,27 +157,27 @@ jobs:
           $ErrorActionPreference = 'Stop'
           & $env:ISCC `
             "/DMyAppVersion=$env:APP_VERSION" `
-            "/DAppImageDir=$((Resolve-Path 'target/app-image/DynamicMusic').Path)" `
+            "/DAppImageDir=$((Resolve-Path 'target/app-image/DynaMusic').Path)" `
             "/DFfmpegDir=$((Resolve-Path 'target/ffmpeg-bundle').Path)" `
             "/DOutputDir=$((New-Item -ItemType Directory -Force 'target/installer').FullName)" `
-            installer/DynamicMusic.iss
+            installer/DynaMusic.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Compute SHA-256
         shell: bash
         working-directory: target/installer
         run: |
-          sha256sum "DynamicMusic-Setup-${APP_VERSION}.exe" > "DynamicMusic-Setup-${APP_VERSION}.exe.sha256"
-          cat "DynamicMusic-Setup-${APP_VERSION}.exe.sha256"
+          sha256sum "DynaMusic-Setup-${APP_VERSION}.exe" > "DynaMusic-Setup-${APP_VERSION}.exe.sha256"
+          cat "DynaMusic-Setup-${APP_VERSION}.exe.sha256"
           ls -l
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: DynamicMusic-Setup-${{ env.APP_VERSION }}
+          name: DynaMusic-Setup-${{ env.APP_VERSION }}
           path: |
-            target/installer/DynamicMusic-Setup-${{ env.APP_VERSION }}.exe
-            target/installer/DynamicMusic-Setup-${{ env.APP_VERSION }}.exe.sha256
+            target/installer/DynaMusic-Setup-${{ env.APP_VERSION }}.exe
+            target/installer/DynaMusic-Setup-${{ env.APP_VERSION }}.exe.sha256
           if-no-files-found: error
           retention-days: 14
 
@@ -193,7 +193,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-          sparse-checkout: src/main/java/com/marianocarrizo/dynamicMusic/service/UpdateSignature.java
+          sparse-checkout: src/main/java/com/marianocarrizo/dynamusic/service/UpdateSignature.java
           sparse-checkout-cone-mode: false
 
       - name: Download installer artifact
@@ -216,7 +216,7 @@ jobs:
           trap 'rm -rf "$work"' EXIT
 
           pub_b64="$(sed -n 's/.*PUBLIC_KEY_BASE64 = "\([^"]*\)".*/\1/p' \
-            src/main/java/com/marianocarrizo/dynamicMusic/service/UpdateSignature.java)"
+            src/main/java/com/marianocarrizo/dynamusic/service/UpdateSignature.java)"
           if [ -z "$pub_b64" ]; then
             echo "::error::Could not read PUBLIC_KEY_BASE64 from UpdateSignature.java"
             exit 1
@@ -227,7 +227,7 @@ jobs:
           printf '%s\n' "$UPDATE_SIGNING_KEY" > "$work/key.pem"
 
           shopt -s nullglob
-          sums=(dist/DynamicMusic-Setup-*.exe.sha256)
+          sums=(dist/DynaMusic-Setup-*.exe.sha256)
           if [ "${#sums[@]}" -eq 0 ]; then
             echo "::error::No checksum files to sign in dist/"
             exit 1
@@ -251,8 +251,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           ls -l dist
-          gh release create "$GITHUB_REF_NAME" dist/DynamicMusic-Setup-*.exe dist/DynamicMusic-Setup-*.exe.sha256 dist/DynamicMusic-Setup-*.exe.sha256.sig \
+          gh release create "$GITHUB_REF_NAME" dist/DynaMusic-Setup-*.exe dist/DynaMusic-Setup-*.exe.sha256 dist/DynaMusic-Setup-*.exe.sha256.sig \
             --repo "$GITHUB_REPOSITORY" \
-            --title "DynamicMusic ${GITHUB_REF_NAME#v}" \
+            --title "DynaMusic ${GITHUB_REF_NAME#v}" \
             --generate-notes \
             --verify-tag
