@@ -8,19 +8,12 @@
 <VBox xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.marianocarrizo.dynamicMusic.Controller.BackgroundEditorController"
       spacing="10">
-    <padding>
-        <Insets top="12" right="12" bottom="12" left="12"/>
-    </padding>
 
     <Label text="BACKGROUND" styleClass="lbl-session-title"/>
-    <HBox spacing="6" alignment="CENTER_LEFT">
-        <Label text="Applies to:" styleClass="lbl-session-title" minWidth="70"/>
-        <ComboBox fx:id="cmbBackgroundTarget" HBox.hgrow="ALWAYS" maxWidth="Infinity" onAction="#onSelectTarget"/>
-    </HBox>
     <Label fx:id="lblBackgroundFile" text="No background set" styleClass="lbl-preview-track" maxWidth="Infinity"/>
     <Label fx:id="lblBackgroundType" text="" styleClass="lbl-session-title" maxWidth="Infinity"/>
     <HBox spacing="6">
-        <Button text="Set background" onAction="#onSetBackground" HBox.hgrow="ALWAYS" maxWidth="Infinity"
+        <Button fx:id="btnSetBackground" text="Set background" onAction="#onSetBackground" HBox.hgrow="ALWAYS" maxWidth="Infinity"
                 styleClass="btn-secondary"/>
         <Button fx:id="btnEditBackground" text="Edit" onAction="#onEditBackground"
                 styleClass="btn-secondary" disable="true"/>

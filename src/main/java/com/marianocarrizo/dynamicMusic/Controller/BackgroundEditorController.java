@@ -35,9 +35,9 @@ import java.util.concurrent.Executors;
 
 public class BackgroundEditorController {
 
-    @FXML private ComboBox<BackgroundTarget> cmbBackgroundTarget;
     @FXML private Label lblBackgroundFile;
     @FXML private Label lblBackgroundType;
+    @FXML private Button btnSetBackground;
     @FXML private Button btnEditBackground;
     @FXML private Button btnRemoveBackground;
     @FXML private ComboBox<BackgroundFitMode> cmbFitMode;
@@ -64,7 +64,7 @@ public class BackgroundEditorController {
 
     private SceneHost host;
     private boolean refreshingUI = false;
-    private BackgroundTarget shownTarget = BackgroundTarget.SCENE_DEFAULT;
+    private BackgroundTarget target = BackgroundTarget.SCENE_DEFAULT;
 
     private final BoomerangBaker boomerangBaker = new BoomerangBaker();
 
@@ -92,20 +92,6 @@ public class BackgroundEditorController {
 
     @FXML
     public void initialize() {
-        cmbBackgroundTarget.setConverter(new StringConverter<>() {
-            @Override public String toString(BackgroundTarget target) {
-                return target == null ? "" : target.label();
-            }
-            @Override public BackgroundTarget fromString(String s) { return null; }
-        });
-        cmbBackgroundTarget.getItems().setAll(BackgroundTarget.values());
-        refreshingUI = true;
-        try {
-            cmbBackgroundTarget.setValue(BackgroundTarget.SCENE_DEFAULT);
-        } finally {
-            refreshingUI = false;
-        }
-
         cmbFitMode.setConverter(new StringConverter<>() {
             @Override public String toString(BackgroundFitMode mode) {
                 if (mode == null) return "";
@@ -138,8 +124,10 @@ public class BackgroundEditorController {
         bgMarkBand.widthProperty().addListener((obs, o, n) -> updateBgMarkOverlay());
     }
 
-    void init(SceneHost host) {
+    void init(SceneHost host, BackgroundTarget target) {
         this.host = host;
+        this.target = target;
+        if (target.slot() != null) btnSetBackground.setText("Choose...");
         refresh();
     }
 
@@ -157,7 +145,7 @@ public class BackgroundEditorController {
     }
 
     private BackgroundConfig targetConfig() {
-        return cmbBackgroundTarget.getValue().configIn(scene());
+        return target.configIn(scene());
     }
 
     private void refreshTargetView() {
@@ -173,38 +161,16 @@ public class BackgroundEditorController {
         cmbFitMode.setDisable(cfg == null);
     }
 
-    @FXML
-    private void onSelectTarget() {
-        if (refreshingUI || host == null) return;
-        if (hasUnappliedChanges() && !confirmDiscardChanges()) {
-            restoreShownTarget();
-            return;
-        }
-        shownTarget = cmbBackgroundTarget.getValue();
-        onCancelBackground();
-        refreshTargetView();
-    }
-
-    private boolean hasUnappliedChanges() {
+    boolean hasUnappliedChanges() {
         return pendingBgPath != null;
     }
 
-    private boolean confirmDiscardChanges() {
-        return ThemedDialog.confirm(
-                bgPreviewPanel.getScene().getWindow(),
-                "Unapplied changes",
-                "You have unapplied background changes for " + shownTarget.label() + ". Discard them?",
-                "Discard",
-                "Cancel");
+    String targetLabel() {
+        return target.label();
     }
 
-    private void restoreShownTarget() {
-        refreshingUI = true;
-        try {
-            cmbBackgroundTarget.setValue(shownTarget);
-        } finally {
-            refreshingUI = false;
-        }
+    void discardChanges() {
+        onCancelBackground();
     }
 
     void dispose() {
@@ -614,7 +580,7 @@ public class BackgroundEditorController {
     @FXML
     private void onApplyBackground() {
         if (pendingBgPath == null) return;
-        BackgroundConfig cfg = cmbBackgroundTarget.getValue().getOrCreateIn(scene());
+        BackgroundConfig cfg = target.getOrCreateIn(scene());
         cfg.setPath(pendingBgPath);
         host.session().setLastImageFolderPath(new File(pendingBgPath).getParent());
         cfg.setSegmentStartMs(pendingBgStart == null ? null : (long) pendingBgStart.toMillis());
@@ -630,7 +596,7 @@ public class BackgroundEditorController {
     @FXML
     private void onRemoveBackground() {
         onCancelBackground();
-        cmbBackgroundTarget.getValue().clearIn(scene());
+        target.clearIn(scene());
         host.saveSession();
         host.applyBackground();
         refreshTargetView();
