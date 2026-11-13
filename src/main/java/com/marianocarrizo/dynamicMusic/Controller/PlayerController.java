@@ -4,6 +4,7 @@ import com.marianocarrizo.dynamicMusic.Enums.TrackType;
 import com.marianocarrizo.dynamicMusic.ambiance.AmbianceStage;
 import com.marianocarrizo.dynamicMusic.ambiance.BackgroundFitMode;
 import com.marianocarrizo.dynamicMusic.ambiance.BoomerangBaker;
+import com.marianocarrizo.dynamicMusic.ambiance.TransitionStyle;
 import com.marianocarrizo.dynamicMusic.ambiance.YoutubePicker;
 import com.marianocarrizo.dynamicMusic.config.SessionConfig;
 import com.marianocarrizo.dynamicMusic.config.SessionConfigManager;
@@ -1078,12 +1079,14 @@ public class PlayerController implements SceneHost {
     private void applyBackgroundIfChanged(AuraSlot slot) {
         if (ambianceStage == null) return;
         BackgroundConfig next = resolveBackground(slot);
-        if (BackgroundResolver.needsShow(appliedBackground, next)) showBackground(next);
+        if (BackgroundResolver.needsShow(appliedBackground, next)) {
+            showBackground(next, ambianceStage.activeTransitionStyle());
+        }
     }
 
     private void showLiveBackground() {
         if (ambianceStage == null) return;
-        showBackground(resolveBackground(liveSlot()));
+        showBackground(resolveBackground(liveSlot()), TransitionStyle.NEUTRAL);
     }
 
     private BackgroundConfig resolveBackground(AuraSlot slot) {
@@ -1095,23 +1098,25 @@ public class PlayerController implements SceneHost {
         return !boomerangBaker.isCachePath(path) && new File(path).exists();
     }
 
-    private void showBackground(BackgroundConfig bg) {
+    private void showBackground(BackgroundConfig bg, TransitionStyle style) {
         String bgPath = bg.getPath();
         Long segStart = bg.getSegmentStartMs();
         Long segEnd   = bg.getSegmentEndMs();
         Double storedRate = bg.getPlaybackRate();
         double rate = storedRate != null ? storedRate : 1.0;
+        BackgroundFitMode fit = BackgroundFitMode.fromString(bg.getFitMode());
 
         ambianceStage.resetBoomerang();
-        ambianceStage.setBackgroundFitMode(BackgroundFitMode.fromString(bg.getFitMode()));
         appliedBackground = bg;
 
         if (bgPath == null) {
+            ambianceStage.setBackground(null, style);
             ambianceStage.clearVideoSegment();
-            ambianceStage.setBackground(null);
+            ambianceStage.setBackgroundFitMode(fit);
             return;
         }
 
+        ambianceStage.setBackground(bgPath, style);
         boolean isVideo = "Video".equals(BackgroundEditorController.mediaType(bgPath));
         if (isVideo && segStart != null && segEnd != null) {
             ambianceStage.setVideoSegment(Duration.millis(segStart), Duration.millis(segEnd));
@@ -1119,7 +1124,7 @@ public class PlayerController implements SceneHost {
             ambianceStage.clearVideoSegment();
         }
         ambianceStage.setVideoRate(rate);
-        ambianceStage.setBackground(bgPath);
+        ambianceStage.setBackgroundFitMode(fit);
 
         if (isVideo && Boolean.TRUE.equals(bg.getBoomerangEnabled())) {
             if (boomerangBaker.isCached(bgPath, segStart, segEnd)) {
