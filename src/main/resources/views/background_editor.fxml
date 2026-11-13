@@ -13,6 +13,10 @@
     </padding>
 
     <Label text="BACKGROUND" styleClass="lbl-session-title"/>
+    <HBox spacing="6" alignment="CENTER_LEFT">
+        <Label text="Applies to:" styleClass="lbl-session-title" minWidth="70"/>
+        <ComboBox fx:id="cmbBackgroundTarget" HBox.hgrow="ALWAYS" maxWidth="Infinity" onAction="#onSelectTarget"/>
+    </HBox>
     <Label fx:id="lblBackgroundFile" text="No background set" styleClass="lbl-preview-track" maxWidth="Infinity"/>
     <Label fx:id="lblBackgroundType" text="" styleClass="lbl-session-title" maxWidth="Infinity"/>
     <HBox spacing="6">
