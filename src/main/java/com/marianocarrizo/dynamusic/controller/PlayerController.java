@@ -423,7 +423,7 @@ public class PlayerController implements SceneHost {
         if (cmbPlaylist != null) {
             cmbPlaylist.setOnAction(e -> {
                 String name = cmbPlaylist.getValue();
-                if (name == null) return;
+                if (name == null || refreshingUI) return;
                 playlistManager.setActivePlaylist(name);
                 sessionConfig.setActivePlaylistName(name);
                 manager.save(sessionConfig);

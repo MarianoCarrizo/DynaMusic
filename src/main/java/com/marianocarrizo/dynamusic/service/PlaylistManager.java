@@ -120,6 +120,7 @@ public class PlaylistManager {
             position = 0;
             return;
         }
+        if (found.get() == activePlaylist) return;
         activePlaylist = found.get();
         position = 0;
         rebuildOrder();
