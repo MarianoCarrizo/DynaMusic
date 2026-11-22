@@ -4,10 +4,16 @@ import com.marianocarrizo.dynamusic.model.Playlist;
 import com.marianocarrizo.dynamusic.model.PlaylistItem;
 
 import java.io.File;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Random;
+import java.util.Set;
 
 /**
  * Gestiona el estado de las playlists y el orden de reproducción.
@@ -25,11 +31,16 @@ public class PlaylistManager {
     // Puntero dentro del buffer de orden (0..order.length-1)
     private int position;
 
+    private boolean currentTrackRemoved;
+
     private boolean shuffle;
     private boolean loop;
 
     // Buffer de reproducción: permutación de índices [0..n-1] de activePlaylist.paths
     private int[] order;
+
+    private static final boolean CASE_INSENSITIVE_PATHS =
+            YtDlpManager.isWindows(System.getProperty("os.name", ""));
 
     private final Random random = new Random();
 
@@ -76,6 +87,7 @@ public class PlaylistManager {
             activePlaylist = null;
             order = new int[0];
             position = 0;
+            currentTrackRemoved = false;
         }
         return removed;
     }
@@ -107,13 +119,9 @@ public class PlaylistManager {
      * Siempre reinicia position=0 y reconstruye el buffer de orden.
      */
     public void setActivePlaylist(String name) {
-        if (name == null) {
-            activePlaylist = null;
-            order = new int[0];
-            position = 0;
-            return;
-        }
         Optional<Playlist> found = findByName(name);
+        if (found.isPresent() && found.get() == activePlaylist) return;
+        currentTrackRemoved = false;
         if (found.isEmpty()) {
             activePlaylist = null;
             order = new int[0];
@@ -155,17 +163,49 @@ public class PlaylistManager {
     // T-04: Edición de pistas con reconstrucción de orden
     // =========================================================================
 
-    /**
-     * Agrega una pista (ruta absoluta) a la playlist indicada.
-     * Si es la playlist activa, reconstruye el buffer de orden.
-     */
     public void addTrack(String playlistName, File file) {
+        insertTracks(playlistName, List.of(file), Integer.MAX_VALUE);
+    }
+
+    public Playlist ensurePlaylist(String name) {
+        return findByName(name).orElseGet(() -> createPlaylist(name));
+    }
+
+    public int insertTracks(String playlistName, List<File> files, int index) {
         Optional<Playlist> found = findByName(playlistName);
-        if (found.isEmpty()) return;
-        found.get().add(file.getAbsolutePath());
+        if (found.isEmpty()) return 0;
+        Playlist playlist = found.get();
+        List<String> newPaths = newPathsOnly(playlist, files);
+        if (newPaths.isEmpty()) return 0;
+        int oldSize = playlist.size();
+        int at = Math.max(0, Math.min(index, oldSize));
+        List<PlaylistItem> items = playlist.getItems();
+        for (int i = 0; i < newPaths.size(); i++) items.add(at + i, new PlaylistItem(newPaths.get(i)));
         if (isActivePlaylist(playlistName)) {
-            rebuildOrder();
+            remapOrder(insertionMapping(oldSize, at, newPaths.size()), playlist.size());
         }
+        return newPaths.size();
+    }
+
+    private List<String> newPathsOnly(Playlist playlist, List<File> files) {
+        Set<String> known = new HashSet<>();
+        for (String path : playlist.getPaths()) known.add(pathKey(path));
+        List<String> fresh = new ArrayList<>();
+        for (File file : files) {
+            String path = file.getAbsolutePath();
+            if (known.add(pathKey(path))) fresh.add(path);
+        }
+        return fresh;
+    }
+
+    private static String pathKey(String path) {
+        String normalized;
+        try {
+            normalized = Path.of(path).normalize().toString();
+        } catch (InvalidPathException e) {
+            normalized = path;
+        }
+        return CASE_INSENSITIVE_PATHS ? normalized.toLowerCase(Locale.ROOT) : normalized;
     }
 
     public void addItem(String playlistName, PlaylistItem item) {
@@ -175,32 +215,86 @@ public class PlaylistManager {
         });
     }
 
-    /**
-     * Elimina la pista en el índice dado de la playlist indicada.
-     * Si es la playlist activa, reconstruye el buffer y ajusta la posición.
-     */
     public void removeTrack(String playlistName, int index) {
         Optional<Playlist> found = findByName(playlistName);
         if (found.isEmpty()) return;
-        found.get().removeAt(index);
+        Playlist playlist = found.get();
+        int oldSize = playlist.size();
+        if (index < 0 || index >= oldSize) return;
+        playlist.removeAt(index);
         if (isActivePlaylist(playlistName)) {
-            rebuildOrder();
-            clampPosition();
+            remapOrder(removalMapping(oldSize, index), playlist.size());
         }
     }
 
-    /**
-     * Reordena la pista en la posición activa.
-     * Si es la playlist activa, reconstruye el buffer y ajusta la posición.
-     */
     public void reorderTrack(String playlistName, int from, int to) {
         Optional<Playlist> found = findByName(playlistName);
         if (found.isEmpty()) return;
-        found.get().reorder(from, to);
+        Playlist playlist = found.get();
+        int size = playlist.size();
+        if (from < 0 || from >= size || to < 0 || to >= size || from == to) return;
+        playlist.reorder(from, to);
         if (isActivePlaylist(playlistName)) {
-            rebuildOrder();
-            clampPosition();
+            remapOrder(moveMapping(size, from, to), size);
         }
+    }
+
+    private static int[] insertionMapping(int oldSize, int at, int count) {
+        int[] mapping = new int[oldSize];
+        for (int i = 0; i < oldSize; i++) mapping[i] = i < at ? i : i + count;
+        return mapping;
+    }
+
+    private static int[] removalMapping(int oldSize, int removed) {
+        int[] mapping = new int[oldSize];
+        for (int i = 0; i < oldSize; i++) mapping[i] = i < removed ? i : i - 1;
+        mapping[removed] = -1;
+        return mapping;
+    }
+
+    private static int[] moveMapping(int size, int from, int to) {
+        int[] mapping = new int[size];
+        for (int i = 0; i < size; i++) {
+            if (i == from) mapping[i] = to;
+            else if (from < to && i > from && i <= to) mapping[i] = i - 1;
+            else if (from > to && i >= to && i < from) mapping[i] = i + 1;
+            else mapping[i] = i;
+        }
+        return mapping;
+    }
+
+    private void remapOrder(int[] oldToNew, int newSize) {
+        if (order.length == 0) {
+            rebuildOrder();
+            return;
+        }
+        int anchorOld = position < order.length ? order[position] : -1;
+        int keptBefore = 0;
+        Set<Integer> sequence = new LinkedHashSet<>();
+        for (int i = 0; i < order.length; i++) {
+            int mapped = oldToNew[order[i]];
+            if (mapped < 0) continue;
+            if (i < position) keptBefore++;
+            if (shuffle) sequence.add(mapped);
+        }
+        for (int i = 0; i < newSize; i++) sequence.add(i);
+        order = sequence.stream().mapToInt(Integer::intValue).toArray();
+        int anchorNew = anchorOld >= 0 ? oldToNew[anchorOld] : -1;
+        if (anchorNew >= 0) {
+            position = indexInOrder(anchorNew);
+        } else {
+            if (anchorOld >= 0) currentTrackRemoved = true;
+            position = keptBefore;
+        }
+        if (order.length == 0) currentTrackRemoved = false;
+        clampPosition();
+    }
+
+    private int indexInOrder(int naturalIndex) {
+        for (int i = 0; i < order.length; i++) {
+            if (order[i] == naturalIndex) return i;
+        }
+        return 0;
     }
 
     /** Ajusta position para que nunca quede fuera del rango del buffer. */
@@ -208,7 +302,8 @@ public class PlaylistManager {
         if (order.length == 0) {
             position = 0;
         } else {
-            position = Math.max(0, Math.min(position, order.length - 1));
+            int last = currentTrackRemoved ? order.length : order.length - 1;
+            position = Math.max(0, Math.min(position, last));
         }
     }
 
@@ -289,6 +384,7 @@ public class PlaylistManager {
         if (activePlaylist == null || order.length == 0) return Optional.empty();
         List<String> paths = activePlaylist.getPaths();
         if (paths.isEmpty()) return Optional.empty();
+        if (position >= order.length) return Optional.empty();
         int idx = order[position];
         if (idx < 0 || idx >= paths.size()) return Optional.empty();
         return Optional.of(new File(paths.get(idx)));
@@ -302,6 +398,11 @@ public class PlaylistManager {
      */
     public Optional<File> next() {
         if (activePlaylist == null || order.length == 0) return Optional.empty();
+        if (currentTrackRemoved) {
+            currentTrackRemoved = false;
+            if (position < order.length) return getCurrentTrack();
+            position = order.length - 1;
+        }
         if (position < order.length - 1) {
             position++;
             return getCurrentTrack();
@@ -326,6 +427,10 @@ public class PlaylistManager {
      * En position=0 es un no-op (no hace wrap); retorna el track actual.
      */
     public Optional<File> prev() {
+        if (currentTrackRemoved) {
+            currentTrackRemoved = false;
+            position = Math.min(position, order.length);
+        }
         if (position > 0) {
             position--;
         }
@@ -337,6 +442,7 @@ public class PlaylistManager {
      * Busca linealmente en el buffer; si no se encuentra, clampea el índice.
      */
     public Optional<File> startAt(int uiIndex) {
+        currentTrackRemoved = false;
         if (activePlaylist == null || order.length == 0) return Optional.empty();
         for (int i = 0; i < order.length; i++) {
             if (order[i] == uiIndex) {
@@ -355,6 +461,8 @@ public class PlaylistManager {
      */
     public void setShuffle(boolean on) {
         this.shuffle = on;
+        currentTrackRemoved = false;
+        clampPosition();
         if (on) {
             buildShuffledOrder();
         } else {
@@ -401,7 +509,14 @@ public class PlaylistManager {
      * Usado por el ListView para resaltar la fila correcta.
      */
     public int currentDisplayIndex() {
-        return (order.length == 0) ? 0 : order[position];
+        if (order.length == 0) return 0;
+        if (currentTrackRemoved) return -1;
+        return order[position];
+    }
+
+    public Optional<File> startCurrent() {
+        currentTrackRemoved = false;
+        return getCurrentTrack();
     }
 
     /**
@@ -410,6 +525,7 @@ public class PlaylistManager {
      */
     public String positionLabel() {
         if (size() == 0) return "— / —";
+        if (currentTrackRemoved) return "— / " + size();
         return (currentDisplayIndex() + 1) + " / " + size();
     }
 }
