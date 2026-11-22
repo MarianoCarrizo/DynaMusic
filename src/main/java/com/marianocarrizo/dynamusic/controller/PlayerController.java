@@ -83,6 +83,8 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 public class PlayerController implements SceneHost {
 
@@ -437,6 +439,7 @@ public class PlayerController implements SceneHost {
 
         if (lstPlaylistTracks != null) {
             lstPlaylistTracks.setCellFactory(lv -> new PlaylistTrackCell(playlistTrackHost));
+            PlaylistTrackCell.acceptFileDropsOnList(lstPlaylistTracks, playlistTrackHost);
             lstPlaylistTracks.setOnKeyPressed(e -> {
                 if (e.getCode() == KeyCode.DELETE) onRemoveTrack();
             });
@@ -1384,6 +1387,7 @@ public class PlayerController implements SceneHost {
             return Optional.of(name);
         });
         if (created.isPresent()) {
+            activatePlaylist(created.get());
             refreshPlaylistUI();
             persistPlaylists();
         }
@@ -1392,30 +1396,70 @@ public class PlayerController implements SceneHost {
 
     private void addLibraryItemToPlaylist(String playlistName, File source) {
         if (source == null) return;
-        addTracksToPlaylist(playlistName, AudioFileCollector.collect(source), Integer.MAX_VALUE);
+        boolean isFolder = source.isDirectory();
+        collectInBackground(() -> AudioFileCollector.collect(source), tracks -> {
+            if (tracks.isEmpty()) {
+                if (isFolder) showNoAudioFilesMessage();
+                return;
+            }
+            addTracksToPlaylist(playlistName, tracks, Integer.MAX_VALUE, false);
+        });
     }
 
     private void createPlaylistFromFolder(File folder) {
         if (folder == null || !folder.isDirectory()) return;
-        List<File> tracks = AudioFileCollector.collect(folder);
-        if (tracks.isEmpty()) return;
-        String name = playlistManager.ensurePlaylist(folder.getName()).getName();
-        addTracksToPlaylist(name, tracks, Integer.MAX_VALUE);
+        collectInBackground(() -> AudioFileCollector.collect(folder), tracks -> {
+            if (tracks.isEmpty()) {
+                showNoAudioFilesMessage();
+                return;
+            }
+            String name = playlistManager.ensurePlaylist(playlistNameFor(folder)).getName();
+            addTracksToPlaylist(name, tracks, Integer.MAX_VALUE, true);
+        });
     }
 
     private void addDroppedFilesToPlaylist(List<File> dropped, int slot) {
-        List<File> tracks = AudioFileCollector.collectAll(dropped);
-        if (tracks.isEmpty()) return;
-        String target = playlistManager.getActivePlaylistName();
-        if (target == null) target = playlistManager.ensurePlaylist(DEFAULT_PLAYLIST_NAME).getName();
-        addTracksToPlaylist(target, tracks, slot);
+        collectInBackground(() -> AudioFileCollector.collectAll(dropped), tracks -> {
+            if (tracks.isEmpty()) return;
+            String target = playlistManager.getActivePlaylistName();
+            if (target == null) target = playlistManager.ensurePlaylist(DEFAULT_PLAYLIST_NAME).getName();
+            addTracksToPlaylist(target, tracks, slot, false);
+        });
     }
 
-    private void addTracksToPlaylist(String playlistName, List<File> tracks, int slot) {
-        playlistManager.insertTracks(playlistName, tracks, slot);
-        if (playlistManager.getActivePlaylistName() == null) activatePlaylist(playlistName);
+    private void collectInBackground(Supplier<List<File>> collector, Consumer<List<File>> onCollected) {
+        CompletableFuture.supplyAsync(collector, ioExecutor).whenComplete((tracks, error) ->
+                Platform.runLater(() -> onCollected.accept(error == null ? tracks : List.of())));
+    }
+
+    private void showNoAudioFilesMessage() {
+        new Alert(Alert.AlertType.INFORMATION, "No audio files (mp3, wav, flac) found in that folder.").showAndWait();
+    }
+
+    private static String playlistNameFor(File folder) {
+        String name = folder.getName();
+        if (name.isEmpty()) name = folder.getPath().replaceAll("[\\\\/]+$", "");
+        return name.isEmpty() ? DEFAULT_PLAYLIST_NAME : name;
+    }
+
+    private void addTracksToPlaylist(String playlistName, List<File> tracks, int slot, boolean activate) {
+        String activeBefore = playlistManager.getActivePlaylistName();
+        boolean isActive = playlistName.equalsIgnoreCase(activeBefore);
+        int selected = lstPlaylistTracks.getSelectionModel().getSelectedIndex();
+        int added = playlistManager.insertTracks(playlistName, tracks, slot);
+        if (activate || activeBefore == null) {
+            activatePlaylist(playlistName);
+            if (!isActive) selected = -1;
+        }
+        if (isActive && slot <= selected) selected += added;
         refreshPlaylistUI();
+        selectTrackRow(selected);
         persistPlaylists();
+    }
+
+    private void selectTrackRow(int index) {
+        if (lstPlaylistTracks == null || index < 0 || index >= lstPlaylistTracks.getItems().size()) return;
+        lstPlaylistTracks.getSelectionModel().select(index);
     }
 
     private void activatePlaylist(String name) {
@@ -1439,6 +1483,7 @@ public class PlayerController implements SceneHost {
         if (active == null || index < 0) return;
         playlistManager.removeTrack(active, index);
         refreshPlaylistUI();
+        selectTrackRow(Math.min(index, lstPlaylistTracks.getItems().size() - 1));
         persistPlaylists();
     }
 
@@ -1486,13 +1531,7 @@ public class PlayerController implements SceneHost {
     }
 
     @FXML private void onRemoveTrack() {
-        String pname = cmbPlaylist.getValue();
-        if (pname == null) return;
-        int idx = lstPlaylistTracks.getSelectionModel().getSelectedIndex();
-        if (idx < 0) return;
-        playlistManager.removeTrack(pname, idx);
-        refreshPlaylistUI();
-        persistPlaylists();
+        removeTrackAt(lstPlaylistTracks.getSelectionModel().getSelectedIndex());
     }
 
     @FXML private void onMoveUp() {
@@ -1703,7 +1742,7 @@ public class PlayerController implements SceneHost {
             musicService.playlistPause();
             if (btnPlaylistPlayPause != null) btnPlaylistPlayPause.setText("▶");
         } else {
-            playlistManager.getCurrentTrack().ifPresent(f -> {
+            playlistManager.startCurrent().ifPresent(f -> {
                 enterMode(MusicService.PlaybackMode.PLAYLIST);
                 musicService.playPlaylistTrack(f);
                 if (btnPlaylistPlayPause != null) btnPlaylistPlayPause.setText("⏸");
@@ -1759,17 +1798,14 @@ public class PlayerController implements SceneHost {
             cmbPlaylist.setValue(current);
 
         if (lstPlaylistTracks != null) {
+            int selected = lstPlaylistTracks.getSelectionModel().getSelectedIndex();
             lstPlaylistTracks.getItems().setAll(
                 playlistManager.getActiveItems().stream()
                     .map(PlaylistItem::displayName)
                     .toList()
             );
-
-            // Highlight current track
-            if (playlistManager.size() > 0) {
-                lstPlaylistTracks.getSelectionModel().select(playlistManager.currentDisplayIndex());
-                lstPlaylistTracks.refresh();
-            }
+            selectTrackRow(selected);
+            lstPlaylistTracks.refresh();
         }
 
         // Update counter

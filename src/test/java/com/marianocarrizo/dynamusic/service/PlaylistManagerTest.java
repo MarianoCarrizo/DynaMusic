@@ -11,6 +11,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class PlaylistManagerTest {
 
@@ -162,6 +163,87 @@ class PlaylistManagerTest {
 
         assertEquals("c.mp3", manager.getCurrentTrack().orElseThrow().getName());
         assertEquals(1, manager.currentDisplayIndex());
+    }
+
+    @Test
+    void afterRemovingThePlayingTrackNextPlaysItsSuccessorWithoutSkipping() {
+        manager.startAt(0);
+
+        manager.removeTrack(PLAYLIST, 0);
+
+        assertEquals(-1, manager.currentDisplayIndex());
+        assertEquals("b.mp3", manager.next().orElseThrow().getName());
+        assertEquals("c.mp3", manager.next().orElseThrow().getName());
+    }
+
+    @Test
+    void afterRemovingThePlayingTrackWithShuffleOnNextPlaysTheSuccessorInTheSequence() {
+        manager.setShuffle(true);
+        manager.startAt(1);
+        List<String> sequence = fullSequence();
+        manager.startAt(1);
+        int playingAt = sequence.indexOf("b.mp3");
+        manager.removeTrack(PLAYLIST, 1);
+
+        Optional<File> next = manager.next();
+
+        if (playingAt == sequence.size() - 1) {
+            assertTrue(next.isEmpty());
+        } else {
+            assertEquals(sequence.get(playingAt + 1), next.orElseThrow().getName());
+        }
+    }
+
+    @Test
+    void pressingPlayAfterRemovingThePlayingTrackStartsTheSuccessor() {
+        manager.startAt(1);
+
+        manager.removeTrack(PLAYLIST, 1);
+
+        assertEquals("c.mp3", manager.startCurrent().orElseThrow().getName());
+        assertEquals(1, manager.currentDisplayIndex());
+        assertEquals("c.mp3", manager.getCurrentTrack().orElseThrow().getName());
+    }
+
+    @Test
+    void afterRemovingThePlayingLastTrackNextStopsWhenLoopIsOff() {
+        manager.startAt(2);
+
+        manager.removeTrack(PLAYLIST, 2);
+
+        assertTrue(manager.next().isEmpty());
+    }
+
+    @Test
+    void afterRemovingThePlayingLastTrackNextWrapsToTheFirstWhenLoopIsOn() {
+        manager.setLoop(true);
+        manager.startAt(2);
+
+        manager.removeTrack(PLAYLIST, 2);
+
+        assertEquals("a.mp3", manager.next().orElseThrow().getName());
+    }
+
+    @Test
+    void removingTheOnlyPlayingTrackLeavesNothingToPlay() {
+        manager.removeTrack(PLAYLIST, 2);
+        manager.removeTrack(PLAYLIST, 1);
+        manager.startAt(0);
+
+        manager.removeTrack(PLAYLIST, 0);
+
+        assertTrue(manager.next().isEmpty());
+        assertTrue(manager.getCurrentTrack().isEmpty());
+        assertEquals(0, manager.size());
+    }
+
+    @Test
+    void skipsDuplicatesThatDifferOnlyByCaseOnCaseInsensitiveSystems() {
+        assumeTrue(System.getProperty("os.name", "").toLowerCase().contains("win"));
+
+        int added = manager.insertTracks(PLAYLIST, files("A.MP3"), 0);
+
+        assertEquals(0, added);
     }
 
     private List<String> fullSequence() {

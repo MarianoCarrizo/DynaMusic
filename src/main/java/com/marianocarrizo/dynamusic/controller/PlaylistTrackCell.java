@@ -3,6 +3,7 @@ package com.marianocarrizo.dynamusic.controller;
 import javafx.css.PseudoClass;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.ListCell;
+import javafx.scene.control.ListView;
 import javafx.scene.control.MenuItem;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.DataFormat;
@@ -55,6 +56,20 @@ final class PlaylistTrackCell extends ListCell<String> {
         setText(item);
         setContextMenu(menu);
         if (host.isNowPlaying(getIndex())) getStyleClass().add(NOW_PLAYING_STYLE);
+    }
+
+    static void acceptFileDropsOnList(ListView<String> list, Host host) {
+        list.setOnDragOver(event -> {
+            if (!event.getDragboard().hasFiles()) return;
+            event.acceptTransferModes(TransferMode.COPY);
+            event.consume();
+        });
+        list.setOnDragDropped(event -> {
+            if (!event.getDragboard().hasFiles()) return;
+            host.filesDropped(event.getDragboard().getFiles(), list.getItems().size());
+            event.setDropCompleted(true);
+            event.consume();
+        });
     }
 
     private void startRowDrag(MouseEvent event) {

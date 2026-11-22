@@ -5,6 +5,8 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.AccessDeniedException;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -70,6 +72,15 @@ class AudioFileCollectorTest {
         assertTrue(AudioFileCollector.collect(root.resolve("empty").toFile()).isEmpty());
         assertTrue(AudioFileCollector.collect(root.resolve("missing.mp3").toFile()).isEmpty());
         assertTrue(AudioFileCollector.collect(null).isEmpty());
+    }
+
+    @Test
+    void skipsEntriesThatCannotBeReadInsteadOfFailing() {
+        AudioFileCollector.CollectingVisitor visitor = new AudioFileCollector.CollectingVisitor();
+
+        FileVisitResult result = visitor.visitFileFailed(root.resolve("locked"), new AccessDeniedException("locked"));
+
+        assertEquals(FileVisitResult.CONTINUE, result);
     }
 
     private File touch(String relative) throws IOException {

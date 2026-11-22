@@ -2,14 +2,15 @@ package com.marianocarrizo.dynamusic.service;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.UncheckedIOException;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-import java.util.stream.Stream;
 
 public final class AudioFileCollector {
 
@@ -38,14 +39,34 @@ public final class AudioFileCollector {
     }
 
     private static List<File> collectFromFolder(Path folder) {
-        try (Stream<Path> walk = Files.walk(folder)) {
-            return walk.filter(Files::isRegularFile)
-                    .map(Path::toFile)
-                    .filter(AudioFileCollector::isAudioFile)
+        CollectingVisitor visitor = new CollectingVisitor();
+        try {
+            Files.walkFileTree(folder, visitor);
+        } catch (IOException e) {
+            System.err.println("Could not read folder: " + e.getMessage());
+        }
+        return visitor.sortedRelativeTo(folder);
+    }
+
+    static final class CollectingVisitor extends SimpleFileVisitor<Path> {
+        private final List<File> found = new ArrayList<>();
+
+        @Override
+        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+            File candidate = file.toFile();
+            if (attrs.isRegularFile() && isAudioFile(candidate)) found.add(candidate);
+            return FileVisitResult.CONTINUE;
+        }
+
+        @Override
+        public FileVisitResult visitFileFailed(Path file, IOException error) {
+            return FileVisitResult.CONTINUE;
+        }
+
+        List<File> sortedRelativeTo(Path folder) {
+            return found.stream()
                     .sorted(Comparator.comparing(file -> folder.relativize(file.toPath()), AudioFileCollector::comparePaths))
                     .toList();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
         }
     }
 
