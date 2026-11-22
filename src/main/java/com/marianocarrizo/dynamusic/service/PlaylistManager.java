@@ -5,9 +5,12 @@ import com.marianocarrizo.dynamusic.model.PlaylistItem;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
+import java.util.Set;
 
 /**
  * Gestiona el estado de las playlists y el orden de reproducción.
@@ -156,17 +159,38 @@ public class PlaylistManager {
     // T-04: Edición de pistas con reconstrucción de orden
     // =========================================================================
 
-    /**
-     * Agrega una pista (ruta absoluta) a la playlist indicada.
-     * Si es la playlist activa, reconstruye el buffer de orden.
-     */
     public void addTrack(String playlistName, File file) {
+        insertTracks(playlistName, List.of(file), Integer.MAX_VALUE);
+    }
+
+    public Playlist ensurePlaylist(String name) {
+        return findByName(name).orElseGet(() -> createPlaylist(name));
+    }
+
+    public int insertTracks(String playlistName, List<File> files, int index) {
         Optional<Playlist> found = findByName(playlistName);
-        if (found.isEmpty()) return;
-        found.get().add(file.getAbsolutePath());
+        if (found.isEmpty()) return 0;
+        Playlist playlist = found.get();
+        List<String> newPaths = newPathsOnly(playlist, files);
+        if (newPaths.isEmpty()) return 0;
+        int oldSize = playlist.size();
+        int at = Math.max(0, Math.min(index, oldSize));
+        List<PlaylistItem> items = playlist.getItems();
+        for (int i = 0; i < newPaths.size(); i++) items.add(at + i, new PlaylistItem(newPaths.get(i)));
         if (isActivePlaylist(playlistName)) {
-            rebuildOrder();
+            remapOrder(insertionMapping(oldSize, at, newPaths.size()), playlist.size());
         }
+        return newPaths.size();
+    }
+
+    private List<String> newPathsOnly(Playlist playlist, List<File> files) {
+        Set<String> known = new HashSet<>(playlist.getPaths());
+        List<String> fresh = new ArrayList<>();
+        for (File file : files) {
+            String path = file.getAbsolutePath();
+            if (known.add(path)) fresh.add(path);
+        }
+        return fresh;
     }
 
     public void addItem(String playlistName, PlaylistItem item) {
@@ -176,32 +200,80 @@ public class PlaylistManager {
         });
     }
 
-    /**
-     * Elimina la pista en el índice dado de la playlist indicada.
-     * Si es la playlist activa, reconstruye el buffer y ajusta la posición.
-     */
     public void removeTrack(String playlistName, int index) {
         Optional<Playlist> found = findByName(playlistName);
         if (found.isEmpty()) return;
-        found.get().removeAt(index);
+        Playlist playlist = found.get();
+        int oldSize = playlist.size();
+        if (index < 0 || index >= oldSize) return;
+        playlist.removeAt(index);
         if (isActivePlaylist(playlistName)) {
-            rebuildOrder();
-            clampPosition();
+            remapOrder(removalMapping(oldSize, index), playlist.size());
         }
     }
 
-    /**
-     * Reordena la pista en la posición activa.
-     * Si es la playlist activa, reconstruye el buffer y ajusta la posición.
-     */
     public void reorderTrack(String playlistName, int from, int to) {
         Optional<Playlist> found = findByName(playlistName);
         if (found.isEmpty()) return;
-        found.get().reorder(from, to);
+        Playlist playlist = found.get();
+        int size = playlist.size();
+        if (from < 0 || from >= size || to < 0 || to >= size || from == to) return;
+        playlist.reorder(from, to);
         if (isActivePlaylist(playlistName)) {
-            rebuildOrder();
-            clampPosition();
+            remapOrder(moveMapping(size, from, to), size);
         }
+    }
+
+    private static int[] insertionMapping(int oldSize, int at, int count) {
+        int[] mapping = new int[oldSize];
+        for (int i = 0; i < oldSize; i++) mapping[i] = i < at ? i : i + count;
+        return mapping;
+    }
+
+    private static int[] removalMapping(int oldSize, int removed) {
+        int[] mapping = new int[oldSize];
+        for (int i = 0; i < oldSize; i++) mapping[i] = i < removed ? i : i - 1;
+        mapping[removed] = -1;
+        return mapping;
+    }
+
+    private static int[] moveMapping(int size, int from, int to) {
+        int[] mapping = new int[size];
+        for (int i = 0; i < size; i++) {
+            if (i == from) mapping[i] = to;
+            else if (from < to && i > from && i <= to) mapping[i] = i - 1;
+            else if (from > to && i >= to && i < from) mapping[i] = i + 1;
+            else mapping[i] = i;
+        }
+        return mapping;
+    }
+
+    private void remapOrder(int[] oldToNew, int newSize) {
+        if (order.length == 0) {
+            rebuildOrder();
+            return;
+        }
+        int currentOld = order[position];
+        int keptBefore = 0;
+        Set<Integer> sequence = new LinkedHashSet<>();
+        for (int i = 0; i < order.length; i++) {
+            int mapped = oldToNew[order[i]];
+            if (mapped < 0) continue;
+            if (i < position) keptBefore++;
+            if (shuffle) sequence.add(mapped);
+        }
+        for (int i = 0; i < newSize; i++) sequence.add(i);
+        order = sequence.stream().mapToInt(Integer::intValue).toArray();
+        int currentNew = oldToNew[currentOld];
+        position = currentNew >= 0 ? indexInOrder(currentNew) : keptBefore;
+        clampPosition();
+    }
+
+    private int indexInOrder(int naturalIndex) {
+        for (int i = 0; i < order.length; i++) {
+            if (order[i] == naturalIndex) return i;
+        }
+        return 0;
     }
 
     /** Ajusta position para que nunca quede fuera del rango del buffer. */
