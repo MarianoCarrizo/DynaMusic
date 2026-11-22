@@ -202,8 +202,8 @@
                                 <HBox spacing="8">
                                     <ComboBox fx:id="cmbPlaylist" HBox.hgrow="ALWAYS" maxWidth="Infinity" promptText="Select playlist"/>
                                     <Button fx:id="btnNewPlaylist" text="+" onAction="#onNewPlaylist" styleClass="btn-secondary"/>
-                                    <Button fx:id="btnRenamePlaylist" text="✎" onAction="#onRenamePlaylist" styleClass="btn-secondary"/>
-                                    <Button fx:id="btnDeletePlaylist" text="🗑" onAction="#onDeletePlaylist" styleClass="btn-secondary"/>
+                                    <Button fx:id="btnRenamePlaylist" text="Rename" onAction="#onRenamePlaylist" styleClass="btn-secondary"/>
+                                    <Button fx:id="btnDeletePlaylist" text="Delete" onAction="#onDeletePlaylist" styleClass="btn-secondary"/>
                                 </HBox>
 
                                 <!-- Lista de pistas + botones de edición -->
