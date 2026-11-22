@@ -28,6 +28,9 @@ module com.marianocarrizo.dynamusic {
     // Reflective access para inyección FXML (@FXML) en el controlador
     opens com.marianocarrizo.dynamusic.controller to javafx.fxml;
 
+    // Reflective access para cargar componentes propios (fx:root) desde FXML
+    opens com.marianocarrizo.dynamusic.component to javafx.fxml;
+
     // Reflective access para Gson sobre el POJO de configuración de sesión
     opens com.marianocarrizo.dynamusic.config to com.google.gson;
 

@@ -6,6 +6,7 @@ import com.marianocarrizo.dynamusic.ambiance.BackgroundFitMode;
 import com.marianocarrizo.dynamusic.ambiance.BoomerangBaker;
 import com.marianocarrizo.dynamusic.ambiance.TransitionStyle;
 import com.marianocarrizo.dynamusic.ambiance.YoutubePicker;
+import com.marianocarrizo.dynamusic.component.SeekBar;
 import com.marianocarrizo.dynamusic.config.SessionConfig;
 import com.marianocarrizo.dynamusic.config.SessionConfigManager;
 import com.marianocarrizo.dynamusic.model.AuraConfig;
@@ -110,26 +111,19 @@ public class PlayerController implements SceneHost {
     // Panel de mood
     @FXML private ToggleButton btnLoopIcon;
     @FXML private Button btnPlayPause;
-    @FXML private Slider progressSlider;
-    @FXML private Label lblCurrentTime;
-    @FXML private Label lblTotalTime;
+    @FXML private SeekBar moodSeekBar;
 
     @FXML private VBox previewPanel;
     @FXML private ToggleButton btnPreviewLoop;
     @FXML private Button btnPreviewPlayPause;
-    @FXML private Slider previewSlider;
-    @FXML private Label lblPreviewCurrentTime;
-    @FXML private Label lblPreviewTotalTime;
+    @FXML private SeekBar previewSeekBar;
     @FXML private Label lblPreviewTrack;
 
     @FXML private VBox onDemandPanel;
     @FXML private Label lblOnDemandTrack;
     @FXML private ToggleButton btnOnDemandLoop;
     @FXML private Button btnOnDemandPlayPause;
-    @FXML private Slider onDemandSlider;
-    @FXML private Label lblOnDemandCurrentTime;
-    @FXML private Label lblOnDemandTotalTime;
-    private boolean isDraggingOnDemandSlider = false;
+    @FXML private SeekBar onDemandSeekBar;
 
     @FXML private Label lblNowPlayingMood;
     @FXML private Label lblNowPlaying;
@@ -153,9 +147,7 @@ public class PlayerController implements SceneHost {
     @FXML private ToggleButton btnPlaylistLoop;
 
     // T-11: Progreso del playlist
-    @FXML private Label lblPlCurrentTime;
-    @FXML private Slider plProgressSlider;
-    @FXML private Label lblPlTotalTime;
+    @FXML private SeekBar playlistSeekBar;
 
     // Lista y búsqueda
     @FXML private TextField txtSearch;
@@ -184,9 +176,6 @@ public class PlayerController implements SceneHost {
     private AmbianceStage ambianceStage;
     private SceneEditorController sceneEditor;
 
-    private boolean isDraggingSlider = false;
-    private boolean isDraggingPreviewSlider = false;
-    private boolean isDraggingPlaylistSlider = false;
     private boolean applyingSession = false;
     private boolean refreshingUI = false;
     private TrackType currentActiveType = TrackType.NORMAL;
@@ -294,11 +283,7 @@ public class PlayerController implements SceneHost {
         // Listener del reproductor de mood
         musicService.setProgressListener((current, total) ->
             Platform.runLater(() -> {
-                if (!isDraggingSlider && total != null && !total.isUnknown()) {
-                    progressSlider.setValue(current.toMillis() / total.toMillis() * 100);
-                    lblCurrentTime.setText(formatDuration(current));
-                    lblTotalTime.setText(formatDuration(total));
-                }
+                moodSeekBar.update(current, total);
                 updateButtons();
                 updatePlayPauseButton();
             }));
@@ -306,54 +291,34 @@ public class PlayerController implements SceneHost {
         // Listener del reproductor de preescucha
         musicService.setPreviewProgressListener((current, total) ->
             Platform.runLater(() -> {
-                if (!isDraggingPreviewSlider && total != null && !total.isUnknown()) {
-                    previewSlider.setValue(current.toMillis() / total.toMillis() * 100);
-                    lblPreviewCurrentTime.setText(formatDuration(current));
-                    lblPreviewTotalTime.setText(formatDuration(total));
-                }
+                previewSeekBar.update(current, total);
                 updatePreviewPlayPauseButton();
             }));
 
         musicService.setOnDemandProgressListener((current, total) ->
             Platform.runLater(() -> {
-                if (!isDraggingOnDemandSlider && total != null && !total.isUnknown() && total.toMillis() > 0) {
-                    onDemandSlider.setValue(current.toMillis() / total.toMillis() * 100);
-                    lblOnDemandCurrentTime.setText(formatDuration(current));
-                    lblOnDemandTotalTime.setText(formatDuration(total));
-                }
+                onDemandSeekBar.update(current, total);
                 updateOnDemandPlayPauseButton();
             }));
         musicService.setOnDemandStateListener(() -> {
-            if (!isDraggingOnDemandSlider && !musicService.isOnDemandPlaying()) {
-                onDemandSlider.setValue(0);
-                lblOnDemandCurrentTime.setText("0:00");
+            if (!musicService.isOnDemandPlaying()) {
+                onDemandSeekBar.rewind();
             }
             updateOnDemandPlayPauseButton();
         });
-        if (onDemandSlider != null) {
-            onDemandSlider.setOnMousePressed(e -> isDraggingOnDemandSlider = true);
-            onDemandSlider.setOnMouseReleased(e -> {
-                isDraggingOnDemandSlider = false;
-                musicService.seekOnDemand(onDemandSlider.getValue() / 100.0);
-            });
-        }
         showOnDemandPanel(false);
 
-        if (progressSlider != null) {
-            progressSlider.setOnMousePressed(e -> isDraggingSlider = true);
-            progressSlider.setOnMouseReleased(e -> {
-                isDraggingSlider = false;
-                musicService.seekCurrentTrack(progressSlider.getValue() / 100.0);
-            });
-        }
+        moodSeekBar.setOnSeek(musicService::seekCurrentTrack);
+        previewSeekBar.setOnSeek(musicService::seekPreview);
 
-        if (previewSlider != null) {
-            previewSlider.setOnMousePressed(e -> isDraggingPreviewSlider = true);
-            previewSlider.setOnMouseReleased(e -> {
-                isDraggingPreviewSlider = false;
-                musicService.seekPreview(previewSlider.getValue() / 100.0);
-            });
-        }
+        musicService.setOnPreviewInterrupted(() -> setPreviewButtonIcon("▶"));
+        musicService.setOnModeInterrupted(() -> {
+            setMoodButtonIcon("▶");
+            if (btnOnDemandPlayPause != null) btnOnDemandPlayPause.setText("▶");
+            if (btnPlaylistPlayPause != null) btnPlaylistPlayPause.setText("▶");
+        });
+        onDemandSeekBar.setOnSeek(musicService::seekOnDemand);
+        playlistSeekBar.setOnSeek(musicService::seekPlaylist);
 
         if (lblNowPlaying != null) {
             lblNowPlaying.textProperty().bind(musicService.nowPlayingProperty());
@@ -407,24 +372,7 @@ public class PlayerController implements SceneHost {
         }));
 
         musicService.setPlaylistProgressListener((current, total) ->
-            Platform.runLater(() -> {
-                if (!isDraggingPlaylistSlider && total != null && !total.isUnknown()) {
-                    if (plProgressSlider != null)
-                        plProgressSlider.setValue(current.toMillis() / total.toMillis() * 100);
-                    if (lblPlCurrentTime != null)
-                        lblPlCurrentTime.setText(formatDuration(current));
-                    if (lblPlTotalTime != null)
-                        lblPlTotalTime.setText(formatDuration(total));
-                }
-            }));
-
-        if (plProgressSlider != null) {
-            plProgressSlider.setOnMousePressed(e -> isDraggingPlaylistSlider = true);
-            plProgressSlider.setOnMouseReleased(e -> {
-                isDraggingPlaylistSlider = false;
-                musicService.seekPlaylist(plProgressSlider.getValue() / 100.0);
-            });
-        }
+            Platform.runLater(() -> playlistSeekBar.update(current, total)));
 
         if (cmbPlaylist != null) {
             cmbPlaylist.setOnAction(e -> {
@@ -660,6 +608,19 @@ public class PlayerController implements SceneHost {
     @FXML private void onSwitchToRaged()    { switchTrack(TrackType.RAGED); }
     @FXML private void onSwitchToAdvantage(){ switchTrack(TrackType.ADVANTAGE); }
 
+    /** Plays or pauses the player of the current playback mode, the one used last. */
+    public void togglePlayback() {
+        if (musicService.previewOwnsAudio()) {
+            onTogglePreviewPlayPause();
+            return;
+        }
+        switch (musicService.getPlaybackMode()) {
+            case MOOD -> onTogglePlayPause();
+            case PLAYLIST -> onPlaylistPlayPause();
+            case ON_DEMAND -> onToggleOnDemandPlayPause();
+        }
+    }
+
     public void switchTrack(TrackType type) {
         if (type == null || !musicService.isLoaded(type)) return;
         boolean fromOtherSource = musicService.getPlaybackMode() != MusicService.PlaybackMode.MOOD;
@@ -735,9 +696,7 @@ public class PlayerController implements SceneHost {
         if (file == null || !file.isFile()) return;
         String label = title != null && !title.isBlank() ? title : stripExtension(file.getName());
         if (lblOnDemandTrack != null) lblOnDemandTrack.setText(label);
-        if (onDemandSlider != null) onDemandSlider.setValue(0);
-        if (lblOnDemandCurrentTime != null) lblOnDemandCurrentTime.setText("0:00");
-        if (lblOnDemandTotalTime != null) lblOnDemandTotalTime.setText("0:00");
+        onDemandSeekBar.reset();
         musicService.playOnDemand(file, label, () -> {
             showOnDemandPanel(true);
             activateSlot(AuraSlot.ON_DEMAND);
@@ -771,8 +730,7 @@ public class PlayerController implements SceneHost {
     private void onOnDemandStop() {
         musicService.onDemandPause();
         musicService.seekOnDemand(0);
-        if (onDemandSlider != null) onDemandSlider.setValue(0);
-        if (lblOnDemandCurrentTime != null) lblOnDemandCurrentTime.setText("0:00");
+        onDemandSeekBar.rewind();
         updateOnDemandPlayPauseButton();
     }
 
@@ -834,15 +792,13 @@ public class PlayerController implements SceneHost {
             previewPanel.setManaged(active);
         }
         if (btnPreviewPlayPause != null) btnPreviewPlayPause.setDisable(!active);
-        if (previewSlider != null) previewSlider.setDisable(!active);
+        previewSeekBar.setSeekable(active);
         if (!active && lblPreviewTrack != null)
             lblPreviewTrack.setText("No active preview");
     }
 
     private void resetPreviewSlider() {
-        if (previewSlider != null) previewSlider.setValue(0);
-        if (lblPreviewCurrentTime != null) lblPreviewCurrentTime.setText("0:00");
-        if (lblPreviewTotalTime != null)   lblPreviewTotalTime.setText("0:00");
+        previewSeekBar.reset();
         updatePreviewPlayPauseButton();
     }
 
@@ -964,9 +920,7 @@ public class PlayerController implements SceneHost {
 
     private void resetMoodProgressIfEmpty() {
         if (musicService.isLoaded(currentActiveType)) return;
-        if (progressSlider != null) progressSlider.setValue(0);
-        if (lblCurrentTime != null) lblCurrentTime.setText("0:00");
-        if (lblTotalTime != null) lblTotalTime.setText("0:00");
+        moodSeekBar.reset();
     }
 
     private void onTrackLoadFailed(TrackType type, String path) {
@@ -1980,11 +1934,6 @@ public class PlayerController implements SceneHost {
     }
 
     // --- Utils ---
-
-    private String formatDuration(javafx.util.Duration dur) {
-        int totalSeconds = (int) dur.toSeconds();
-        return (totalSeconds / 60) + ":" + String.format("%02d", totalSeconds % 60);
-    }
 
     private static String stripExtension(String name) {
         int dot = name.lastIndexOf('.');
