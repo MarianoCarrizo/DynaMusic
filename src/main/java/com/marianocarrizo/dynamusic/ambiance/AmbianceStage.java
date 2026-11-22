@@ -390,7 +390,9 @@ public class AmbianceStage {
         auraCanvas.heightProperty().unbind();
 
         // 3. Cerrar el stage viejo
+        stage.setOnCloseRequest(null);
         stage.close();
+        stage.setScene(null);
 
         // 4. Crear un stage nuevo
         stage = new Stage();
