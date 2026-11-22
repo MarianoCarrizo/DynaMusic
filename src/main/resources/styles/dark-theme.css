@@ -628,3 +628,12 @@
 .link-support:visited {
     -fx-text-fill: #c8a24a;
 }
+
+.list-cell:drop-above {
+    -fx-border-color: #1db954 transparent transparent transparent;
+    -fx-border-width: 2px 0 0 0;
+}
+.list-cell:drop-below {
+    -fx-border-color: transparent transparent #1db954 transparent;
+    -fx-border-width: 0 0 2px 0;
+}
