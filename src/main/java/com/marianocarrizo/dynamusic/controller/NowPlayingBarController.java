@@ -14,6 +14,8 @@ import com.marianocarrizo.dynamusic.service.CoverArtLoader;
 import javafx.fxml.FXML;
 import javafx.scene.control.Label;
 import javafx.scene.image.Image;
+import javafx.scene.input.ContextMenuEvent;
+import javafx.scene.layout.HBox;
 
 import java.io.File;
 import java.util.Objects;
@@ -23,7 +25,7 @@ public final class NowPlayingBarController {
     private static final String PLACEHOLDER_RESOURCE = "/images/cover-placeholder.png";
     private static final int PLACEHOLDER_PIXELS = 112;
 
-    interface Host extends VolumeController.Host {
+    interface Host extends VolumeController.Host, TrackActionsMenu.Host {
         NowPlayingModel nowPlaying();
 
         void togglePlayback();
@@ -43,6 +45,7 @@ public final class NowPlayingBarController {
         RepeatMode cycleRepeat(NowPlayingSource source);
     }
 
+    @FXML private HBox trackInfo;
     @FXML private CoverView cover;
     @FXML private Label lblTitle;
     @FXML private Label lblDetail;
@@ -58,6 +61,7 @@ public final class NowPlayingBarController {
     private final CoverArtLoader coverArt = new CoverArtLoader();
     private Image placeholder;
     private Host host;
+    private TrackActionsMenu trackMenu;
     private NowPlaying shown = NowPlaying.NONE;
     private File shownCoverFile;
 
@@ -77,11 +81,20 @@ public final class NowPlayingBarController {
 
     void attach(Host host) {
         this.host = host;
+        trackMenu = new TrackActionsMenu(host);
+        trackInfo.setOnContextMenuRequested(this::showTrackMenu);
         seekBar.setOnSeekToFraction(host::seekActive);
         host.musicService().setActiveProgressListener(seekBar::showPlayback);
         volumeController.attach(host);
         host.nowPlaying().snapshotProperty().addListener((obs, oldValue, newValue) -> render(newValue));
         render(host.nowPlaying().get());
+    }
+
+    private void showTrackMenu(ContextMenuEvent event) {
+        File playing = host.nowPlaying().get().file();
+        if (playing == null) return;
+        trackMenu.show(trackInfo, playing, event.getScreenX(), event.getScreenY());
+        event.consume();
     }
 
     void restoreVolume(double volume) {

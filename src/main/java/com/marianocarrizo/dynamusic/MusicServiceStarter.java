@@ -6,7 +6,10 @@ import com.marianocarrizo.dynamusic.enums.TrackType;
 import com.marianocarrizo.dynamusic.config.SessionConfig;
 import com.marianocarrizo.dynamusic.config.SessionConfigManager;
 import com.marianocarrizo.dynamusic.service.DataFolderMigration;
+import com.marianocarrizo.dynamusic.service.OpenRequest;
+import com.marianocarrizo.dynamusic.service.SingleInstance;
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.collections.ListChangeListener;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Cursor;
@@ -20,17 +23,29 @@ import javafx.scene.input.KeyEvent;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 import javafx.stage.StageStyle;
+import java.io.File;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 public class MusicServiceStarter extends Application {
 
     private double xOffset = 0;
     private double yOffset = 0;
+    private final SingleInstance singleInstance = SingleInstance.inAppDataFolder();
+    private List<File> launchFiles = List.of();
+
+    @Override
+    public void init() {
+        DataFolderMigration.migrateIfNeeded();
+        OpenRequest launch = OpenRequest.fromPaths(getParameters().getRaw());
+        launchFiles = launch.files();
+        boolean runningElsewhere = singleInstance.claim() == SingleInstance.Role.SECONDARY;
+        if (runningElsewhere && singleInstance.forward(launch)) System.exit(0);
+    }
 
     @Override
     public void start(Stage stage) throws Exception {
-        DataFolderMigration.migrateIfNeeded();
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/views/player_view.fxml"));
         Parent root = loader.load();
 
@@ -143,6 +158,18 @@ public class MusicServiceStarter extends Application {
         stage.centerOnScreen();
 
         stage.show();
+
+        Platform.runLater(() -> controller.openFiles(launchFiles));
+        singleInstance.listen(request -> Platform.runLater(() -> {
+            bringToFront(stage);
+            controller.openFiles(request.files());
+        }));
+    }
+
+    private static void bringToFront(Stage stage) {
+        stage.setIconified(false);
+        stage.toFront();
+        stage.requestFocus();
     }
 
     private static void interceptSpaceBeforeFocusedButton(

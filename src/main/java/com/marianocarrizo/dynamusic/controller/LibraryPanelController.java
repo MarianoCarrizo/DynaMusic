@@ -8,6 +8,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
 import javafx.scene.input.KeyCode;
+import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
 
 import java.io.File;
@@ -23,17 +24,22 @@ public final class LibraryPanelController {
         void saveSession();
 
         void startPreview(File file);
+
+        void focusYoutubeUrl();
     }
 
 
     @FXML private TextField txtSearch;
     @FXML private TreeView<File> treeFiles;
+    @FXML private VBox emptyState;
 
     private Host host;
     private File rootFolder;
 
     void attach(Host host) {
         this.host = host;
+        emptyState.visibleProperty().bind(treeFiles.rootProperty().isNull());
+        treeFiles.visibleProperty().bind(treeFiles.rootProperty().isNotNull());
         txtSearch.textProperty().addListener((obs, oldVal, newVal) -> rebuildTree());
         treeFiles.setCellFactory(tv -> new LibraryCell(host));
         treeFiles.setOnKeyPressed(e -> {
@@ -74,13 +80,47 @@ public final class LibraryPanelController {
             File last = new File(lastPath);
             if (last.isDirectory()) chooser.setInitialDirectory(last);
         }
-        File folder = chooser.showDialog(null);
+        showFolder(chooser.showDialog(null));
+    }
+
+    @FXML
+    private void onPasteYoutubeLink() {
+        host.focusYoutubeUrl();
+    }
+
+    void showFolder(File folder) {
         if (folder == null || !folder.isDirectory()) return;
         rootFolder = folder;
         host.session().setLastFolderPath(folder.getAbsolutePath());
         host.saveSession();
         txtSearch.clear();
         rebuildTree();
+    }
+
+    void reveal(File file) {
+        File root = LibraryRoot.rootFor(rootFolder, file);
+        if (rootFolder == null || !LibraryRoot.isSameFile(root, rootFolder)) {
+            showFolder(root);
+        } else if (!txtSearch.getText().isEmpty()) {
+            txtSearch.clear();
+        }
+        TreeItem<File> item = findItem(treeFiles.getRoot(), file);
+        if (item == null) return;
+        for (TreeItem<File> parent = item.getParent(); parent != null; parent = parent.getParent()) {
+            parent.setExpanded(true);
+        }
+        treeFiles.getSelectionModel().select(item);
+        treeFiles.scrollTo(treeFiles.getRow(item));
+    }
+
+    private static TreeItem<File> findItem(TreeItem<File> node, File target) {
+        if (node == null) return null;
+        if (node.getValue() != null && LibraryRoot.isSameFile(node.getValue(), target)) return node;
+        for (TreeItem<File> child : node.getChildren()) {
+            TreeItem<File> found = findItem(child, target);
+            if (found != null) return found;
+        }
+        return null;
     }
 
     private void rebuildTree() {

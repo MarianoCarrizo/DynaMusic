@@ -58,7 +58,7 @@ public class SessionConfigManager {
         Path path = configPath();
         if (!Files.exists(path)) {
             System.out.println("No session config found — starting fresh");
-            SessionConfig fresh = new SessionConfig();
+            SessionConfig fresh = SessionConfig.firstRun();
             fresh.getActiveScene();
             return fresh;
         }

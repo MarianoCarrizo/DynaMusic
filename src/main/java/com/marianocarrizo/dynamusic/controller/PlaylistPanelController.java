@@ -27,7 +27,7 @@ import java.util.function.Supplier;
 
 public final class PlaylistPanelController {
 
-    interface Host {
+    interface Host extends FileTrackMenuItems.Host {
         SessionConfig session();
 
         void saveSession();
@@ -44,6 +44,7 @@ public final class PlaylistPanelController {
     }
 
 
+    private static final String EMPTY_LIST_HINT = "Drag tracks or folders here";
     private static final String DEFAULT_PLAYLIST_NAME = "New playlist";
     private static final String NAME_REJECTED_MESSAGE = "Name already exists or is blank.";
 
@@ -74,9 +75,10 @@ public final class PlaylistPanelController {
             refresh();
         });
         host.nowPlaying().snapshotProperty().addListener((obs, oldValue, newValue) -> refreshPlayingState());
+        lstPlaylistTracks.setPlaceholder(emptyListHint());
         lstPlaylistTracks.setOnDragEntered(e -> dragActivity.begin());
         lstPlaylistTracks.setOnDragExited(e -> dragActivity.end());
-        lstPlaylistTracks.setCellFactory(lv -> new PlaylistTrackCell(trackHost));
+        lstPlaylistTracks.setCellFactory(lv -> new PlaylistTrackCell(trackHost, host));
         PlaylistTrackCell.acceptFileDropsOnList(lstPlaylistTracks, trackHost);
         lstPlaylistTracks.setOnKeyPressed(e -> {
             if (e.getCode() == KeyCode.DELETE) onRemoveTrack();
@@ -92,6 +94,12 @@ public final class PlaylistPanelController {
                 }
             }
         });
+    }
+
+    private static Label emptyListHint() {
+        Label hint = new Label(EMPTY_LIST_HINT);
+        hint.getStyleClass().add("empty-state-hint");
+        return hint;
     }
 
     String selectedPlaylistName() {
@@ -262,6 +270,13 @@ public final class PlaylistPanelController {
                 boolean currentRow = current.source() == NowPlayingSource.PLAYLIST
                         && index == playlistManager.currentDisplayIndex();
                 return RowPlayback.of(currentRow, current.playing());
+            }
+            @Override public File trackAt(int index) {
+                List<PlaylistItem> items = playlistManager.getActiveItems();
+                return index >= 0 && index < items.size() ? new File(items.get(index).getPath()) : null;
+            }
+            @Override public String playlistName() {
+                return playlistManager.getActivePlaylistName();
             }
             @Override public void filesDropped(List<File> files, int slot) {
                 addDroppedFiles(files, slot);

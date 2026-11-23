@@ -96,6 +96,10 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
             mode -> musicService.setOnDemandLoop(mode.repeatsTrack()),
             mode -> musicService.setPreviewLoop(mode.repeatsTrack()));
 
+    private final FileOpener fileOpener = new FileOpener(
+            this::playNow, folder -> libraryPanelController.showFolder(folder),
+            file -> libraryPanelController.reveal(file));
+
     @FXML
     public void initialize() {
         libraryVisibility = new LibraryVisibility(mainSplit, leftPanel, btnToggleLibrary,
@@ -127,9 +131,11 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
             });
         }
 
+        WindowFileDrop.install(mainRoot, fileOpener::open);
+
         Platform.runLater(() -> {
             updateWindowMood(TrackType.NORMAL);
-            ambiance.open();
+            if (sessionConfig.isAmbianceIntroduced()) ambiance.open();
         });
     }
 
@@ -260,6 +266,15 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
             ambiance.activateSlot(AuraSlot.ON_DEMAND);
             liveAuraController.refresh();
         });
+    }
+
+    public void openFiles(List<File> files) {
+        fileOpener.open(files);
+    }
+
+    @Override
+    public void focusYoutubeUrl() {
+        youTubeBarController.focusUrl();
     }
 
     @Override
@@ -466,6 +481,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
     public void applySession(SessionConfig cfg) {
         if (cfg == null) return;
         sessionConfig.adoptScenesFrom(cfg);
+        sessionConfig.adoptAmbianceIntroductionFrom(cfg);
 
         String lastImgDir = cfg.getLastImageFolderPath();
         if (lastImgDir != null) {
