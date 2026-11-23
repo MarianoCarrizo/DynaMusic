@@ -22,6 +22,7 @@ final class PlaylistPlayback {
         this.enterMode = enterMode;
         this.refreshView = refreshView;
         musicService.setOnPlaylistEnd(() -> Platform.runLater(this::advanceAfterEnd));
+        musicService.setOnPlaylistTrackFailed(() -> Platform.runLater(this::skipFailedTrack));
     }
 
     void play(File file) {
@@ -42,6 +43,11 @@ final class PlaylistPlayback {
 
     void next() {
         playlistManager.next().ifPresentOrElse(this::play, musicService::stopPlaylist);
+        refreshView.run();
+    }
+
+    private void skipFailedTrack() {
+        playlistManager.next().ifPresentOrElse(musicService::playPlaylistTrack, musicService::stopPlaylist);
         refreshView.run();
     }
 

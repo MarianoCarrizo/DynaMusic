@@ -118,6 +118,7 @@ public class MusicService {
 
     // Callback que el controlador suministra para avanzar al siguiente track
     private Runnable onPlaylistEnd = null;
+    private Runnable onPlaylistTrackFailed = null;
 
     // =========================================================================
     // Constructor
@@ -827,7 +828,7 @@ public class MusicService {
     private void handlePlaylistPlayerError(MediaPlayer player, int seq) {
         System.err.println("Playlist playback error: " + player.getError());
         if (player == playlistPlayer) {
-            if (mode == PlaybackMode.PLAYLIST && onPlaylistEnd != null) onPlaylistEnd.run();
+            if (mode == PlaybackMode.PLAYLIST && onPlaylistTrackFailed != null) onPlaylistTrackFailed.run();
             return;
         }
         player.dispose();
@@ -922,6 +923,10 @@ public class MusicService {
     /** Establece el callback que se invoca al llegar al fin de una pista del playlist. */
     public void setOnPlaylistEnd(Runnable r) {
         this.onPlaylistEnd = r;
+    }
+
+    public void setOnPlaylistTrackFailed(Runnable r) {
+        this.onPlaylistTrackFailed = r;
     }
 
     private void disposeOnDemandPlayer() {
