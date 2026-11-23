@@ -5,6 +5,9 @@ import com.marianocarrizo.dynamusic.config.SessionConfig;
 import com.marianocarrizo.dynamusic.config.SessionConfigManager;
 import com.marianocarrizo.dynamusic.model.AuraSlot;
 import com.marianocarrizo.dynamusic.model.NowPlayingModel;
+import com.marianocarrizo.dynamusic.model.NowPlayingSource;
+import com.marianocarrizo.dynamusic.model.RepeatMode;
+import com.marianocarrizo.dynamusic.model.Playlist;
 import com.marianocarrizo.dynamusic.model.PlaylistItem;
 import com.marianocarrizo.dynamusic.model.Scene;
 import com.marianocarrizo.dynamusic.service.MusicService;
@@ -18,17 +21,23 @@ import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 import javafx.util.Duration;
 
 import java.io.File;
+import java.util.List;
 import java.util.Optional;
 
-public class PlayerController implements SceneHost, PlayerHost {
+public class PlayerController implements SceneHost, UpdateBarController.Host, SceneBarController.Host,
+        AmbianceToolbarController.Host, LiveAuraController.Host, MoodPanelController.Host,
+        LibraryPanelController.Host, PlaylistPanelController.Host, YouTubeBarController.Host,
+        NowPlayingBarController.Host {
 
     private static final String CAFECITO_URL = "https://cafecito.app/duhonha";
     private HostServices hostServices;
@@ -36,17 +45,18 @@ public class PlayerController implements SceneHost, PlayerHost {
     // Layout
     @FXML private VBox mainRoot;
     @FXML private Button btnMaximize;
+    @FXML private SplitPane mainSplit;
+    @FXML private VBox leftPanel;
+    @FXML private ToggleButton btnToggleLibrary;
 
     @FXML private UpdateBarController updateBarController;
     @FXML private SceneBarController sceneBarController;
     @FXML private AmbianceToolbarController ambianceToolbarController;
-    @FXML private VolumeController volumeController;
 
     @FXML private MoodPanelController moodPanelController;
     @FXML private LiveAuraController liveAuraController;
 
-    @FXML private PreviewPanelController previewPanelController;
-    @FXML private OnDemandPanelController onDemandPanelController;
+    @FXML private NowPlayingBarController nowPlayingBarController;
 
     // T-10: TabPane de modos
     @FXML private TabPane modeTabPane;
@@ -54,7 +64,6 @@ public class PlayerController implements SceneHost, PlayerHost {
     @FXML private Tab playlistsTab;
 
     @FXML private PlaylistPanelController playlistPanelController;
-    @FXML private PlaylistTransportController playlistTransportController;
 
     @FXML private LibraryPanelController libraryPanelController;
     @FXML private YouTubeBarController youTubeBarController;
@@ -65,6 +74,7 @@ public class PlayerController implements SceneHost, PlayerHost {
     private final AmbianceCoordinator ambiance = new AmbianceCoordinator(
             sessionConfig, () -> manager.save(sessionConfig), this::liveSlot, this::refreshSceneEditorBackground);
     private SceneEditorController sceneEditor;
+    private LibraryVisibility libraryVisibility;
 
     private boolean applyingSession = false;
 
@@ -77,33 +87,34 @@ public class PlayerController implements SceneHost, PlayerHost {
     private final PlaylistManager playlistManager = new PlaylistManager();
     private final NowPlayingModel nowPlaying = new NowPlayingModel();
     private final NowPlayingTracker nowPlayingTracker = new NowPlayingTracker(
-            musicService, playlistManager, () -> moodPanelController.activeMood(), nowPlaying);
+            musicService::playbackState, playlistManager::getActivePlaylistName, nowPlaying);
+    private final PlaylistPlayback playlistPlayback = new PlaylistPlayback(
+            musicService, playlistManager, this::enterMode, this::refreshPlaylistView);
+    private final ActiveTransport transport = new ActiveTransport(musicService, playlistPlayback::startCurrent);
+    private final RepeatSettings repeatSettings = new RepeatSettings(
+            mode -> musicService.setLoop(mode.repeatsTrack()), playlistManager::setRepeat,
+            mode -> musicService.setOnDemandLoop(mode.repeatsTrack()),
+            mode -> musicService.setPreviewLoop(mode.repeatsTrack()));
 
     @FXML
     public void initialize() {
-        nowPlaying.titleProperty().bind(musicService.nowPlayingProperty());
+        libraryVisibility = new LibraryVisibility(mainSplit, leftPanel, btnToggleLibrary,
+                this::onLibraryDividerMoved);
+        musicService.setOnPlaybackChanged(nowPlayingTracker::sync);
         youTubeBarController.attach(this);
         updateBarController.attach(this);
         sceneBarController.attach(this);
         ambianceToolbarController.attach(this);
-        volumeController.attach(this);
         liveAuraController.attach(this);
         moodPanelController.attach(this);
         libraryPanelController.attach(this);
-        previewPanelController.attach(this);
-        onDemandPanelController.attach(this);
         playlistPanelController.attach(this);
-        playlistTransportController.attach(this);
+        nowPlayingBarController.attach(this);
+        nowPlayingTracker.sync();
         liveAuraController.refresh();
 
         saveDebounce.setOnFinished(e -> manager.save(sessionConfig));
 
-        musicService.setOnModePausedByPreview(() -> {
-            moodPanelController.showPlaying(false);
-            onDemandPanelController.showPlaying(false);
-            playlistTransportController.showPlaying(false);
-            playbackStateChanged();
-        });
         ambiance.setAudioSource(musicService::getAudioFeatures);
 
         if (modeTabPane != null) {
@@ -141,15 +152,70 @@ public class PlayerController implements SceneHost, PlayerHost {
     }
 
     public void toggleLastUsedPlayer() {
-        if (musicService.previewSoundedLast()) {
-            previewPanelController.togglePlayPause();
-            return;
+        if (shouldStartPlaylist() && playlistPlayback.startCurrent()) return;
+        transport.togglePlayPause();
+    }
+
+    private boolean shouldStartPlaylist() {
+        return modeTabPane.getSelectionModel().getSelectedItem() == playlistsTab
+                && musicService.activeSource() == NowPlayingSource.MOOD
+                && !musicService.isPlaying();
+    }
+
+    @Override
+    public void togglePlayback() {
+        toggleLastUsedPlayer();
+    }
+
+    @Override
+    public void playPrevious() {
+        playlistPlayback.previous();
+    }
+
+    @Override
+    public void playNext() {
+        playlistPlayback.next();
+    }
+
+    @Override
+    public boolean isShuffleOn() {
+        return playlistManager.isShuffle();
+    }
+
+    @Override
+    public void setShuffle(boolean on) {
+        playlistManager.setShuffle(on);
+        refreshPlaylistView();
+    }
+
+    @Override
+    public RepeatMode repeatMode(NowPlayingSource source) {
+        return repeatSettings.modeOf(source);
+    }
+
+    @Override
+    public RepeatMode cycleRepeat(NowPlayingSource source) {
+        RepeatMode mode = repeatSettings.cycle(source);
+        sessionConfig.setRepeatMode(source, mode);
+        manager.save(sessionConfig);
+        return mode;
+    }
+
+    public boolean moodKeysEnabled() {
+        return MoodShortcuts.enabled(modeTabPane.getSelectionModel().getSelectedItem(), moodsTab);
+    }
+
+    private void restoreRepeatModes(SessionConfig saved) {
+        for (NowPlayingSource source : NowPlayingSource.values()) {
+            if (!source.isRepeatable()) continue;
+            repeatSettings.set(source, saved.getRepeatMode(source));
+            sessionConfig.setRepeatMode(source, repeatSettings.modeOf(source));
         }
-        switch (musicService.getPlaybackMode()) {
-            case MOOD -> moodPanelController.togglePlayPause();
-            case PLAYLIST -> playlistTransportController.togglePlayPause();
-            case ON_DEMAND -> onDemandPanelController.togglePlayPause();
-        }
+    }
+
+    @Override
+    public void seekActive(double fraction) {
+        transport.seek(fraction);
     }
 
     @Override
@@ -164,9 +230,6 @@ public class PlayerController implements SceneHost, PlayerHost {
         ambiance.activateSlot(AuraSlot.of(type));
         liveAuraController.refresh();
         moodPanelController.refreshButtonStates();
-        moodPanelController.showPlaying(true);
-        previewPanelController.hide();
-        playbackStateChanged();
     }
 
     private boolean usesOnDemandAura() {
@@ -179,53 +242,29 @@ public class PlayerController implements SceneHost, PlayerHost {
         return usesOnDemandAura() ? AuraSlot.ON_DEMAND : AuraSlot.of(moodPanelController.activeMood());
     }
 
-    @Override
-    public void enterMode(MusicService.PlaybackMode target) {
+    private void enterMode(MusicService.PlaybackMode target) {
         musicService.setPlaybackMode(target);
         syncSourceUi();
     }
 
     private void syncSourceUi() {
-        MusicService.PlaybackMode mode = musicService.getPlaybackMode();
-        if (mode != MusicService.PlaybackMode.ON_DEMAND) onDemandPanelController.show(false);
-        if (mode != MusicService.PlaybackMode.PLAYLIST) {
-            playlistTransportController.showPlaying(false);
-            playlistPanelController.refreshRows();
-        }
         ambiance.activateSlot(liveSlot());
         liveAuraController.refresh();
-        moodPanelController.syncPlayPauseIcon();
-        playbackStateChanged();
     }
 
     @Override
     public void playNow(File file, String title) {
         if (file == null || !file.isFile()) return;
         String label = DisplayNames.trackLabel(file, title);
-        onDemandPanelController.showTrack(label);
         musicService.playOnDemand(file, label, () -> {
-            onDemandPanelController.show(true);
             ambiance.activateSlot(AuraSlot.ON_DEMAND);
             liveAuraController.refresh();
-            moodPanelController.showPlaying(false);
-            playlistTransportController.showPlaying(false);
-            playlistPanelController.refreshRows();
-            onDemandPanelController.syncPlayPauseIcon();
-            playbackStateChanged();
         });
     }
 
     @Override
-    public void closeOnDemand() {
-        enterMode(MusicService.PlaybackMode.MOOD);
-        moodPanelController.showPlaying(false);
-    }
-
-    @Override
     public void startPreview(File file) {
-        previewPanelController.start(file);
-        onDemandPanelController.syncPlayPauseIcon();
-        playbackStateChanged();
+        musicService.previewTrack(file);
     }
 
     private void updateWindowMood(TrackType type) {
@@ -236,10 +275,23 @@ public class PlayerController implements SceneHost, PlayerHost {
             case NORMAL    -> "window-normal";
             case ADVANTAGE -> "window-advantage";
         });
+        if (sceneEditor != null) sceneEditor.refreshAccent();
     }
 
     public void setHostServices(HostServices hostServices) {
         this.hostServices = hostServices;
+    }
+
+    private void onLibraryDividerMoved(double position) {
+        sessionConfig.setLibraryDividerPosition(position);
+        saveDebounce.playFromStart();
+    }
+
+    @FXML
+    private void onToggleLibrary() {
+        libraryVisibility.set(btnToggleLibrary.isSelected());
+        sessionConfig.setLibraryCollapsed(!libraryVisibility.isVisible());
+        manager.save(sessionConfig);
     }
 
     @FXML
@@ -268,14 +320,11 @@ public class PlayerController implements SceneHost, PlayerHost {
 
         refreshCards();
         moodPanelController.refreshButtonStates();
-        moodPanelController.syncPlayPauseIcon();
-        moodPanelController.resetProgressIfEmpty();
     }
 
     private void refreshMoodState() {
         refreshCards();
         moodPanelController.refreshButtonStates();
-        moodPanelController.syncPlayPauseIcon();
     }
 
     @Override public SessionConfig session() { return sessionConfig; }
@@ -284,6 +333,7 @@ public class PlayerController implements SceneHost, PlayerHost {
 
     @Override public AmbianceCoordinator ambiance() { return ambiance; }
 
+    @Override public String windowMoodId() { return mainRoot.getId(); }
     @Override public Window window() { return mainRoot.getScene().getWindow(); }
 
     @Override public void saveSession() { manager.save(sessionConfig); }
@@ -325,8 +375,6 @@ public class PlayerController implements SceneHost, PlayerHost {
         if (type == null) return;
         trackLoader.clear(type);
         moodPanelController.refreshButtonStates();
-        moodPanelController.syncPlayPauseIcon();
-        moodPanelController.resetProgressIfEmpty();
         refreshCards();
         if (sceneEditor != null) sceneEditor.refreshTracks();
     }
@@ -351,7 +399,7 @@ public class PlayerController implements SceneHost, PlayerHost {
 
     @Override
     public void playPlaylistTrack(File file) {
-        playlistTransportController.play(file);
+        playlistPlayback.play(file);
     }
 
     @Override
@@ -395,6 +443,11 @@ public class PlayerController implements SceneHost, PlayerHost {
     }
 
     @Override
+    public List<String> playlistNames() {
+        return playlistManager.getPlaylists().stream().map(Playlist::getName).toList();
+    }
+
+    @Override
     public Optional<File> selectedLibraryItem() {
         return libraryPanelController.selectedItem();
     }
@@ -402,11 +455,6 @@ public class PlayerController implements SceneHost, PlayerHost {
     @Override
     public NowPlayingModel nowPlaying() {
         return nowPlaying;
-    }
-
-    @Override
-    public void playbackStateChanged() {
-        nowPlayingTracker.sync();
     }
 
     @Override
@@ -429,7 +477,12 @@ public class PlayerController implements SceneHost, PlayerHost {
         Platform.runLater(() -> ambianceToolbarController.restoreScreen(screenIdx));
 
         libraryPanelController.restoreFolder(cfg.getLastFolderPath());
+        sessionConfig.setLibraryCollapsed(cfg.isLibraryCollapsed());
+        sessionConfig.setLibraryDividerPosition(cfg.getLibraryDividerPosition());
+        libraryVisibility.setDividerPosition(cfg.getLibraryDividerPosition());
+        libraryVisibility.set(!cfg.isLibraryCollapsed());
 
+        restoreRepeatModes(cfg);
         playlistManager.setPlaylists(cfg.getPlaylists());
         sessionConfig.setPlaylists(cfg.getPlaylists());
         sessionConfig.setActiveMode(cfg.getActiveMode());
@@ -449,7 +502,7 @@ public class PlayerController implements SceneHost, PlayerHost {
         }
 
         Platform.runLater(() -> {
-            volumeController.restore(cfg.getMasterVolume());
+            nowPlayingBarController.restoreVolume(cfg.getMasterVolume());
             sceneBarController.refresh();
             applyScene(sessionConfig.getActiveScene());
         });

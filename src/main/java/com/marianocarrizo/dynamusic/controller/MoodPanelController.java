@@ -3,18 +3,19 @@ package com.marianocarrizo.dynamusic.controller;
 import com.marianocarrizo.dynamusic.enums.TrackType;
 import com.marianocarrizo.dynamusic.model.AuraConfig;
 import com.marianocarrizo.dynamusic.model.AuraSlot;
+import com.marianocarrizo.dynamusic.model.NowPlaying;
+import com.marianocarrizo.dynamusic.model.NowPlayingModel;
+import com.marianocarrizo.dynamusic.model.NowPlayingSource;
 import com.marianocarrizo.dynamusic.model.Scene;
-import com.marianocarrizo.dynamusic.component.SeekBar;
 import com.marianocarrizo.dynamusic.service.AudioFileCollector;
 import com.marianocarrizo.dynamusic.service.MusicService;
-import javafx.application.Platform;
+import com.marianocarrizo.dynamusic.service.TrackNames;
 import javafx.css.PseudoClass;
 import javafx.fxml.FXML;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.Label;
-import javafx.scene.control.ToggleButton;
 import javafx.scene.input.Dragboard;
 import javafx.scene.input.TransferMode;
 import javafx.scene.layout.HBox;
@@ -29,31 +30,40 @@ import java.util.Map;
 public final class MoodPanelController {
 
     private static final PseudoClass DROP_TARGET = PseudoClass.getPseudoClass("drop-target");
-    private static final String PLAY_ICON = "▶";
-    private static final String PAUSE_ICON = "⏸";
+    private static final String PLAYING_MARK = "  ▶";
+    private static final String STYLE_EMPTY = "btn-phase-empty";
+    private static final String STYLE_ACTIVE = "btn-phase-active";
+    private static final String STYLE_PLAYING = "btn-phase-playing";
+
+    interface Host extends MoodBackgroundMenu.Host {
+        MusicService musicService();
+
+        NowPlayingModel nowPlaying();
+
+        void switchTrack(TrackType type);
+
+        void assignTrack(TrackType type, File file);
+    }
 
     @FXML private Button btnPaused;
     @FXML private Button btnNormal;
     @FXML private Button btnRaged;
     @FXML private Button btnAdvantage;
-    @FXML private ToggleButton btnLoopIcon;
-    @FXML private Button btnPlayPause;
-    @FXML private SeekBar moodSeekBar;
-    @FXML private Label lblNowPlayingMood;
-    @FXML private Label lblNowPlaying;
 
     private final Map<TrackType, Button> moodButtons = new EnumMap<>(TrackType.class);
     private final Map<TrackType, MoodCard> moodCards = new EnumMap<>(TrackType.class);
-    private PlayerHost host;
+    private Host host;
     private TrackType activeMood = TrackType.NORMAL;
 
     private static final class MoodCard {
+        final Label title = new Label();
+        String baseTitle;
         final Label track = new Label();
         final Circle dot = new Circle(5);
         final Label preset = new Label();
     }
 
-    void attach(PlayerHost host) {
+    void attach(Host host) {
         this.host = host;
         MusicService musicService = host.musicService();
         MoodBackgroundMenu backgroundMenu = new MoodBackgroundMenu(host);
@@ -63,18 +73,8 @@ public final class MoodPanelController {
         bindCard(TrackType.ADVANTAGE, btnAdvantage, 4, backgroundMenu);
         refreshCards();
         refreshButtonStates();
-        showActiveMood();
 
-        btnLoopIcon.selectedProperty().addListener((obs, oldVal, newVal) -> musicService.setLoop(newVal));
-        musicService.setProgressListener((current, total) ->
-            Platform.runLater(() -> {
-                moodSeekBar.showPlayback(current, total);
-                refreshButtonStates();
-                syncPlayPauseIcon();
-                host.playbackStateChanged();
-            }));
-        moodSeekBar.setOnSeekToFraction(musicService::seekCurrentTrack);
-        lblNowPlaying.textProperty().bind(host.nowPlaying().titleProperty());
+        host.nowPlaying().snapshotProperty().addListener((obs, oldValue, newValue) -> refreshButtonStates());
     }
 
     TrackType activeMood() {
@@ -83,7 +83,7 @@ public final class MoodPanelController {
 
     void setActiveMood(TrackType type) {
         activeMood = type;
-        showActiveMood();
+        refreshButtonStates();
     }
 
     void refreshCards() {
@@ -98,7 +98,7 @@ public final class MoodPanelController {
                 card.track.getStyleClass().add("card-track-empty");
             } else {
                 File f = new File(path);
-                card.track.setText(DisplayNames.stripExtension(f.getName()) + (f.isFile() ? "" : " (missing)"));
+                card.track.setText(TrackNames.title(f.getName()) + (f.isFile() ? "" : " (missing)"));
             }
             AuraConfig aura = scene.getAura(AuraSlot.of(type));
             card.dot.setFill(Color.web(aura.getPrimaryColor()));
@@ -108,28 +108,19 @@ public final class MoodPanelController {
 
     void refreshButtonStates() {
         MusicService musicService = host.musicService();
+        NowPlaying current = host.nowPlaying().get();
         for (TrackType t : TrackType.values()) {
             Button b = moodButtons.get(t);
-            b.getStyleClass().remove("btn-phase-empty");
-            b.getStyleClass().remove("btn-phase-active");
-            if (!musicService.isLoaded(t)) b.getStyleClass().add("btn-phase-empty");
+            boolean loaded = musicService.isLoaded(t);
+            boolean selected = loaded && t == activeMood;
+            boolean playing = current.isSounding(NowPlayingSource.MOOD) && current.sourceName().equals(t.name());
+            b.getStyleClass().removeAll(STYLE_EMPTY, STYLE_ACTIVE, STYLE_PLAYING);
+            if (!loaded) b.getStyleClass().add(STYLE_EMPTY);
+            if (selected) b.getStyleClass().add(STYLE_ACTIVE);
+            if (playing) b.getStyleClass().add(STYLE_PLAYING);
+            MoodCard card = moodCards.get(t);
+            card.title.setText(card.baseTitle + (playing ? PLAYING_MARK : ""));
         }
-        if (activeMood != null && musicService.isLoaded(activeMood)) {
-            moodButtons.get(activeMood).getStyleClass().add("btn-phase-active");
-        }
-    }
-
-    void showPlaying(boolean playing) {
-        btnPlayPause.setText(playing ? PAUSE_ICON : PLAY_ICON);
-    }
-
-    void syncPlayPauseIcon() {
-        showPlaying(host.musicService().isPlaying());
-    }
-
-    void resetProgressIfEmpty() {
-        if (host.musicService().isLoaded(activeMood)) return;
-        moodSeekBar.showNoTrack();
     }
 
     @FXML private void onSwitchToPaused() { host.switchTrack(TrackType.PAUSED); }
@@ -137,40 +128,12 @@ public final class MoodPanelController {
     @FXML private void onSwitchToRaged() { host.switchTrack(TrackType.RAGED); }
     @FXML private void onSwitchToAdvantage() { host.switchTrack(TrackType.ADVANTAGE); }
 
-    @FXML
-    void togglePlayPause() {
-        MusicService musicService = host.musicService();
-        if (musicService.isPlaying()) {
-            showPlaying(false);
-            musicService.fadeOutAndPause(null);
-        } else {
-            showPlaying(true);
-            host.enterMode(MusicService.PlaybackMode.MOOD);
-            musicService.fadeInAndPlay();
-        }
-        host.playbackStateChanged();
-    }
-
-    @FXML
-    private void onStop() {
-        host.musicService().stop();
-        showPlaying(false);
-        host.playbackStateChanged();
-    }
-
-    @FXML
-    private void onToggleLoop() {
-        host.musicService().setLoop(btnLoopIcon.isSelected());
-    }
-
-    private void showActiveMood() {
-        lblNowPlayingMood.setText("NOW PLAYING · " + activeMood.name());
-    }
-
     private void bindCard(TrackType type, Button button, int number, MoodBackgroundMenu backgroundMenu) {
         MoodCard card = new MoodCard();
 
-        Label title = new Label("[" + number + "] " + type.name());
+        card.baseTitle = "[" + number + "] " + type.name();
+        Label title = card.title;
+        title.setText(card.baseTitle);
         title.getStyleClass().add("card-title");
         card.track.getStyleClass().add("card-track");
         card.track.setMaxWidth(190);

@@ -1,44 +1,44 @@
 package com.marianocarrizo.dynamusic.controller;
 
-import com.marianocarrizo.dynamusic.enums.TrackType;
+import com.marianocarrizo.dynamusic.model.NowPlaying;
 import com.marianocarrizo.dynamusic.model.NowPlayingModel;
 import com.marianocarrizo.dynamusic.model.NowPlayingSource;
-import com.marianocarrizo.dynamusic.service.MusicService;
-import com.marianocarrizo.dynamusic.service.PlaylistManager;
+import com.marianocarrizo.dynamusic.service.PlaybackState;
+import com.marianocarrizo.dynamusic.service.SoundingTrack;
 
 import java.util.function.Supplier;
 
 final class NowPlayingTracker {
 
-    private final MusicService musicService;
-    private final PlaylistManager playlistManager;
-    private final Supplier<TrackType> activeMood;
+    private final Supplier<PlaybackState> playbackState;
+    private final Supplier<String> activePlaylistName;
     private final NowPlayingModel model;
 
-    NowPlayingTracker(MusicService musicService, PlaylistManager playlistManager,
-                      Supplier<TrackType> activeMood, NowPlayingModel model) {
-        this.musicService = musicService;
-        this.playlistManager = playlistManager;
-        this.activeMood = activeMood;
+    NowPlayingTracker(Supplier<PlaybackState> playbackState, Supplier<String> activePlaylistName,
+                      NowPlayingModel model) {
+        this.playbackState = playbackState;
+        this.activePlaylistName = activePlaylistName;
         this.model = model;
     }
 
     void sync() {
-        if (musicService.previewSoundedLast()) {
-            model.show(NowPlayingSource.PREVIEW, "", musicService.isPreviewPlaying());
-            return;
-        }
-        switch (musicService.getPlaybackMode()) {
-            case MOOD -> showMood();
-            case PLAYLIST -> model.show(NowPlayingSource.PLAYLIST,
-                    playlistManager.getActivePlaylistName(), musicService.isPlaylistPlaying());
-            case ON_DEMAND -> model.show(NowPlayingSource.ON_DEMAND, "", musicService.isOnDemandPlaying());
-        }
+        model.show(decide(playbackState.get(), activePlaylistName.get()));
     }
 
-    private void showMood() {
-        TrackType mood = activeMood.get();
-        NowPlayingSource source = musicService.isLoaded(mood) ? NowPlayingSource.MOOD : NowPlayingSource.NONE;
-        model.show(source, mood.name(), musicService.isPlaying());
+    static NowPlaying decide(PlaybackState state, String playlistName) {
+        if (state.previewSoundedLast()) {
+            return of(NowPlayingSource.PREVIEW, "", state.preview());
+        }
+        return switch (state.mode()) {
+            case MOOD -> of(NowPlayingSource.MOOD, state.moodType() == null ? "" : state.moodType().name(),
+                    state.mood());
+            case PLAYLIST -> of(NowPlayingSource.PLAYLIST, playlistName, state.playlist());
+            case ON_DEMAND -> of(NowPlayingSource.ON_DEMAND, "", state.onDemand());
+        };
+    }
+
+    private static NowPlaying of(NowPlayingSource source, String sourceName, SoundingTrack track) {
+        if (!track.isPresent()) return NowPlaying.NONE;
+        return new NowPlaying(source, sourceName, track.title(), track.detail(), track.file(), track.playing());
     }
 }

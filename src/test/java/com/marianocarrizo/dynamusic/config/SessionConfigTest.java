@@ -4,6 +4,9 @@ import com.marianocarrizo.dynamusic.enums.TrackType;
 import com.marianocarrizo.dynamusic.model.AuraPreset;
 import com.marianocarrizo.dynamusic.model.AuraSlot;
 import com.marianocarrizo.dynamusic.model.Scene;
+import com.google.gson.Gson;
+import com.marianocarrizo.dynamusic.model.NowPlayingSource;
+import com.marianocarrizo.dynamusic.model.RepeatMode;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -216,5 +219,46 @@ class SessionConfigTest {
         assertNull(cfg.getVideoSegmentEndMs());
         assertFalse(Boolean.TRUE.equals(cfg.getBoomerangEnabled()));
         assertEquals("FIT", cfg.getBackgroundFitMode());
+    }
+
+    @Test
+    void sessionWithoutRepeatDataStartsWithRepeatOff() {
+        SessionConfig cfg = new Gson().fromJson("{}", SessionConfig.class);
+
+        for (NowPlayingSource source : NowPlayingSource.values()) {
+            assertEquals(RepeatMode.OFF, cfg.getRepeatMode(source));
+        }
+    }
+
+    @Test
+    void legacyBooleanRepeatFlagsMigrateToAllForPlaylistsAndOneForSingleTracks() {
+        String json = "{\"repeatModes\":{\"PLAYLIST\":true,\"MOOD\":true,\"ON_DEMAND\":false}}";
+
+        SessionConfig cfg = new Gson().fromJson(json, SessionConfig.class);
+
+        assertEquals(RepeatMode.ALL, cfg.getRepeatMode(NowPlayingSource.PLAYLIST));
+        assertEquals(RepeatMode.ONE, cfg.getRepeatMode(NowPlayingSource.MOOD));
+        assertEquals(RepeatMode.OFF, cfg.getRepeatMode(NowPlayingSource.ON_DEMAND));
+        assertEquals(RepeatMode.OFF, cfg.getRepeatMode(NowPlayingSource.PREVIEW));
+    }
+
+    @Test
+    void unknownStoredRepeatValuesFallBackToOff() {
+        SessionConfig cfg = new Gson().fromJson("{\"repeatModes\":{\"PLAYLIST\":\"sideways\"}}", SessionConfig.class);
+
+        assertEquals(RepeatMode.OFF, cfg.getRepeatMode(NowPlayingSource.PLAYLIST));
+    }
+
+    @Test
+    void repeatModesRoundTripAndAreNormalizedPerSource() {
+        SessionConfig cfg = new SessionConfig();
+        cfg.setRepeatMode(NowPlayingSource.PLAYLIST, RepeatMode.ONE);
+        cfg.setRepeatMode(NowPlayingSource.MOOD, RepeatMode.ALL);
+        Gson gson = new Gson();
+
+        SessionConfig reloaded = gson.fromJson(gson.toJson(cfg), SessionConfig.class);
+
+        assertEquals(RepeatMode.ONE, reloaded.getRepeatMode(NowPlayingSource.PLAYLIST));
+        assertEquals(RepeatMode.ONE, reloaded.getRepeatMode(NowPlayingSource.MOOD));
     }
 }

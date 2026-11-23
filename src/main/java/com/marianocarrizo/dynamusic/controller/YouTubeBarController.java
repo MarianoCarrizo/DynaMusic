@@ -19,6 +19,19 @@ import java.util.Optional;
 
 public final class YouTubeBarController {
 
+    interface Host {
+        String selectedPlaylistName();
+
+        void showPendingPlaylistEntry(String text);
+
+        void addPlaylistItem(String playlistName, PlaylistItem item);
+
+        void refreshPlaylistView();
+
+        void playNow(File file, String title);
+    }
+
+
     private static final String INVALID_URL_MESSAGE = "Not a valid YouTube URL.";
 
     @FXML private TextField txtYoutubeUrl;
@@ -29,9 +42,9 @@ public final class YouTubeBarController {
 
     private final YouTubeDownloader youTubeDownloader = new YouTubeDownloader();
     private final PauseTransition statusClear = new PauseTransition(Duration.seconds(5));
-    private PlayerHost host;
+    private Host host;
 
-    void attach(PlayerHost host) {
+    void attach(Host host) {
         this.host = host;
         statusClear.setOnFinished(e -> hideMessage());
         YtDlpManager manager = YtDlpManager.get();

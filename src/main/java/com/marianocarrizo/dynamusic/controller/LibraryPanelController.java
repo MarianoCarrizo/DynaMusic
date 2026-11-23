@@ -1,5 +1,6 @@
 package com.marianocarrizo.dynamusic.controller;
 
+import com.marianocarrizo.dynamusic.config.SessionConfig;
 import com.marianocarrizo.dynamusic.service.AudioFileCollector;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -16,13 +17,22 @@ import java.util.Optional;
 
 public final class LibraryPanelController {
 
+    interface Host extends LibraryCell.Host {
+        SessionConfig session();
+
+        void saveSession();
+
+        void startPreview(File file);
+    }
+
+
     @FXML private TextField txtSearch;
     @FXML private TreeView<File> treeFiles;
 
-    private PlayerHost host;
+    private Host host;
     private File rootFolder;
 
-    void attach(PlayerHost host) {
+    void attach(Host host) {
         this.host = host;
         txtSearch.textProperty().addListener((obs, oldVal, newVal) -> rebuildTree());
         treeFiles.setCellFactory(tv -> new LibraryCell(host));

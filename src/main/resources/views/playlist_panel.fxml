@@ -4,23 +4,31 @@
 
 <VBox xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.marianocarrizo.dynamusic.controller.PlaylistPanelController"
-      spacing="14" VBox.vgrow="ALWAYS">
-    <HBox spacing="8">
+      spacing="10" VBox.vgrow="ALWAYS">
+    <HBox spacing="8" alignment="CENTER_LEFT">
         <ComboBox fx:id="cmbPlaylist" HBox.hgrow="ALWAYS" maxWidth="Infinity" promptText="Select playlist"/>
-        <Button fx:id="btnNewPlaylist" text="+" onAction="#onNewPlaylist" styleClass="btn-secondary"/>
+        <Label fx:id="lblTrackCounter" text="— / —" minWidth="56" alignment="CENTER" styleClass="playlist-counter"/>
+        <Button fx:id="btnNewPlaylist" text="+" onAction="#onNewPlaylist" styleClass="btn-secondary">
+            <tooltip>
+                <Tooltip text="Create a new playlist"/>
+            </tooltip>
+        </Button>
         <Button fx:id="btnRenamePlaylist" text="Rename" onAction="#onRenamePlaylist" styleClass="btn-secondary"/>
         <Button fx:id="btnDeletePlaylist" text="Delete" onAction="#onDeletePlaylist" styleClass="btn-secondary"/>
     </HBox>
 
-    <VBox VBox.vgrow="ALWAYS" spacing="4">
-        <ListView fx:id="lstPlaylistTracks" VBox.vgrow="ALWAYS" prefHeight="150"/>
-        <HBox spacing="4">
-            <Button fx:id="btnAddToPlaylist" text="Add" onAction="#onAddToPlaylist" styleClass="btn-secondary"/>
-            <Button fx:id="btnRemoveTrack" text="Remove" onAction="#onRemoveTrack" styleClass="btn-secondary"/>
-            <Button fx:id="btnMoveUp" text="↑" onAction="#onMoveUp" styleClass="btn-secondary"/>
-            <Button fx:id="btnMoveDown" text="↓" onAction="#onMoveDown" styleClass="btn-secondary"/>
-        </HBox>
-    </VBox>
+    <ListView fx:id="lstPlaylistTracks" VBox.vgrow="ALWAYS" prefHeight="150"/>
 
-    <Label fx:id="lblTrackCounter" text="— / —" alignment="CENTER" maxWidth="Infinity" styleClass="lbl-session-title"/>
+    <HBox spacing="8">
+        <Button fx:id="btnAddToPlaylist" text="Add selected" onAction="#onAddToPlaylist" styleClass="btn-secondary">
+            <tooltip>
+                <Tooltip text="Add the file or folder selected in the library"/>
+            </tooltip>
+        </Button>
+        <Button fx:id="btnRemoveTrack" text="Remove" onAction="#onRemoveTrack" styleClass="btn-secondary">
+            <tooltip>
+                <Tooltip text="Remove the selected track from the playlist"/>
+            </tooltip>
+        </Button>
+    </HBox>
 </VBox>

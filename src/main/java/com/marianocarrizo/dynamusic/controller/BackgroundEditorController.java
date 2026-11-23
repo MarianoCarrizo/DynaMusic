@@ -2,6 +2,7 @@ package com.marianocarrizo.dynamusic.controller;
 
 import com.marianocarrizo.dynamusic.ambiance.BackgroundFitMode;
 import com.marianocarrizo.dynamusic.ambiance.BoomerangBaker;
+import com.marianocarrizo.dynamusic.component.FilledSlider;
 import com.marianocarrizo.dynamusic.model.BackgroundConfig;
 import com.marianocarrizo.dynamusic.model.BackgroundTarget;
 import com.marianocarrizo.dynamusic.model.Scene;
@@ -12,7 +13,6 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
-import javafx.scene.control.Slider;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
@@ -48,7 +48,7 @@ public class BackgroundEditorController {
     @FXML private ImageView       bgPreviewImageView;
     @FXML private ProgressIndicator bgPreviewSpinner;
     @FXML private Label           lblBgPreviewPlaceholder;
-    @FXML private Slider          bgPreviewSlider;
+    @FXML private FilledSlider          bgPreviewSlider;
     @FXML private Pane            bgMarkBand;
     @FXML private Label           lblBgPreviewCurrentTime;
     @FXML private Label           lblBgPreviewTotalTime;

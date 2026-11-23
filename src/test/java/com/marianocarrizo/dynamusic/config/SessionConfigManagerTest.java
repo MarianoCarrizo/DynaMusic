@@ -122,4 +122,16 @@ class SessionConfigManagerTest {
         assertEquals(first.getActiveSceneId(), second.getActiveSceneId());
         assertEquals(legacy, Files.readString(dir.resolve("session.json.bak")));
     }
+
+    @Test
+    void libraryCollapsedDefaultsToVisibleAndRoundTrips(@TempDir Path dir) {
+        SessionConfigManager mgr = new SessionConfigManager(dir.resolve("session.json"));
+        SessionConfig cfg = new SessionConfig();
+        assertFalse(cfg.isLibraryCollapsed());
+
+        cfg.setLibraryCollapsed(true);
+        mgr.save(cfg);
+
+        assertTrue(mgr.load().isLibraryCollapsed());
+    }
 }

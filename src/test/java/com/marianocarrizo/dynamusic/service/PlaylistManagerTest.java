@@ -1,5 +1,6 @@
 package com.marianocarrizo.dynamusic.service;
 
+import com.marianocarrizo.dynamusic.model.RepeatMode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -59,7 +60,7 @@ class PlaylistManagerTest {
 
     @Test
     void wrapsToTheFirstTrackAtTheEndWhenLoopIsOn() {
-        manager.setLoop(true);
+        manager.setRepeat(RepeatMode.ALL);
         manager.startAt(2);
 
         assertEquals("a.mp3", manager.next().orElseThrow().getName());
@@ -216,7 +217,7 @@ class PlaylistManagerTest {
 
     @Test
     void afterRemovingThePlayingLastTrackNextWrapsToTheFirstWhenLoopIsOn() {
-        manager.setLoop(true);
+        manager.setRepeat(RepeatMode.ALL);
         manager.startAt(2);
 
         manager.removeTrack(PLAYLIST, 2);
@@ -264,5 +265,65 @@ class PlaylistManagerTest {
 
     private static List<File> files(String... names) {
         return Arrays.stream(names).map(File::new).toList();
+    }
+
+    @Test
+    void endOfTrackStopsAtTheEndOfThePlaylistWhenRepeatIsOff() {
+        manager.startAt(2);
+
+        assertTrue(manager.nextAfterEnd().isEmpty());
+    }
+
+    @Test
+    void endOfTrackAdvancesWhenRepeatIsOff() {
+        manager.startAt(0);
+
+        assertEquals("b.mp3", manager.nextAfterEnd().orElseThrow().getName());
+    }
+
+    @Test
+    void endOfTrackWrapsToTheFirstTrackWhenRepeatIsAll() {
+        manager.setRepeat(RepeatMode.ALL);
+        manager.startAt(2);
+
+        assertEquals("a.mp3", manager.nextAfterEnd().orElseThrow().getName());
+    }
+
+    @Test
+    void endOfTrackRepeatsTheSameTrackWhenRepeatIsOne() {
+        manager.setRepeat(RepeatMode.ONE);
+        manager.startAt(1);
+
+        assertEquals("b.mp3", manager.nextAfterEnd().orElseThrow().getName());
+        assertEquals("b.mp3", manager.nextAfterEnd().orElseThrow().getName());
+        assertEquals(1, manager.currentDisplayIndex());
+    }
+
+    @Test
+    void endOfTrackRepeatsTheSameTrackWhenRepeatIsOneWithShuffle() {
+        manager.setRepeat(RepeatMode.ONE);
+        manager.setShuffle(true);
+        manager.startAt(2);
+
+        for (int i = 0; i < 5; i++) {
+            assertEquals("c.mp3", manager.nextAfterEnd().orElseThrow().getName());
+        }
+        assertEquals(2, manager.currentDisplayIndex());
+    }
+
+    @Test
+    void manualNextStillAdvancesWhenRepeatIsOne() {
+        manager.setRepeat(RepeatMode.ONE);
+        manager.startAt(0);
+
+        assertEquals("b.mp3", manager.next().orElseThrow().getName());
+    }
+
+    @Test
+    void manualPreviousStillGoesBackWhenRepeatIsOne() {
+        manager.setRepeat(RepeatMode.ONE);
+        manager.startAt(2);
+
+        assertEquals("b.mp3", manager.prev().orElseThrow().getName());
     }
 }

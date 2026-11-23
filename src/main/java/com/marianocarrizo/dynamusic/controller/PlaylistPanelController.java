@@ -1,5 +1,9 @@
 package com.marianocarrizo.dynamusic.controller;
 
+import com.marianocarrizo.dynamusic.model.NowPlaying;
+import com.marianocarrizo.dynamusic.model.NowPlayingModel;
+import com.marianocarrizo.dynamusic.config.SessionConfig;
+import com.marianocarrizo.dynamusic.model.NowPlayingSource;
 import com.marianocarrizo.dynamusic.model.PlaylistItem;
 import com.marianocarrizo.dynamusic.service.AudioFileCollector;
 import com.marianocarrizo.dynamusic.service.PlaylistManager;
@@ -10,7 +14,6 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
-import javafx.scene.control.TextInputDialog;
 import javafx.scene.input.KeyCode;
 
 import java.io.File;
@@ -24,11 +27,28 @@ import java.util.function.Supplier;
 
 public final class PlaylistPanelController {
 
+    interface Host {
+        SessionConfig session();
+
+        void saveSession();
+
+        PlaylistManager playlistManager();
+
+        NowPlayingModel nowPlaying();
+
+        Optional<File> selectedLibraryItem();
+
+        void playPlaylistTrack(File file);
+
+        void persistPlaylists();
+    }
+
+
     private static final String DEFAULT_PLAYLIST_NAME = "New playlist";
     private static final String NAME_REJECTED_MESSAGE = "Name already exists or is blank.";
 
     @FXML private ComboBox<String> cmbPlaylist;
-    @FXML private ListView<String> lstPlaylistTracks;
+    @FXML private ListView<PlaylistRow> lstPlaylistTracks;
     @FXML private Label lblTrackCounter;
 
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor(r -> {
@@ -36,11 +56,13 @@ public final class PlaylistPanelController {
         t.setDaemon(true);
         return t;
     });
-    private PlayerHost host;
+    private Host host;
     private PlaylistManager playlistManager;
     private boolean refreshing = false;
+    private final DragActivity dragActivity = new DragActivity();
+    private File followedTrack;
 
-    void attach(PlayerHost host) {
+    void attach(Host host) {
         this.host = host;
         this.playlistManager = host.playlistManager();
         PlaylistTrackCell.Host trackHost = trackHost();
@@ -51,6 +73,9 @@ public final class PlaylistPanelController {
             host.saveSession();
             refresh();
         });
+        host.nowPlaying().snapshotProperty().addListener((obs, oldValue, newValue) -> refreshPlayingState());
+        lstPlaylistTracks.setOnDragEntered(e -> dragActivity.begin());
+        lstPlaylistTracks.setOnDragExited(e -> dragActivity.end());
         lstPlaylistTracks.setCellFactory(lv -> new PlaylistTrackCell(trackHost));
         PlaylistTrackCell.acceptFileDropsOnList(lstPlaylistTracks, trackHost);
         lstPlaylistTracks.setOnKeyPressed(e -> {
@@ -78,11 +103,29 @@ public final class PlaylistPanelController {
     }
 
     void showPendingEntry(String text) {
-        lstPlaylistTracks.getItems().add(text);
+        lstPlaylistTracks.getItems().add(PlaylistRow.pending(text));
     }
 
-    void refreshRows() {
+    private void refreshPlayingState() {
         lstPlaylistTracks.refresh();
+        lblTrackCounter.setText(playlistManager.positionLabel());
+        File previous = followedTrack;
+        File playing = playingPlaylistTrack();
+        followedTrack = playing;
+        Platform.runLater(() -> followPlayingRow(previous, playing));
+    }
+
+    private File playingPlaylistTrack() {
+        NowPlaying current = host.nowPlaying().get();
+        return current.source() == NowPlayingSource.PLAYLIST ? current.file() : null;
+    }
+
+    private void followPlayingRow(File previous, File playing) {
+        if (dragActivity.isActive()) return;
+        int index = playlistManager.currentDisplayIndex();
+        RowRange visible = VisibleRows.of(lstPlaylistTracks);
+        if (!PlayingRowScroll.shouldScroll(previous, playing, index, visible)) return;
+        lstPlaylistTracks.scrollTo(PlayingRowScroll.topIndexFor(index, visible));
     }
 
     void addItem(String playlistName, PlaylistItem item) {
@@ -110,7 +153,7 @@ public final class PlaylistPanelController {
             int selected = lstPlaylistTracks.getSelectionModel().getSelectedIndex();
             lstPlaylistTracks.getItems().setAll(
                 playlistManager.getActiveItems().stream()
-                    .map(PlaylistItem::displayName)
+                    .map(PlaylistRow::of)
                     .toList()
             );
             selectTrackRow(selected);
@@ -123,11 +166,7 @@ public final class PlaylistPanelController {
     }
 
     Optional<String> promptNewName() {
-        TextInputDialog d = new TextInputDialog();
-        d.setTitle("New Playlist");
-        d.setHeaderText(null);
-        d.setContentText("Name:");
-        Optional<String> created = d.showAndWait().map(String::trim).filter(n -> !n.isEmpty()).flatMap(name -> {
+        Optional<String> created = NamePrompt.ask("New Playlist", "Name:", "").flatMap(name -> {
             if (playlistManager.createPlaylist(name) == null) {
                 new Alert(Alert.AlertType.WARNING, NAME_REJECTED_MESSAGE).showAndWait();
                 return Optional.empty();
@@ -175,11 +214,7 @@ public final class PlaylistPanelController {
     private void onRenamePlaylist() {
         String current = cmbPlaylist.getValue();
         if (current == null) return;
-        TextInputDialog d = new TextInputDialog(current);
-        d.setTitle("Rename");
-        d.setHeaderText(null);
-        d.setContentText("New name:");
-        d.showAndWait().map(String::trim).filter(n -> !n.isEmpty()).ifPresent(name -> {
+        NamePrompt.ask("Rename", "New name:", current).ifPresent(name -> {
             if (!playlistManager.renamePlaylist(current, name)) {
                 new Alert(Alert.AlertType.WARNING, NAME_REJECTED_MESSAGE).showAndWait();
                 return;
@@ -220,32 +255,13 @@ public final class PlaylistPanelController {
         removeTrackAt(lstPlaylistTracks.getSelectionModel().getSelectedIndex());
     }
 
-    @FXML
-    private void onMoveUp() {
-        moveSelectedBy(-1);
-    }
-
-    @FXML
-    private void onMoveDown() {
-        moveSelectedBy(1);
-    }
-
-    private void moveSelectedBy(int delta) {
-        String name = cmbPlaylist.getValue();
-        if (name == null) return;
-        int idx = lstPlaylistTracks.getSelectionModel().getSelectedIndex();
-        int target = idx + delta;
-        if (idx < 0 || target < 0 || target >= lstPlaylistTracks.getItems().size()) return;
-        playlistManager.reorderTrack(name, idx, target);
-        refresh();
-        lstPlaylistTracks.getSelectionModel().select(target);
-        persist();
-    }
-
     private PlaylistTrackCell.Host trackHost() {
         return new PlaylistTrackCell.Host() {
-            @Override public boolean isNowPlaying(int index) {
-                return host.musicService().isPlaylistPlaying() && index == playlistManager.currentDisplayIndex();
+            @Override public RowPlayback playbackOf(int index) {
+                NowPlaying current = host.nowPlaying().get();
+                boolean currentRow = current.source() == NowPlayingSource.PLAYLIST
+                        && index == playlistManager.currentDisplayIndex();
+                return RowPlayback.of(currentRow, current.playing());
             }
             @Override public void filesDropped(List<File> files, int slot) {
                 addDroppedFiles(files, slot);
@@ -255,6 +271,12 @@ public final class PlaylistPanelController {
             }
             @Override public void removeRequested(int index) {
                 removeTrackAt(index);
+            }
+            @Override public void rowDragStarted() {
+                dragActivity.begin();
+            }
+            @Override public void rowDragFinished() {
+                dragActivity.end();
             }
         };
     }

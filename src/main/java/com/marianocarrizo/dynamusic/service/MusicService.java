@@ -1,11 +1,9 @@
 package com.marianocarrizo.dynamusic.service;
 
 import com.marianocarrizo.dynamusic.enums.TrackType;
+import com.marianocarrizo.dynamusic.model.NowPlayingSource;
 import com.marianocarrizo.dynamusic.utils.ConversorUtils;
 import javafx.application.Platform;
-import javafx.beans.property.ReadOnlyStringProperty;
-import javafx.beans.property.SimpleStringProperty;
-import javafx.beans.property.StringProperty;
 import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
 import javafx.util.Duration;
@@ -31,9 +29,19 @@ public class MusicService {
 
     /** Modo de reproducción activo. Solo un modo emite audio a la vez. */
     public enum PlaybackMode {
-        MOOD,
-        PLAYLIST,
-        ON_DEMAND
+        MOOD(NowPlayingSource.MOOD),
+        PLAYLIST(NowPlayingSource.PLAYLIST),
+        ON_DEMAND(NowPlayingSource.ON_DEMAND);
+
+        private final NowPlayingSource source;
+
+        PlaybackMode(NowPlayingSource source) {
+            this.source = source;
+        }
+
+        public NowPlayingSource source() {
+            return source;
+        }
     }
 
     // =========================================================================
@@ -44,7 +52,7 @@ public class MusicService {
     private final Map<TrackType, MediaPlayer> players;
 
     // Nombres de archivo por tipo, para actualizar el label "ahora sonando"
-    private final Map<TrackType, String> trackNames;
+    private final Map<TrackType, File> trackFiles;
 
     // Volumen RMS calculado por pista — necesario para restaurar al hacer fade-in
     private final Map<TrackType, Double> trackGains;
@@ -57,16 +65,18 @@ public class MusicService {
     private TrackType currentTrack;
     private boolean loopEnabled;
     private boolean previewLoopEnabled;
-    private BiConsumer<Duration, Duration> progressListener;
-    private BiConsumer<Duration, Duration> previewProgressListener;
+    private BiConsumer<Duration, Duration> activeProgressListener = (current, total) -> { };
+    private Runnable onPlaybackChanged = () -> { };
+    private MediaPlayer fadingOutPlayer;
+    private File previewFile;
+    private File playlistFile;
+    private File onDemandFile;
+    private String onDemandTitle;
 
     // Reproductor dedicado a preescucha — nunca entra al mapa 'players'
     private MediaPlayer previewPlayer;
     private final AudioFocus audioFocus =
             new AudioFocus(() -> previewPlayer != null, this::pausePreviewPlayer, this::pauseModePlayers);
-
-    // Propiedad reactiva con el nombre de la pista actualmente sonando
-    private final StringProperty nowPlaying = new SimpleStringProperty("—");
 
     // Amplitud de audio: escrita en el hilo del callback del espectro, leída por la UI
     private final AudioAnalyzer audioAnalyzer = new AudioAnalyzer();
@@ -104,14 +114,11 @@ public class MusicService {
     private double onDemandGain = 1.0;
     private boolean onDemandLoop = false;
     private int onDemandSeq = 0;
-    private BiConsumer<Duration, Duration> onDemandProgressListener = null;
-    private Runnable onDemandStateListener = null;
+    private final LoadSequence playlistLoads = new LoadSequence();
 
     // Callback que el controlador suministra para avanzar al siguiente track
     private Runnable onPlaylistEnd = null;
-
-    // Listener de progreso para el panel de progreso del playlist
-    private BiConsumer<Duration, Duration> playlistProgressListener = null;
+    private Runnable onPlaylistTrackFailed = null;
 
     // =========================================================================
     // Constructor
@@ -119,13 +126,11 @@ public class MusicService {
 
     public MusicService() {
         this.players = new HashMap<>();
-        this.trackNames = new EnumMap<>(TrackType.class);
+        this.trackFiles = new EnumMap<>(TrackType.class);
         this.trackGains = new EnumMap<>(TrackType.class);
         this.currentTrack = null;
         this.loopEnabled = false;
         this.previewLoopEnabled = false;
-        this.progressListener = null;
-        this.previewProgressListener = null;
         this.previewPlayer = null;
     }
 
@@ -167,8 +172,82 @@ public class MusicService {
     // Propiedad nowPlaying + amplitud
     // =========================================================================
 
-    public ReadOnlyStringProperty nowPlayingProperty() {
-        return nowPlaying;
+    public void setOnPlaybackChanged(Runnable listener) {
+        onPlaybackChanged = listener == null ? () -> { } : listener;
+    }
+
+    public void setActiveProgressListener(BiConsumer<Duration, Duration> listener) {
+        activeProgressListener = listener == null ? (current, total) -> { } : listener;
+    }
+
+    public void reportActiveProgress() {
+        reportProgress(activePlayer());
+    }
+
+    public NowPlayingSource activeSource() {
+        return audioFocus.previewSoundedLast() ? NowPlayingSource.PREVIEW : mode.source();
+    }
+
+    public boolean hasPlaylistTrack() {
+        return playlistFile != null;
+    }
+
+    public PlaybackState playbackState() {
+        return new PlaybackState(mode, audioFocus.previewSoundedLast(), currentTrack,
+                previewSounding(), moodSounding(), playlistSounding(), onDemandSounding());
+    }
+
+    private SoundingTrack previewSounding() {
+        if (previewPlayer == null || previewFile == null) return SoundingTrack.ABSENT;
+        return SoundingTrack.of(previewFile, isPreviewPlaying());
+    }
+
+    private SoundingTrack moodSounding() {
+        File file = currentTrack == null || !players.containsKey(currentTrack) ? null : trackFiles.get(currentTrack);
+        return file == null ? SoundingTrack.ABSENT : SoundingTrack.of(file, isPlaying());
+    }
+
+    private SoundingTrack playlistSounding() {
+        return playlistFile == null ? SoundingTrack.ABSENT : SoundingTrack.of(playlistFile, isPlaylistPlaying());
+    }
+
+    private SoundingTrack onDemandSounding() {
+        if (onDemandFile == null) return SoundingTrack.ABSENT;
+        return SoundingTrack.of(onDemandTitle, onDemandFile, isOnDemandPlaying());
+    }
+
+    private void notifyPlaybackChanged() {
+        onPlaybackChanged.run();
+    }
+
+    private void observeStatus(MediaPlayer player) {
+        player.statusProperty().addListener((obs, oldStatus, newStatus) -> {
+            if (newStatus != MediaPlayer.Status.PLAYING && player == fadingOutPlayer) fadingOutPlayer = null;
+            notifyPlaybackChanged();
+        });
+    }
+
+    private boolean isSounding(MediaPlayer player) {
+        return player != null && player != fadingOutPlayer && player.getStatus() == MediaPlayer.Status.PLAYING;
+    }
+
+    private MediaPlayer activePlayer() {
+        if (audioFocus.previewSoundedLast()) return previewPlayer;
+        return switch (mode) {
+            case MOOD -> currentTrack == null ? null : players.get(currentTrack);
+            case PLAYLIST -> playlistPlayer;
+            case ON_DEMAND -> onDemandPlayer;
+        };
+    }
+
+    private void emitProgress(MediaPlayer player) {
+        if (player == activePlayer()) reportProgress(player);
+    }
+
+    private void reportProgress(MediaPlayer player) {
+        if (player == null) return;
+        Duration total = player.getTotalDuration();
+        if (total != null && !total.isUnknown()) activeProgressListener.accept(player.getCurrentTime(), total);
     }
 
     public AudioFeatures getAudioFeatures() {
@@ -229,6 +308,8 @@ public class MusicService {
                 playlistPlayer.dispose();
                 playlistPlayer = null;
             }
+            playlistFile = null;
+            playlistLoads.invalidate();
         }
 
         mode = target;
@@ -240,9 +321,9 @@ public class MusicService {
             if (currentTrack != null && players.containsKey(currentTrack)) {
                 attachSpectrumListener(players.get(currentTrack));
             }
-            nowPlaying.set(currentTrack != null ? trackNames.getOrDefault(currentTrack, "—") : "—");
             // No se auto-reproduce; el controlador decide
         }
+        notifyPlaybackChanged();
         // Entrando al modo PLAYLIST: playlistPlayer ya es null; el controlador
         // llamará a playPlaylistTrack(...) cuando el usuario pulse play
     }
@@ -272,7 +353,6 @@ public class MusicService {
     public void loadTrack(TrackType type, File file, Runnable onLoaded, Runnable onFailed) {
         if (file == null || !file.exists()) return;
 
-        final String trackDisplayName = file.getName();
         final int seq = loadSeq.merge(type, 1, Integer::sum);
 
         audioPrep.submit(() -> {
@@ -299,6 +379,7 @@ public class MusicService {
                     }
 
                     player.setVolume(effectiveGain(gain));
+                    observeStatus(player);
 
                     player.setOnError(() -> {
                         System.err.println("Error en pista " + type + ": " + player.getError());
@@ -316,17 +397,13 @@ public class MusicService {
                         if (loopEnabled) {
                             player.seek(Duration.ZERO);
                             player.play();
+                        } else {
+                            player.pause();
+                            player.seek(Duration.ZERO);
                         }
                     });
 
-                    player.currentTimeProperty().addListener((obs, oldVal, newVal) -> {
-                        if (progressListener != null) {
-                            Duration total = player.getTotalDuration();
-                            if (total != null && !total.isUnknown()) {
-                                progressListener.accept(newVal, total);
-                            }
-                        }
-                    });
+                    player.currentTimeProperty().addListener((obs, oldVal, newVal) -> emitProgress(player));
 
                     player.setOnReady(() -> {
                         if (loadSeq.getOrDefault(type, 0) != seq) {
@@ -344,25 +421,15 @@ public class MusicService {
                             replaced.stop();
                             replaced.dispose();
                         }
-                        trackNames.put(type, trackDisplayName);
+                        trackFiles.put(type, file);
                         trackGains.put(type, gain);
                         attachSpectrumListener(player);
                         if (currentTrack == null) {
                             currentTrack = type;
                         }
-                        if (type == currentTrack && replaced != null) {
-                            nowPlaying.set(trackDisplayName);
-                            if (resumePlayback) player.play();
-                        }
+                        if (type == currentTrack && replaced != null && resumePlayback) player.play();
                         if (onLoaded != null) onLoaded.run();
-                        if (progressListener != null) {
-                            Platform.runLater(() -> {
-                                Duration total = player.getTotalDuration();
-                                if (total != null && !total.isUnknown()) {
-                                    progressListener.accept(Duration.ZERO, total);
-                                }
-                            });
-                        }
+                        notifyPlaybackChanged();
                     });
                 });
 
@@ -382,17 +449,17 @@ public class MusicService {
         if (type == null) return;
         loadSeq.merge(type, 1, Integer::sum);
         MediaPlayer removed = players.remove(type);
-        trackNames.remove(type);
+        trackFiles.remove(type);
         trackGains.remove(type);
         if (removed == null) return;
         if (type == currentTrack) {
             cancelActiveFade();
             currentTrack = null;
-            nowPlaying.set("—");
         }
         removed.setAudioSpectrumListener(null);
         removed.stop();
         removed.dispose();
+        notifyPlaybackChanged();
     }
 
     public TrackType getCurrentTrack() {
@@ -410,7 +477,7 @@ public class MusicService {
         }
         currentTrack = type;
         attachSpectrumListener(players.get(type));
-        nowPlaying.set(trackNames.getOrDefault(type, type.name()));
+        notifyPlaybackChanged();
     }
 
     // =========================================================================
@@ -446,7 +513,7 @@ public class MusicService {
         nextPlayer.seek(currentTime);
         nextPlayer.play();
 
-        nowPlaying.set(trackNames.getOrDefault(newTrack, newTrack.name()));
+        notifyPlaybackChanged();
     }
 
     // =========================================================================
@@ -457,10 +524,11 @@ public class MusicService {
      * Inicia la preescucha de un archivo sin afectar los slots de mood asignados.
      * Pausa el reproductor de mood activo y, si hay uno de playlist sonando, también lo pausa.
      */
-    public void previewTrack(File file) {
-        if (file == null || !file.exists()) return;
+    public boolean previewTrack(File file) {
+        if (file == null || !file.exists()) return false;
 
-        audioFocus.claimForPreview();
+        final PreviewTicket ticket = audioFocus.claimForNewPreview();
+        previewFile = file;
 
         if (previewPlayer != null) {
             previewPlayer.stop();
@@ -479,10 +547,10 @@ public class MusicService {
                 }
 
                 final double gain = ConversorUtils.calculateGainForRMS(finalFile);
-                final String previewLabel = "▶ " + file.getName();
 
                 // (4) Construcción del reproductor en el hilo FX
                 Platform.runLater(() -> {
+                    if (audioFocus.readinessOf(ticket) == PreviewReadiness.DISCARD) return;
                     try {
                         String sourceUrl = finalFile.toURI().toString();
                         Media media = new Media(sourceUrl);
@@ -490,48 +558,38 @@ public class MusicService {
                         previewGain = gain;
                         player.setVolume(effectiveGain(gain));
 
-                        player.setOnEndOfMedia(() -> {
-                            Platform.runLater(() -> {
-                                if (previewLoopEnabled) {
-                                    player.seek(Duration.ZERO);
-                                    player.play();
-                                } else {
-                                    String restoredName = currentTrack != null
-                                            ? trackNames.getOrDefault(currentTrack, "—")
-                                            : "—";
-                                    nowPlaying.set(restoredName);
-                                    if (previewPlayer != null) {
-                                        previewPlayer.dispose();
-                                        previewPlayer = null;
-                                    }
-                                }
-                            });
-                        });
-
-                        player.currentTimeProperty().addListener((obs, oldVal, newVal) -> {
-                            if (previewProgressListener != null) {
-                                Duration total = player.getTotalDuration();
-                                if (total != null && !total.isUnknown()) {
-                                    previewProgressListener.accept(newVal, total);
-                                }
+                        player.setOnEndOfMedia(() -> Platform.runLater(() -> {
+                            if (player != previewPlayer) return;
+                            if (previewLoopEnabled) {
+                                player.seek(Duration.ZERO);
+                                player.play();
+                            } else {
+                                stopPreview();
                             }
-                        });
+                        }));
+
+                        player.setOnError(() -> Platform.runLater(() -> {
+                            System.err.println("Preview playback error: " + player.getError());
+                            if (player == previewPlayer) stopPreview();
+                        }));
+
+                        player.currentTimeProperty().addListener((obs, oldVal, newVal) -> emitProgress(player));
 
                         previewPlayer = player;
+                        observeStatus(player);
                         attachSpectrumListener(player);
+                        notifyPlaybackChanged();
 
                         player.setOnReady(() -> {
-                            player.play();
-                            nowPlaying.set(previewLabel);
-                            if (previewProgressListener != null) {
-                                previewProgressListener.accept(Duration.ZERO, player.getTotalDuration());
-                            }
+                            if (player != previewPlayer) return;
+                            if (audioFocus.readinessOf(ticket) == PreviewReadiness.PLAY) player.play();
                         });
 
                     } catch (Exception e) {
                         System.err.println("Error al iniciar preescucha de "
                                 + file.getName() + ": " + e.getMessage());
                         e.printStackTrace();
+                        notifyPlaybackChanged();
                     }
                 });
 
@@ -539,8 +597,10 @@ public class MusicService {
                 System.err.println("Error en preparación de preescucha de "
                         + file.getName() + ": " + e.getMessage());
                 e.printStackTrace();
+                Platform.runLater(this::notifyPlaybackChanged);
             }
         });
+        return true;
     }
 
     public void stopPreview() {
@@ -548,6 +608,7 @@ public class MusicService {
             previewPlayer.stop();
             previewPlayer.dispose();
             previewPlayer = null;
+            notifyPlaybackChanged();
         }
     }
 
@@ -568,13 +629,6 @@ public class MusicService {
             players.get(currentTrack).pause();
     }
 
-    public void stop() {
-        if (mode != PlaybackMode.MOOD) return; // guard T-08
-        cancelActiveFade();
-        if (currentTrack != null && players.containsKey(currentTrack))
-            players.get(currentTrack).stop();
-    }
-
     /**
      * Baja el volumen a 0 en 1 segundo, luego pausa y restaura el volumen.
      * No-op mientras el modo activo sea PLAYLIST (T-08).
@@ -585,6 +639,7 @@ public class MusicService {
         if (currentTrack == null || !players.containsKey(currentTrack)) return;
         MediaPlayer player = players.get(currentTrack);
         double savedVolume = player.getVolume();
+        fadingOutPlayer = player;
         activeFade = new Timeline(
             new KeyFrame(
                 javafx.util.Duration.millis(1000),
@@ -598,6 +653,7 @@ public class MusicService {
             if (onComplete != null) onComplete.run();
         });
         activeFade.play();
+        notifyPlaybackChanged();
     }
 
     /**
@@ -630,6 +686,7 @@ public class MusicService {
     private void cancelActiveFade() {
         if (activeFade != null) {
             activeFade.stop();
+            fadingOutPlayer = null;
             if (mode == PlaybackMode.PLAYLIST) {
                 if (playlistPlayer != null) {
                     playlistPlayer.setVolume(effectiveGain(playlistGain));
@@ -641,12 +698,13 @@ public class MusicService {
                 }
             }
             activeFade = null;
+            notifyPlaybackChanged();
         }
     }
 
     public boolean isPlaying() {
         if (currentTrack == null || !players.containsKey(currentTrack)) return false;
-        return players.get(currentTrack).getStatus() == MediaPlayer.Status.PLAYING;
+        return isSounding(players.get(currentTrack));
     }
 
     // =========================================================================
@@ -661,14 +719,6 @@ public class MusicService {
 
     public boolean previewSoundedLast() {
         return audioFocus.previewSoundedLast();
-    }
-
-    public void setOnPreviewPausedByMode(Runnable listener) {
-        audioFocus.setOnPreviewPausedByMode(listener);
-    }
-
-    public void setOnModePausedByPreview(Runnable listener) {
-        audioFocus.setOnModePausedByPreview(listener);
     }
 
     private void pausePreviewPlayer() {
@@ -700,10 +750,6 @@ public class MusicService {
         this.previewLoopEnabled = enabled;
     }
 
-    public void setPreviewProgressListener(BiConsumer<Duration, Duration> listener) {
-        this.previewProgressListener = listener;
-    }
-
     public void seekPreview(double fraction) {
         if (previewPlayer != null) {
             Duration total = previewPlayer.getTotalDuration();
@@ -723,84 +769,82 @@ public class MusicService {
      *   audioPrep (FLAC→WAV + RMS) → Platform.runLater (construcción de MediaPlayer).
      */
     public void playPlaylistTrack(File file) {
-        if (mode != PlaybackMode.PLAYLIST) return; // guard T-09
+        if (mode != PlaybackMode.PLAYLIST) return;
         audioFocus.claimForMode();
+        cancelActiveFade();
+        final int seq = playlistLoads.begin();
 
         audioPrep.submit(() -> {
             try {
-                final File finalFile;
-                if (file.getName().toLowerCase().endsWith(".flac")) {
-                    finalFile = ConversorUtils.convertFlacToWav(file);
-                } else {
-                    finalFile = file;
-                }
-
-                final double gain = ConversorUtils.calculateGainForRMS(finalFile);
-
-                Platform.runLater(() -> {
-                    // T-17: re-verificar el modo dentro del runLater — la llamada async puede
-                    // completarse después de un cambio de modo
-                    if (mode != PlaybackMode.PLAYLIST) return;
-
-                    // T-16 + T-17: desconectar espectro ANTES de dispose del reproductor anterior
-                    if (playlistPlayer != null) {
-                        playlistPlayer.setAudioSpectrumListener(null); // T-16
-                        playlistPlayer.stop();
-                        playlistPlayer.dispose();
-                        playlistPlayer = null; // null después de dispose (T-17)
-                    }
-
-                    String sourceUrl = finalFile.toURI().toString();
-                    Media media = new Media(sourceUrl);
-                    MediaPlayer player = new MediaPlayer(media);
-
-                    player.setVolume(effectiveGain(gain));
-                    playlistGain = gain;
-
-                    // T-16: adjuntar espectro ANTES de setOnReady (activo desde el primer frame)
-                    attachSpectrumListener(player);
-
-                    // Listener de progreso del panel de playlist
-                    player.currentTimeProperty().addListener((obs, oldVal, newVal) -> {
-                        if (playlistProgressListener != null) {
-                            Duration total = player.getTotalDuration();
-                            if (total != null && !total.isUnknown()) {
-                                playlistProgressListener.accept(newVal, total);
-                            }
-                        }
-                    });
-
-                    nowPlaying.set(file.getName());
-
-                    // T-05/T-09: al llegar al fin de la pista, delegar la lógica de avance
-                    // al callback suministrado por el controlador (onPlaylistEnd)
-                    player.setOnEndOfMedia(() -> Platform.runLater(() -> {
-                        if (mode == PlaybackMode.PLAYLIST && onPlaylistEnd != null) {
-                            onPlaylistEnd.run();
-                        }
-                    }));
-
-                    // En caso de error, avanzar para no quedar bloqueado en una pista mala
-                    player.setOnError(() -> {
-                        System.err.println("Error en pista de playlist: " + player.getError());
-                        Platform.runLater(() -> {
-                            if (mode == PlaybackMode.PLAYLIST && player == playlistPlayer && onPlaylistEnd != null) {
-                                onPlaylistEnd.run();
-                            }
-                        });
-                    });
-
-                    // Arrancar la reproducción cuando el reproductor esté listo
-                    player.setOnReady(() -> player.play());
-
-                    playlistPlayer = player;
-                });
-
+                final File playable = file.getName().toLowerCase().endsWith(".flac")
+                        ? ConversorUtils.convertFlacToWav(file) : file;
+                final double gain = ConversorUtils.calculateGainForRMS(playable);
+                Platform.runLater(() -> openPlaylistPlayer(file, playable, gain, seq));
             } catch (Exception e) {
                 System.err.println("No se pudo cargar la pista de playlist: " + e.getMessage());
                 e.printStackTrace();
+                Platform.runLater(() -> failPlaylistLoad(seq));
             }
         });
+    }
+
+    private void openPlaylistPlayer(File file, File playable, double gain, int seq) {
+        if (!playlistLoads.isCurrent(seq) || mode != PlaybackMode.PLAYLIST) return;
+        final MediaPlayer player;
+        try {
+            player = new MediaPlayer(new Media(playable.toURI().toString()));
+        } catch (RuntimeException ex) {
+            System.err.println("Could not open playlist track: " + ex.getMessage());
+            failPlaylistLoad(seq);
+            return;
+        }
+        player.setVolume(effectiveGain(gain));
+        observeStatus(player);
+        player.currentTimeProperty().addListener((obs, oldVal, newVal) -> emitProgress(player));
+        player.setOnEndOfMedia(() -> Platform.runLater(() -> {
+            if (mode == PlaybackMode.PLAYLIST && player == playlistPlayer && onPlaylistEnd != null) {
+                onPlaylistEnd.run();
+            }
+        }));
+        player.setOnError(() -> Platform.runLater(() -> handlePlaylistPlayerError(player, seq)));
+        player.setOnReady(() -> commitPlaylistPlayer(player, file, gain, seq));
+    }
+
+    private void commitPlaylistPlayer(MediaPlayer player, File file, double gain, int seq) {
+        if (!playlistLoads.isCurrent(seq) || mode != PlaybackMode.PLAYLIST) {
+            player.dispose();
+            return;
+        }
+        cancelActiveFade();
+        releasePlaylistPlayer();
+        playlistGain = gain;
+        playlistPlayer = player;
+        playlistFile = file;
+        attachSpectrumListener(player);
+        player.play();
+        notifyPlaybackChanged();
+    }
+
+    private void handlePlaylistPlayerError(MediaPlayer player, int seq) {
+        System.err.println("Playlist playback error: " + player.getError());
+        if (player == playlistPlayer) {
+            if (mode == PlaybackMode.PLAYLIST && onPlaylistTrackFailed != null) onPlaylistTrackFailed.run();
+            return;
+        }
+        player.dispose();
+        failPlaylistLoad(seq);
+    }
+
+    private void failPlaylistLoad(int seq) {
+        if (playlistLoads.isCurrent(seq)) stopPlaylist();
+    }
+
+    private void releasePlaylistPlayer() {
+        if (playlistPlayer == null) return;
+        playlistPlayer.setAudioSpectrumListener(null);
+        playlistPlayer.stop();
+        playlistPlayer.dispose();
+        playlistPlayer = null;
     }
 
     /**
@@ -810,6 +854,7 @@ public class MusicService {
     public void playlistPlay() {
         if (mode != PlaybackMode.PLAYLIST) return;
         audioFocus.claimForMode();
+        cancelActiveFade();
         if (playlistPlayer != null
                 && playlistPlayer.getStatus() != MediaPlayer.Status.PLAYING) {
             playlistPlayer.play();
@@ -827,20 +872,21 @@ public class MusicService {
 
         cancelActiveFade();
         final double savedGain = playlistGain;
+        final MediaPlayer fading = playlistPlayer;
+        fadingOutPlayer = fading;
         activeFade = new Timeline(
             new KeyFrame(
                 javafx.util.Duration.millis(1000),
-                new KeyValue(playlistPlayer.volumeProperty(), 0.0, Interpolator.EASE_IN)
+                new KeyValue(fading.volumeProperty(), 0.0, Interpolator.EASE_IN)
             )
         );
         activeFade.setOnFinished(e -> {
-            if (playlistPlayer != null) {
-                playlistPlayer.pause();
-                playlistPlayer.setVolume(effectiveGain(savedGain));
-            }
+            fading.pause();
+            fading.setVolume(effectiveGain(savedGain));
             activeFade = null;
         });
         activeFade.play();
+        notifyPlaybackChanged();
     }
 
     /**
@@ -848,11 +894,11 @@ public class MusicService {
      * T-17: null-guard antes de dispose; null del campo después de dispose.
      */
     public void stopPlaylist() {
-        if (playlistPlayer != null) {
-            playlistPlayer.stop();
-            playlistPlayer.dispose();
-            playlistPlayer = null;
-        }
+        playlistLoads.invalidate();
+        if (mode == PlaybackMode.PLAYLIST) cancelActiveFade();
+        releasePlaylistPlayer();
+        playlistFile = null;
+        notifyPlaybackChanged();
     }
 
     /**
@@ -871,8 +917,7 @@ public class MusicService {
 
     /** Retorna true si el reproductor de playlist está en estado PLAYING. */
     public boolean isPlaylistPlaying() {
-        return playlistPlayer != null
-                && playlistPlayer.getStatus() == MediaPlayer.Status.PLAYING;
+        return isSounding(playlistPlayer);
     }
 
     /** Establece el callback que se invoca al llegar al fin de una pista del playlist. */
@@ -880,9 +925,8 @@ public class MusicService {
         this.onPlaylistEnd = r;
     }
 
-    /** Establece el listener de progreso para el panel de playlist. */
-    public void setPlaylistProgressListener(BiConsumer<Duration, Duration> l) {
-        this.playlistProgressListener = l;
+    public void setOnPlaylistTrackFailed(Runnable r) {
+        this.onPlaylistTrackFailed = r;
     }
 
     private void disposeOnDemandPlayer() {
@@ -892,6 +936,9 @@ public class MusicService {
             onDemandPlayer.dispose();
             onDemandPlayer = null;
         }
+        onDemandFile = null;
+        onDemandTitle = null;
+        notifyPlaybackChanged();
     }
 
     public void playOnDemand(File file, String title, Runnable onStarted) {
@@ -913,15 +960,12 @@ public class MusicService {
                         player = new MediaPlayer(new Media(finalFile.toURI().toString()));
                     } catch (RuntimeException ex) {
                         System.err.println("Could not open on-demand track: " + ex.getMessage());
+                        notifyPlaybackChanged();
                         return;
                     }
 
-                    player.currentTimeProperty().addListener((obs, o, nv) -> {
-                        if (onDemandProgressListener != null && player == onDemandPlayer) {
-                            Duration total = player.getTotalDuration();
-                            if (total != null && !total.isUnknown()) onDemandProgressListener.accept(nv, total);
-                        }
-                    });
+                    observeStatus(player);
+                    player.currentTimeProperty().addListener((obs, o, nv) -> emitProgress(player));
                     player.setOnEndOfMedia(() -> Platform.runLater(() -> {
                         if (player != onDemandPlayer) return;
                         if (onDemandLoop) {
@@ -930,17 +974,13 @@ public class MusicService {
                         } else {
                             player.pause();
                             player.seek(Duration.ZERO);
-                            if (onDemandStateListener != null) onDemandStateListener.run();
                         }
                     }));
                     player.setOnError(() -> {
                         System.err.println("On-demand playback error: " + player.getError());
                         Platform.runLater(() -> {
-                            if (player == onDemandPlayer) {
-                                if (onDemandStateListener != null) onDemandStateListener.run();
-                            } else {
-                                player.dispose();
-                            }
+                            if (player != onDemandPlayer) player.dispose();
+                            notifyPlaybackChanged();
                         });
                     });
                     player.setOnReady(() -> {
@@ -955,17 +995,17 @@ public class MusicService {
                         player.setVolume(effectiveGain(gain));
                         attachSpectrumListener(player);
                         onDemandPlayer = player;
-                        nowPlaying.set(title != null ? title : file.getName());
+                        onDemandFile = file;
+                        onDemandTitle = title != null && !title.isBlank() ? title : TrackNames.title(file.getName());
                         player.play();
-                        if (onDemandProgressListener != null)
-                            onDemandProgressListener.accept(Duration.ZERO, player.getTotalDuration());
                         if (onStarted != null) onStarted.run();
-                        if (onDemandStateListener != null) onDemandStateListener.run();
+                        notifyPlaybackChanged();
                     });
                 });
             } catch (Exception e) {
                 System.err.println("Could not load on-demand track: " + e.getMessage());
                 e.printStackTrace();
+                Platform.runLater(this::notifyPlaybackChanged);
             }
         });
     }
@@ -981,8 +1021,7 @@ public class MusicService {
     }
 
     public boolean isOnDemandPlaying() {
-        return mode == PlaybackMode.ON_DEMAND && onDemandPlayer != null
-                && onDemandPlayer.getStatus() == MediaPlayer.Status.PLAYING;
+        return mode == PlaybackMode.ON_DEMAND && isSounding(onDemandPlayer);
     }
 
     public void seekOnDemand(double fraction) {
@@ -996,14 +1035,6 @@ public class MusicService {
         this.onDemandLoop = enabled;
     }
 
-    public void setOnDemandProgressListener(BiConsumer<Duration, Duration> l) {
-        this.onDemandProgressListener = l;
-    }
-
-    public void setOnDemandStateListener(Runnable r) {
-        this.onDemandStateListener = r;
-    }
-
     // =========================================================================
     // Getters y setters estructurales
     // =========================================================================
@@ -1014,10 +1045,6 @@ public class MusicService {
 
     public void setLoop(boolean enabled) {
         this.loopEnabled = enabled;
-    }
-
-    public void setProgressListener(BiConsumer<Duration, Duration> listener) {
-        this.progressListener = listener;
     }
 
     public void seekCurrentTrack(double fraction) {

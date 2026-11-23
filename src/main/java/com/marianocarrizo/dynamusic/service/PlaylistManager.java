@@ -2,6 +2,7 @@ package com.marianocarrizo.dynamusic.service;
 
 import com.marianocarrizo.dynamusic.model.Playlist;
 import com.marianocarrizo.dynamusic.model.PlaylistItem;
+import com.marianocarrizo.dynamusic.model.RepeatMode;
 
 import java.io.File;
 import java.nio.file.InvalidPathException;
@@ -34,7 +35,7 @@ public class PlaylistManager {
     private boolean currentTrackRemoved;
 
     private boolean shuffle;
-    private boolean loop;
+    private RepeatMode repeat = RepeatMode.OFF;
 
     // Buffer de reproducción: permutación de índices [0..n-1] de activePlaylist.paths
     private int[] order;
@@ -408,7 +409,7 @@ public class PlaylistManager {
             return getCurrentTrack();
         }
         // Fin de la playlist
-        if (loop) {
+        if (repeat == RepeatMode.ALL) {
             if (shuffle) {
                 buildShuffledOrder(); // reinicia barajado; position ya queda en 0
             } else {
@@ -477,13 +478,18 @@ public class PlaylistManager {
         }
     }
 
-    /** Activa o desactiva el modo loop. */
-    public void setLoop(boolean on) {
-        this.loop = on;
+    public void setRepeat(RepeatMode mode) {
+        this.repeat = mode;
+    }
+
+    public RepeatMode getRepeat() { return repeat; }
+
+    public Optional<File> nextAfterEnd() {
+        if (repeat == RepeatMode.ONE && !currentTrackRemoved) return getCurrentTrack();
+        return next();
     }
 
     public boolean isShuffle() { return shuffle; }
-    public boolean isLoop()    { return loop; }
 
     /** Cantidad de pistas de la playlist activa; 0 si no hay ninguna seleccionada. */
     public int size() {

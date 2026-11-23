@@ -5,7 +5,6 @@ import javafx.animation.PauseTransition;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.control.Label;
-import javafx.scene.control.Slider;
 import javafx.scene.layout.HBox;
 import javafx.util.Duration;
 
@@ -19,7 +18,7 @@ public final class SeekBar extends HBox {
     private static final Duration SEEK_COOLDOWN = Duration.millis(150);
 
     @FXML private Label lblCurrentTime;
-    @FXML private Slider slider;
+    @FXML private FilledSlider slider;
     @FXML private Label lblTotalTime;
 
     private DoubleConsumer onSeekToFraction = fraction -> { };

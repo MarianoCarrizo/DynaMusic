@@ -1,5 +1,6 @@
 package com.marianocarrizo.dynamusic.controller;
 
+import com.marianocarrizo.dynamusic.config.SessionConfig;
 import javafx.collections.ListChangeListener;
 import javafx.fxml.FXML;
 import javafx.scene.control.RadioMenuItem;
@@ -12,14 +13,23 @@ import java.util.List;
 
 public final class AmbianceToolbarController {
 
+    interface Host {
+        AmbianceCoordinator ambiance();
+
+        SessionConfig session();
+
+        void saveSession();
+    }
+
+
     private static final int AUTO_SCREEN_MENU_INDEX = 0;
 
     @FXML private SplitMenuButton btnToggleAmbiance;
 
     private final ToggleGroup screenGroup = new ToggleGroup();
-    private PlayerHost host;
+    private Host host;
 
-    void attach(PlayerHost host) {
+    void attach(Host host) {
         this.host = host;
         host.ambiance().setOnVisibilityChanged(this::showVisibility);
         populateScreenMenu();

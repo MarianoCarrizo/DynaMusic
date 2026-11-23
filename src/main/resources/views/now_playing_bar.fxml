@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+<?import com.marianocarrizo.dynamusic.component.CoverView?>
+<?import com.marianocarrizo.dynamusic.component.IconButton?>
+<?import com.marianocarrizo.dynamusic.component.IconToggleButton?>
+<?import com.marianocarrizo.dynamusic.component.PlayPauseButton?>
+<?import com.marianocarrizo.dynamusic.component.SeekBar?>
+
+<GridPane xmlns:fx="http://javafx.com/fxml/1"
+          fx:controller="com.marianocarrizo.dynamusic.controller.NowPlayingBarController"
+          hgap="16" styleClass="now-playing-bar">
+    <padding>
+        <Insets top="10" right="16" bottom="10" left="16"/>
+    </padding>
+    <columnConstraints>
+        <ColumnConstraints percentWidth="30" hgrow="ALWAYS"/>
+        <ColumnConstraints percentWidth="40" hgrow="ALWAYS"/>
+        <ColumnConstraints percentWidth="30" hgrow="ALWAYS"/>
+    </columnConstraints>
+
+    <HBox spacing="12" alignment="CENTER_LEFT" GridPane.columnIndex="0">
+        <CoverView fx:id="cover"/>
+        <VBox spacing="2" alignment="CENTER_LEFT" HBox.hgrow="ALWAYS" minWidth="0">
+            <Label fx:id="lblTitle" maxWidth="Infinity" styleClass="now-playing-title"/>
+            <Label fx:id="lblDetail" maxWidth="Infinity" styleClass="now-playing-detail"/>
+            <Label fx:id="lblSource" maxWidth="Infinity" styleClass="now-playing-source"/>
+        </VBox>
+    </HBox>
+
+    <VBox spacing="4" alignment="CENTER" GridPane.columnIndex="1">
+        <HBox spacing="14" alignment="CENTER">
+            <IconToggleButton fx:id="btnShuffle" onAction="#onShuffle"/>
+            <IconButton fx:id="btnPrevious" onAction="#onPrevious"/>
+            <PlayPauseButton fx:id="btnPlayPause" onAction="#onTogglePlayPause"/>
+            <IconButton fx:id="btnNext" onAction="#onNext"/>
+            <IconToggleButton fx:id="btnRepeat" onAction="#onRepeat"/>
+        </HBox>
+        <SeekBar fx:id="seekBar"/>
+    </VBox>
+
+    <fx:include fx:id="volume" source="volume_control.fxml" GridPane.columnIndex="2"
+                GridPane.halignment="RIGHT"/>
+</GridPane>

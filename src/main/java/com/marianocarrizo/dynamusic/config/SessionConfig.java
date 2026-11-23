@@ -2,7 +2,9 @@ package com.marianocarrizo.dynamusic.config;
 
 import com.marianocarrizo.dynamusic.enums.TrackType;
 import com.marianocarrizo.dynamusic.model.BackgroundConfig;
+import com.marianocarrizo.dynamusic.model.NowPlayingSource;
 import com.marianocarrizo.dynamusic.model.Playlist;
+import com.marianocarrizo.dynamusic.model.RepeatMode;
 import com.marianocarrizo.dynamusic.model.Scene;
 
 import java.util.ArrayList;
@@ -54,11 +56,17 @@ public class SessionConfig {
     // Nombre de la playlist activa al cerrar la sesión; null si ninguna
     private String activePlaylistName;
 
+    private boolean libraryCollapsed;
+
+    private double libraryDividerPosition = 0.3;
+
     // Sensibilidad por mood: TrackType.name() -> Double; null en sesiones antiguas (defecto 2.0)
     private Map<String, Double> moodSensitivities;
 
     // Volumen maestro [0.0-1.0]; boxed Double para que Gson deserialice null (no 0.0) en sesiones antiguas
     private Double masterVolume;
+
+    private Map<String, String> repeatModes;
 
     public SessionConfig() {}
 
@@ -277,6 +285,12 @@ public class SessionConfig {
 
     // --- Active playlist name ---
 
+    public double getLibraryDividerPosition() { return libraryDividerPosition; }
+    public void setLibraryDividerPosition(double position) { this.libraryDividerPosition = position; }
+
+    public boolean isLibraryCollapsed() { return libraryCollapsed; }
+    public void setLibraryCollapsed(boolean collapsed) { this.libraryCollapsed = collapsed; }
+
     public String getActivePlaylistName() { return activePlaylistName; }
     public void setActivePlaylistName(String name) { this.activePlaylistName = name; }
 
@@ -330,6 +344,16 @@ public class SessionConfig {
 
     public void setMasterVolume(double v) {
         this.masterVolume = v;
+    }
+
+    public RepeatMode getRepeatMode(NowPlayingSource source) {
+        String stored = repeatModes == null ? null : repeatModes.get(source.name());
+        return source.supportedRepeat(RepeatMode.fromStored(stored));
+    }
+
+    public void setRepeatMode(NowPlayingSource source, RepeatMode mode) {
+        if (repeatModes == null) repeatModes = new LinkedHashMap<>();
+        repeatModes.put(source.name(), mode.name());
     }
 
     // --- Video segment loop ---

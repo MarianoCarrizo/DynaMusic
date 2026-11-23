@@ -12,6 +12,11 @@
 
 /* El contenedor interno real */
 .main-container {
+    -mood-accent: #2ecc71;
+    -mood-accent-hover: derive(-mood-accent, 25%);
+    -mood-accent-text: #0b0b0e;
+    -mood-selection: #1e4a2b;
+    -mood-selection-focused: derive(-mood-selection, 18%);
     -fx-background-color: #1e1e24;
     -fx-font-family: "Segoe UI", Helvetica, Arial, sans-serif;
 
@@ -55,16 +60,35 @@
     -fx-background-color: #383842;
 }
 .tree-cell:filled:selected {
-    -fx-background-color: #3a3a48;
+    -fx-background-color: -mood-selection;
     -fx-text-fill: #ffffff;
 }
 .tree-cell:filled:selected:focused {
-    -fx-background-color: #4a4a5a;
+    -fx-background-color: -mood-selection-focused;
 }
-/* Track actualmente sonando en la playlist */
-.list-cell-now-playing {
-    -fx-background-color: #1a3a2a !important;
-    -fx-text-fill: #1db954 !important;
+.playlist-row-title {
+    -fx-text-fill: #e0e0e0;
+    -fx-font-size: 13px;
+}
+.playlist-row-album {
+    -fx-text-fill: #808085;
+    -fx-font-size: 11px;
+}
+.playlist-row-marker {
+    -fx-text-fill: -mood-accent;
+    -fx-font-size: 12px;
+}
+.list-cell:filled:selected .playlist-row-title {
+    -fx-text-fill: #ffffff;
+}
+.list-cell-now-playing .playlist-row-title,
+.list-cell-now-playing:filled:selected .playlist-row-title {
+    -fx-text-fill: -mood-accent;
+    -fx-font-weight: bold;
+}
+.playlist-counter {
+    -fx-text-fill: #b0b0b8;
+    -fx-font-size: 12px;
     -fx-font-weight: bold;
 }
 
@@ -287,18 +311,10 @@
     -fx-border-color: #7a7a8e;
 }
 
-.track-info-container {
-    -fx-padding: 5px 0;
-}
 .lbl-session-title {
     -fx-text-fill: #707075;
     -fx-font-size: 11px;
     -fx-font-weight: bold;
-}
-.lbl-track-active {
-    -fx-font-size: 18px;
-    -fx-font-weight: bold;
-    -fx-text-fill: #ffffff;
 }
 
 /* =========================================================================
@@ -340,32 +356,17 @@
     -fx-spacing: 8px;
 }
 
-/* Reset total para botones planos (Loop y Stop) */
-.btn-spotify-flat {
-    -fx-background-color: transparent !important;
-    -fx-background-insets: 0 !important;
-    -fx-background-radius: 0 !important;
-    -fx-border-color: transparent !important;
-    -fx-border-width: 0 !important;
-    -fx-text-fill: #b3b3b3;
-    -fx-font-size: 15px;
-    -fx-cursor: hand;
-    -fx-padding: 6px;
-    -fx-alignment: CENTER;
-}
-.btn-spotify-flat:hover { -fx-text-fill: #ffffff; }
-.btn-spotify-flat:selected { -fx-text-fill: #1db954; -fx-effect: none !important; }
-
 /* Los botones redondos internos quedan bien circulares para contraste */
 .btn-spotify-circle {
     -fx-background-color: #ffffff !important;
     -fx-text-fill: #000000 !important;
     -fx-background-radius: 40px !important;
     -fx-border-radius: 40px !important;
-    -fx-min-width: 38px;
-    -fx-max-width: 38px;
-    -fx-min-height: 38px;
-    -fx-max-height: 38px;
+    -fx-font-size: 16px;
+    -fx-min-width: 46px;
+    -fx-max-width: 46px;
+    -fx-min-height: 46px;
+    -fx-max-height: 46px;
     -fx-cursor: hand;
     -fx-alignment: CENTER;
     -fx-padding: 0;
@@ -395,25 +396,8 @@
     -fx-font-style: italic;
 }
 
-/* Panel de preescucha: borde superior para separación visual */
-.preview-panel {
-    -fx-border-color: #2a2a35 transparent transparent transparent;
-    -fx-border-width: 1px;
-}
-
 /* Barra de progreso */
 .progress-container { -fx-padding: 2px 0 0 0; }
-.spotify-slider { -fx-cursor: hand; }
-.spotify-slider .track { -fx-background-color: #2c2c30; -fx-background-radius: 0px; -fx-pref-height: 4px; }
-.spotify-slider .range-bar { -fx-background-radius: 0px; -fx-background-color: #1db954; }
-/* Thumb siempre visible: indica el valor/posición actual en todos los sliders */
-.spotify-slider .thumb {
-    -fx-background-color: #ffffff;
-    -fx-background-radius: 0px;
-    -fx-pref-width: 10px;
-    -fx-pref-height: 10px;
-    -fx-background-insets: 0;
-}
 .lbl-time { -fx-font-family: "Segoe UI", Arial, sans-serif; -fx-font-size: 11px; -fx-text-fill: #a7a7a7; -fx-min-width: 30px; }
 
 /* =========================================================================
@@ -421,80 +405,55 @@
    ========================================================================= */
 
 /* --- 1. PAUSED (Gris / Platino) --- */
-#window-paused.main-container { -fx-background-color: #151517; -fx-background-radius: 0px !important; -fx-border-radius: 0px !important; }
+#window-paused.main-container { -mood-accent: #95a5a6; -mood-selection: #3a3a3e; -fx-background-color: #151517; -fx-background-radius: 0px !important; -fx-border-radius: 0px !important; }
 #window-paused .window-header { -fx-background-color: #222226; }
 #window-paused .window-title { -fx-text-fill: #95a5a6; }
-#window-paused .slider .track { -fx-background-color: #3e3e40; }
-#window-paused .slider .thumb { -fx-background-color: #7f8c8d; }
-#window-paused .slider .range-bar { -fx-background-color: #95a5a6; }
-#window-paused .list-cell:filled:selected { -fx-background-color: #4a4a4a; }
 #window-paused .text-field:focused { -fx-border-color: #7f8c8d; }
-#window-paused .btn-spotify-flat:selected { -fx-text-fill: #95a5a6; }
 
 /* --- 2. RAGED (Rojo Combate) --- */
-#window-raged.main-container { -fx-background-color: #160e0e; -fx-background-radius: 0px !important; -fx-border-radius: 0px !important; }
+#window-raged.main-container { -mood-accent: #e74c3c; -mood-selection: #4a1c1c; -fx-background-color: #160e0e; -fx-background-radius: 0px !important; -fx-border-radius: 0px !important; }
 #window-raged .window-header { -fx-background-color: #2c1616; }
 #window-raged .window-title { -fx-text-fill: #e74c3c; }
-#window-raged .slider .track { -fx-background-color: #451b1b; }
-#window-raged .slider .thumb { -fx-background-color: #e74c3c; }
-#window-raged .slider .range-bar { -fx-background-color: #c0392b; }
-#window-raged .list-cell:filled:selected { -fx-background-color: #8a1f1f; }
 #window-raged .text-field:focused { -fx-border-color: #e74c3c; }
-#window-raged .btn-spotify-flat:selected { -fx-text-fill: #e74c3c; }
 
 /* --- 3. NORMAL (Verde Exploración) --- */
-#window-normal.main-container { -fx-background-color: #0e1410; -fx-background-radius: 0px !important; -fx-border-radius: 0px !important; }
+#window-normal.main-container { -mood-accent: #2ecc71; -mood-selection: #1e4a2b; -fx-background-color: #0e1410; -fx-background-radius: 0px !important; -fx-border-radius: 0px !important; }
 #window-normal .window-header { -fx-background-color: #16241b; }
 #window-normal .window-title { -fx-text-fill: #2ecc71; }
-#window-normal .slider .track { -fx-background-color: #14331d; }
-#window-normal .slider .thumb { -fx-background-color: #2ecc71; }
-#window-normal .slider .range-bar { -fx-background-color: #27ae60; }
-#window-normal .list-cell:filled:selected { -fx-background-color: #1e4a2b; }
 #window-normal .text-field:focused { -fx-border-color: #2ecc71; }
-#window-normal .btn-spotify-flat:selected { -fx-text-fill: #2ecc71; }
 
 /* --- 4. ADVANTAGE (Azul) --- */
-#window-advantage.main-container { -fx-background-color: #0f1318; -fx-background-radius: 0px !important; -fx-border-radius: 0px !important; }
+#window-advantage.main-container { -mood-accent: #3498db; -mood-selection: #1e354a; -fx-background-color: #0f1318; -fx-background-radius: 0px !important; -fx-border-radius: 0px !important; }
 #window-advantage .window-header { -fx-background-color: #16222f; }
 #window-advantage .window-title { -fx-text-fill: #3498db; }
-#window-advantage .slider .track { -fx-background-color: #112233; }
-#window-advantage .slider .thumb { -fx-background-color: #3498db; }
-#window-advantage .slider .range-bar { -fx-background-color: #2980b9; }
-#window-advantage .list-cell:filled:selected { -fx-background-color: #1e354a; }
 #window-advantage .text-field:focused { -fx-border-color: #3498db; }
-#window-advantage .btn-spotify-flat:selected { -fx-text-fill: #3498db; }
 
-/* =========================================================================
-   BOTÓN FASE ACTIVO (G6 — reemplaza setStyle() inline en updateButtons)
-   ========================================================================= */
-
-/* Base: borde visible y texto blanco para todos los moods */
 .btn-phase-active {
     -fx-border-width: 2px;
     -fx-text-fill: #ffffff;
 }
-
-/* PAUSED: gris/platino con texto oscuro para contraste */
-#window-paused .btn-phase-active {
+.btn-phase-playing {
+    -fx-border-width: 2px;
+    -fx-text-fill: #ffffff;
+}
+#window-paused .btn-phase-active { -fx-border-color: #95a5a6; }
+#window-raged .btn-phase-active { -fx-border-color: #e74c3c; }
+#window-normal .btn-phase-active { -fx-border-color: #2ecc71; }
+#window-advantage .btn-phase-active { -fx-border-color: #3498db; }
+#window-paused .btn-phase-playing {
     -fx-background-color: #7f8c8d;
     -fx-border-color: #95a5a6;
     -fx-text-fill: #000000;
 }
-
-/* RAGED: rojo combate */
-#window-raged .btn-phase-active {
+#window-raged .btn-phase-playing {
     -fx-background-color: #c0392b;
     -fx-border-color: #e74c3c;
 }
-
-/* NORMAL: verde exploración */
-#window-normal .btn-phase-active {
+#window-normal .btn-phase-playing {
     -fx-background-color: #27ae60;
     -fx-border-color: #2ecc71;
 }
-
-/* ADVANTAGE: azul */
-#window-advantage .btn-phase-active {
+#window-advantage .btn-phase-playing {
     -fx-background-color: #2980b9;
     -fx-border-color: #3498db;
 }
@@ -548,11 +507,11 @@
 
 /* Lista de tracks de playlist: highlighted item */
 .list-cell:filled:selected {
-    -fx-background-color: #3a3a48;
+    -fx-background-color: -mood-selection;
     -fx-text-fill: #ffffff;
 }
 .list-cell:filled:selected:focused {
-    -fx-background-color: #4a4a5a;
+    -fx-background-color: -mood-selection-focused;
 }
 
 /* Estado ON del toggle de boomerang */
@@ -601,8 +560,6 @@
     -fx-font-style: italic;
 }
 
-/* bgPreviewSlider inherits spotify-slider — no additional rule needed */
-
 /* Segment info label in preview */
 #lblBgSegmentInfo {
     -fx-text-fill: #909098;
@@ -630,10 +587,130 @@
 }
 
 .list-cell:drop-above {
-    -fx-border-color: #1db954 transparent transparent transparent;
+    -fx-border-color: -mood-accent transparent transparent transparent;
     -fx-border-width: 2px 0 0 0;
 }
 .list-cell:drop-below {
-    -fx-border-color: transparent transparent #1db954 transparent;
+    -fx-border-color: transparent transparent -mood-accent transparent;
     -fx-border-width: 0 0 2px 0;
 }
+
+.btn-toggle {
+    -fx-background-color: #2a2a32;
+    -fx-text-fill: #b0b0b8;
+    -fx-border-color: #4f4f5c;
+    -fx-border-width: 1px;
+    -fx-background-radius: 0px;
+    -fx-border-radius: 0px;
+    -fx-font-size: 13px;
+    -fx-padding: 8px 14px;
+    -fx-cursor: hand;
+}
+.btn-toggle:hover {
+    -fx-background-color: #3a3a43;
+    -fx-text-fill: #ffffff;
+}
+.btn-toggle:selected {
+    -fx-background-color: -mood-accent;
+    -fx-border-color: -mood-accent;
+    -fx-text-fill: -mood-accent-text;
+    -fx-font-weight: bold;
+}
+.btn-toggle:selected:hover {
+    -fx-background-color: -mood-accent-hover;
+    -fx-border-color: -mood-accent-hover;
+}
+
+.now-playing-bar {
+    -fx-background-color: #121214;
+    -fx-border-color: #2d2d35 transparent transparent transparent;
+    -fx-border-width: 1px 0 0 0;
+}
+.now-playing-title {
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+}
+.now-playing-detail {
+    -fx-text-fill: #b3b3b3;
+    -fx-font-size: 12px;
+}
+.now-playing-source {
+    -fx-text-fill: #6a6a72;
+    -fx-font-size: 11px;
+}
+
+.icon {
+    -fx-fill: #b3b3b3;
+}
+.btn-icon, .btn-icon-toggle {
+    -fx-background-color: transparent;
+    -fx-background-radius: 0px;
+    -fx-border-width: 0;
+    -fx-padding: 6px;
+    -fx-cursor: hand;
+}
+.btn-icon:hover .icon, .btn-icon-toggle:hover .icon {
+    -fx-fill: #ffffff;
+}
+.btn-icon:disabled, .btn-icon-toggle:disabled {
+    -fx-opacity: 0.3;
+    -fx-cursor: default;
+}
+.btn-icon-toggle:selected .icon {
+    -fx-fill: -mood-accent;
+}
+.btn-icon-toggle:selected:hover .icon {
+    -fx-fill: -mood-accent-hover;
+}
+.icon-dot {
+    -fx-fill: -mood-accent;
+}
+.btn-spotify-circle .icon {
+    -fx-fill: #121214;
+}
+
+.seek-progress {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.filled-slider { -fx-cursor: hand; }
+.filled-slider .track {
+    -fx-background-color: #4d4d55;
+    -fx-background-radius: 2px;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+    -fx-pref-height: 4px;
+    -fx-min-height: 4px;
+    -fx-max-height: 4px;
+}
+.filled-slider:vertical .track {
+    -fx-pref-height: -1;
+    -fx-min-height: -1;
+    -fx-max-height: -1;
+    -fx-pref-width: 4px;
+    -fx-min-width: 4px;
+    -fx-max-width: 4px;
+}
+.filled-slider .fill {
+    -fx-background-color: -mood-accent;
+    -fx-background-radius: 2px;
+}
+.filled-slider:hover .fill {
+    -fx-background-color: -mood-accent-hover;
+}
+.filled-slider .thumb {
+    -fx-background-color: #ffffff;
+    -fx-background-radius: 6px;
+    -fx-background-insets: 0;
+    -fx-padding: 6px;
+    -fx-effect: none;
+    -fx-opacity: 0;
+}
+.filled-slider:hover .thumb,
+.filled-slider:focused .thumb,
+.filled-slider .thumb:pressed {
+    -fx-opacity: 1;
+}
+.filled-slider:disabled { -fx-opacity: 0.4; }

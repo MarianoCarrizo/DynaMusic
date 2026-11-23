@@ -4,6 +4,7 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.media.MediaView?>
 <?import javafx.scene.image.ImageView?>
+<?import com.marianocarrizo.dynamusic.component.FilledSlider?>
 
 <VBox xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.marianocarrizo.dynamusic.controller.BackgroundEditorController"
@@ -41,8 +42,7 @@
         </HBox>
         <HBox spacing="4" alignment="CENTER_LEFT">
             <Label fx:id="lblBgPreviewCurrentTime" text="0:00" styleClass="lbl-time" minWidth="35"/>
-            <Slider fx:id="bgPreviewSlider" HBox.hgrow="ALWAYS" min="0" max="100" value="0"
-                    styleClass="spotify-slider"/>
+            <FilledSlider fx:id="bgPreviewSlider" HBox.hgrow="ALWAYS" min="0" max="100" value="0"/>
             <Label fx:id="lblBgPreviewTotalTime" text="0:00" styleClass="lbl-time" minWidth="35"/>
         </HBox>
         <HBox spacing="6">
