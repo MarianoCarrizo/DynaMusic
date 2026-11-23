@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+<?import com.marianocarrizo.dynamusic.component.PlayPauseButton?>
+<?import com.marianocarrizo.dynamusic.component.SeekBar?>
+
+<HBox xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.marianocarrizo.dynamusic.controller.NowPlayingBarController"
+      spacing="24" alignment="CENTER_LEFT" styleClass="now-playing-bar">
+    <padding>
+        <Insets top="10" right="16" bottom="10" left="16"/>
+    </padding>
+
+    <VBox spacing="2" alignment="CENTER_LEFT" minWidth="200" prefWidth="300" maxWidth="360">
+        <Label fx:id="lblSourceBadge" styleClass="now-playing-badge"/>
+        <Label fx:id="lblTitle" maxWidth="Infinity" styleClass="now-playing-title"/>
+        <Label fx:id="lblDetail" maxWidth="Infinity" styleClass="now-playing-detail"/>
+    </VBox>
+
+    <VBox spacing="6" alignment="CENTER" HBox.hgrow="ALWAYS">
+        <HBox spacing="14" alignment="CENTER">
+            <Button fx:id="btnPrevious" text="|◁" onAction="#onPrevious" styleClass="btn-transport">
+                <tooltip>
+                    <Tooltip text="Previous track"/>
+                </tooltip>
+            </Button>
+            <PlayPauseButton fx:id="btnPlayPause" onAction="#onTogglePlayPause"/>
+            <Button fx:id="btnNext" text="▷|" onAction="#onNext" styleClass="btn-transport">
+                <tooltip>
+                    <Tooltip text="Next track"/>
+                </tooltip>
+            </Button>
+            <Button fx:id="btnStop" text="■" onAction="#onStop" styleClass="btn-transport">
+                <tooltip>
+                    <Tooltip text="Stop"/>
+                </tooltip>
+            </Button>
+        </HBox>
+        <SeekBar fx:id="seekBar"/>
+    </VBox>
+</HBox>

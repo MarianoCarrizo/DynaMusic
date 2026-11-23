@@ -1,6 +1,5 @@
 package com.marianocarrizo.dynamusic.model;
 
-import javafx.beans.property.SimpleStringProperty;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -9,6 +8,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class NowPlayingModelTest {
@@ -22,73 +22,72 @@ class NowPlayingModelTest {
 
     @Test
     void startsWithNothingPlaying() {
-        assertEquals(NowPlayingSource.NONE, model.getSource());
-        assertEquals("", model.getSourceName());
-        assertFalse(model.isPlaying());
-        assertEquals(NowPlayingModel.NO_TITLE, model.titleProperty().get());
+        assertSame(NowPlaying.NONE, model.get());
+        assertEquals(NowPlayingSource.NONE, model.get().source());
+        assertFalse(model.get().playing());
     }
 
     @Test
     void moodSourceKeepsItsName() {
-        model.show(NowPlayingSource.MOOD, "RAGED", true);
+        model.show(new NowPlaying(NowPlayingSource.MOOD, "RAGED", "Battle", "Album", true));
 
-        assertEquals(NowPlayingSource.MOOD, model.getSource());
-        assertEquals("RAGED", model.getSourceName());
-        assertTrue(model.isPlaying());
-    }
-
-    @Test
-    void playlistSourceKeepsItsName() {
-        model.show(NowPlayingSource.PLAYLIST, "Night drive", false);
-
-        assertEquals("Night drive", model.getSourceName());
-        assertFalse(model.isPlaying());
+        assertEquals("RAGED", model.get().sourceName());
+        assertEquals("MOOD · RAGED", model.get().badge());
+        assertTrue(model.get().playing());
     }
 
     @Test
     void unnamedSourcesDropTheName() {
-        model.show(NowPlayingSource.ON_DEMAND, "ignored", true);
-        assertEquals("", model.getSourceName());
+        NowPlaying onDemand = new NowPlaying(NowPlayingSource.ON_DEMAND, "ignored", "Song", "", true);
+        NowPlaying preview = new NowPlaying(NowPlayingSource.PREVIEW, "ignored", "Song", "", true);
 
-        model.show(NowPlayingSource.PREVIEW, "ignored", true);
-        assertEquals("", model.getSourceName());
+        assertEquals("", onDemand.sourceName());
+        assertEquals("PLAYING NOW", onDemand.badge());
+        assertEquals("", preview.sourceName());
+        assertEquals("PREVIEW", preview.badge());
     }
 
     @Test
-    void nullNameBecomesEmpty() {
-        model.show(NowPlayingSource.PLAYLIST, null, true);
+    void nullNameAndTextBecomeEmpty() {
+        NowPlaying snapshot = new NowPlaying(NowPlayingSource.PLAYLIST, null, null, null, false);
 
-        assertEquals("", model.getSourceName());
+        assertEquals("", snapshot.sourceName());
+        assertEquals("", snapshot.title());
+        assertEquals("", snapshot.detail());
+        assertEquals("PLAYLIST", snapshot.badge());
     }
 
     @Test
     void noneSourceIsNeverPlaying() {
-        model.show(NowPlayingSource.NONE, "RAGED", true);
+        NowPlaying snapshot = new NowPlaying(NowPlayingSource.NONE, "RAGED", "x", "", true);
 
-        assertEquals("", model.getSourceName());
-        assertFalse(model.isPlaying());
+        assertEquals("", snapshot.sourceName());
+        assertFalse(snapshot.playing());
     }
 
     @Test
-    void notifiesWhenTheSourceChanges() {
-        List<NowPlayingSource> seen = new ArrayList<>();
-        model.sourceProperty().addListener((obs, oldValue, newValue) -> seen.add(newValue));
+    void isSoundingNeedsBothTheSourceAndPlaying() {
+        NowPlaying paused = new NowPlaying(NowPlayingSource.MOOD, "RAGED", "x", "", false);
+        NowPlaying playing = new NowPlaying(NowPlayingSource.MOOD, "RAGED", "x", "", true);
 
-        model.show(NowPlayingSource.MOOD, "NORMAL", true);
-        model.show(NowPlayingSource.MOOD, "NORMAL", false);
-        model.show(NowPlayingSource.PREVIEW, "", true);
-
-        assertEquals(List.of(NowPlayingSource.MOOD, NowPlayingSource.PREVIEW), seen);
+        assertFalse(paused.isSounding(NowPlayingSource.MOOD));
+        assertFalse(playing.isSounding(NowPlayingSource.PLAYLIST));
+        assertTrue(playing.isSounding(NowPlayingSource.MOOD));
     }
 
     @Test
-    void titleCanFollowAnotherProperty() {
-        SimpleStringProperty origin = new SimpleStringProperty("First track");
-        model.titleProperty().bind(origin);
+    void notifiesOncePerDistinctSnapshot() {
+        List<NowPlaying> seen = new ArrayList<>();
+        model.snapshotProperty().addListener((obs, oldValue, newValue) -> seen.add(newValue));
+        NowPlaying first = new NowPlaying(NowPlayingSource.MOOD, "NORMAL", "A", "", true);
 
-        origin.set("Second track");
+        model.show(first);
+        model.show(new NowPlaying(NowPlayingSource.MOOD, "NORMAL", "A", "", true));
+        model.show(new NowPlaying(NowPlayingSource.MOOD, "NORMAL", "A", "", false));
 
-        assertEquals("Second track", model.titleProperty().get());
+        assertEquals(2, seen.size());
+        assertSame(first, seen.get(0));
+        assertFalse(seen.get(1).playing());
     }
 
     @Test

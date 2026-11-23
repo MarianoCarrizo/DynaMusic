@@ -11,8 +11,6 @@ final class AudioFocus {
     private boolean previewSoundedLast = false;
     private int previewRequests = 0;
     private int modeClaims = 0;
-    private Runnable onPreviewPausedByMode = () -> { };
-    private Runnable onModePausedByPreview = () -> { };
 
     AudioFocus(BooleanSupplier previewLoaded, Runnable pausePreview, Runnable pauseModePlayers) {
         this.previewLoaded = previewLoaded;
@@ -23,16 +21,12 @@ final class AudioFocus {
     void claimForMode() {
         previewSoundedLast = false;
         modeClaims++;
-        if (previewLoaded.getAsBoolean()) {
-            pausePreview.run();
-            onPreviewPausedByMode.run();
-        }
+        if (previewLoaded.getAsBoolean()) pausePreview.run();
     }
 
     void claimForPreview() {
         previewSoundedLast = true;
         pauseModePlayers.run();
-        onModePausedByPreview.run();
     }
 
     PreviewTicket claimForNewPreview() {
@@ -49,13 +43,5 @@ final class AudioFocus {
 
     boolean previewSoundedLast() {
         return previewSoundedLast && previewLoaded.getAsBoolean();
-    }
-
-    void setOnPreviewPausedByMode(Runnable listener) {
-        onPreviewPausedByMode = listener == null ? () -> { } : listener;
-    }
-
-    void setOnModePausedByPreview(Runnable listener) {
-        onModePausedByPreview = listener == null ? () -> { } : listener;
     }
 }

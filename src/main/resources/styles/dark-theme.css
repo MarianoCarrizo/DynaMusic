@@ -464,37 +464,32 @@
 #window-advantage .text-field:focused { -fx-border-color: #3498db; }
 #window-advantage .btn-spotify-flat:selected { -fx-text-fill: #3498db; }
 
-/* =========================================================================
-   BOTÓN FASE ACTIVO (G6 — reemplaza setStyle() inline en updateButtons)
-   ========================================================================= */
-
-/* Base: borde visible y texto blanco para todos los moods */
 .btn-phase-active {
     -fx-border-width: 2px;
     -fx-text-fill: #ffffff;
 }
-
-/* PAUSED: gris/platino con texto oscuro para contraste */
-#window-paused .btn-phase-active {
+.btn-phase-playing {
+    -fx-border-width: 2px;
+    -fx-text-fill: #ffffff;
+}
+#window-paused .btn-phase-active { -fx-border-color: #95a5a6; }
+#window-raged .btn-phase-active { -fx-border-color: #e74c3c; }
+#window-normal .btn-phase-active { -fx-border-color: #2ecc71; }
+#window-advantage .btn-phase-active { -fx-border-color: #3498db; }
+#window-paused .btn-phase-playing {
     -fx-background-color: #7f8c8d;
     -fx-border-color: #95a5a6;
     -fx-text-fill: #000000;
 }
-
-/* RAGED: rojo combate */
-#window-raged .btn-phase-active {
+#window-raged .btn-phase-playing {
     -fx-background-color: #c0392b;
     -fx-border-color: #e74c3c;
 }
-
-/* NORMAL: verde exploración */
-#window-normal .btn-phase-active {
+#window-normal .btn-phase-playing {
     -fx-background-color: #27ae60;
     -fx-border-color: #2ecc71;
 }
-
-/* ADVANTAGE: azul */
-#window-advantage .btn-phase-active {
+#window-advantage .btn-phase-playing {
     -fx-background-color: #2980b9;
     -fx-border-color: #3498db;
 }
@@ -636,4 +631,75 @@
 .list-cell:drop-below {
     -fx-border-color: transparent transparent #1db954 transparent;
     -fx-border-width: 0 0 2px 0;
+}
+
+.btn-transport {
+    -fx-background-color: #2a2a32;
+    -fx-text-fill: #e0e0e0;
+    -fx-font-size: 16px;
+    -fx-background-radius: 0px;
+    -fx-min-width: 40px;
+    -fx-min-height: 40px;
+    -fx-cursor: hand;
+    -fx-padding: 0;
+    -fx-alignment: CENTER;
+}
+.btn-transport:hover {
+    -fx-background-color: #3e3e4a;
+    -fx-text-fill: #ffffff;
+}
+.btn-transport:disabled {
+    -fx-opacity: 0.35;
+    -fx-cursor: default;
+}
+
+.btn-toggle {
+    -fx-background-color: #2a2a32;
+    -fx-text-fill: #b0b0b8;
+    -fx-border-color: #4f4f5c;
+    -fx-border-width: 1px;
+    -fx-background-radius: 0px;
+    -fx-border-radius: 0px;
+    -fx-font-size: 13px;
+    -fx-padding: 8px 14px;
+    -fx-cursor: hand;
+}
+.btn-toggle:hover {
+    -fx-background-color: #3a3a43;
+    -fx-text-fill: #ffffff;
+}
+.btn-toggle:selected {
+    -fx-background-color: #1db954;
+    -fx-border-color: #1db954;
+    -fx-text-fill: #08140d;
+    -fx-font-weight: bold;
+}
+.btn-toggle:selected:hover {
+    -fx-background-color: #3ad06c;
+    -fx-border-color: #3ad06c;
+}
+
+.now-playing-bar {
+    -fx-background-color: #121214;
+    -fx-border-color: #2d2d35 transparent transparent transparent;
+    -fx-border-width: 1px 0 0 0;
+}
+.now-playing-badge {
+    -fx-text-fill: #1db954;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-letter-spacing: 1px;
+}
+.now-playing-title {
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+}
+.now-playing-detail {
+    -fx-text-fill: #808085;
+    -fx-font-size: 12px;
+}
+
+.mode-strip {
+    -fx-padding: 6px 12px;
 }

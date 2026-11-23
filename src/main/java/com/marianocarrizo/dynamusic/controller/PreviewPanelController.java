@@ -1,10 +1,11 @@
 package com.marianocarrizo.dynamusic.controller;
 
+import com.marianocarrizo.dynamusic.component.PlayPauseButton;
 import com.marianocarrizo.dynamusic.component.SeekBar;
+import com.marianocarrizo.dynamusic.model.NowPlayingModel;
 import com.marianocarrizo.dynamusic.service.MusicService;
-import javafx.application.Platform;
+import com.marianocarrizo.dynamusic.service.TrackNames;
 import javafx.fxml.FXML;
-import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.VBox;
@@ -15,60 +16,47 @@ public final class PreviewPanelController {
 
     private static final String NO_PREVIEW_TEXT = "No active preview";
 
+    interface Host {
+        MusicService musicService();
+
+        NowPlayingModel nowPlaying();
+    }
+
     @FXML private VBox previewPanel;
     @FXML private Label lblPreviewTrack;
     @FXML private ToggleButton btnPreviewLoop;
-    @FXML private Button btnPreviewPlayPause;
+    @FXML private PlayPauseButton btnPreviewPlayPause;
     @FXML private SeekBar previewSeekBar;
 
-    private PlayerHost host;
+    private Host host;
 
-    void attach(PlayerHost host) {
+    void attach(Host host) {
         this.host = host;
         MusicService musicService = host.musicService();
-        musicService.setPreviewProgressListener((current, total) ->
-            Platform.runLater(() -> {
-                previewSeekBar.showPlayback(current, total);
-                syncPlayPauseIcon();
-                host.playbackStateChanged();
-            }));
+        musicService.setPreviewProgressListener(previewSeekBar::showPlayback);
         previewSeekBar.setOnSeekToFraction(musicService::seekPreview);
-        musicService.setOnPreviewPausedByMode(() -> {
-            showPlaying(false);
-            host.playbackStateChanged();
-        });
+        host.nowPlaying().snapshotProperty().addListener((obs, oldValue, newValue) -> syncPlayPauseIcon());
         show(false);
     }
 
     void start(File file) {
-        MusicService musicService = host.musicService();
-        if (musicService.isPlaying()) musicService.fadeOutAndPause(null);
-        if (musicService.isPlaylistPlaying()) musicService.playlistPause();
-        lblPreviewTrack.setText(file.getName());
-        musicService.previewTrack(file);
+        lblPreviewTrack.setText(TrackNames.title(file.getName()));
+        host.musicService().previewTrack(file);
         show(true);
         syncPlayPauseIcon();
-        host.playbackStateChanged();
     }
 
     void hide() {
         show(false);
         previewSeekBar.showNoTrack();
         syncPlayPauseIcon();
-        host.playbackStateChanged();
     }
 
     @FXML
-    void togglePlayPause() {
+    private void onTogglePlayPause() {
         MusicService musicService = host.musicService();
-        if (musicService.isPreviewPlaying()) {
-            musicService.previewPause();
-            showPlaying(false);
-        } else {
-            musicService.previewPlay();
-            showPlaying(true);
-        }
-        host.playbackStateChanged();
+        if (musicService.isPreviewPlaying()) musicService.previewPause();
+        else musicService.previewPlay();
     }
 
     @FXML
@@ -90,11 +78,7 @@ public final class PreviewPanelController {
         if (!active) lblPreviewTrack.setText(NO_PREVIEW_TEXT);
     }
 
-    private void showPlaying(boolean playing) {
-        btnPreviewPlayPause.setText(playing ? "⏸" : "▶");
-    }
-
     private void syncPlayPauseIcon() {
-        showPlaying(host.musicService().isPreviewPlaying());
+        btnPreviewPlayPause.showPlaying(host.musicService().isPreviewPlaying());
     }
 }

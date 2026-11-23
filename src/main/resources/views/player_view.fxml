@@ -52,8 +52,6 @@
 
                 <fx:include fx:id="previewPanel" source="preview_panel.fxml"/>
 
-                <fx:include fx:id="onDemandPanel" source="on_demand_panel.fxml"/>
-
                 <fx:include fx:id="youTubeBar" source="youtube_bar.fxml"/>
             </VBox>
 
@@ -61,6 +59,8 @@
                 <padding>
                     <Insets top="10" right="10" bottom="10" left="10"/>
                 </padding>
+
+                <fx:include fx:id="onDemandPanel" source="on_demand_panel.fxml"/>
 
                 <!-- T-10: TabPane que agrupa los modos Moods y Playlists -->
                 <TabPane fx:id="modeTabPane" VBox.vgrow="ALWAYS" tabClosingPolicy="UNAVAILABLE">
@@ -90,5 +90,7 @@
 
             </VBox>
         </SplitPane>
+
+        <fx:include fx:id="nowPlayingBar" source="now_playing_bar.fxml"/>
     </VBox>
 </VBox>

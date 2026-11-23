@@ -12,8 +12,6 @@ class AudioFocusTest {
     private boolean previewLoaded;
     private int previewPauses;
     private int modePauses;
-    private int previewPausedNotifications;
-    private int modePausedNotifications;
     private AudioFocus focus;
 
     @BeforeEach
@@ -21,28 +19,22 @@ class AudioFocusTest {
         previewLoaded = true;
         previewPauses = 0;
         modePauses = 0;
-        previewPausedNotifications = 0;
-        modePausedNotifications = 0;
         focus = new AudioFocus(() -> previewLoaded, () -> previewPauses++, () -> modePauses++);
-        focus.setOnPreviewPausedByMode(() -> previewPausedNotifications++);
-        focus.setOnModePausedByPreview(() -> modePausedNotifications++);
     }
 
     @Test
-    void claimingForPreviewPausesModePlayersAndNotifies() {
+    void claimingForPreviewPausesModePlayers() {
         focus.claimForPreview();
 
         assertEquals(1, modePauses);
-        assertEquals(1, modePausedNotifications);
         assertEquals(0, previewPauses);
     }
 
     @Test
-    void claimingForModePausesTheLoadedPreviewAndNotifies() {
+    void claimingForModePausesTheLoadedPreview() {
         focus.claimForMode();
 
         assertEquals(1, previewPauses);
-        assertEquals(1, previewPausedNotifications);
         assertEquals(0, modePauses);
     }
 
@@ -53,7 +45,6 @@ class AudioFocusTest {
         focus.claimForMode();
 
         assertEquals(0, previewPauses);
-        assertEquals(0, previewPausedNotifications);
     }
 
     @Test
@@ -82,18 +73,6 @@ class AudioFocusTest {
     @Test
     void nothingSoundedYetMeansNoPreview() {
         assertFalse(focus.previewSoundedLast());
-    }
-
-    @Test
-    void clearingListenersIsAllowed() {
-        focus.setOnPreviewPausedByMode(null);
-        focus.setOnModePausedByPreview(null);
-
-        focus.claimForPreview();
-        focus.claimForMode();
-
-        assertEquals(1, previewPauses);
-        assertEquals(1, modePauses);
     }
 
     @Test
@@ -137,11 +116,10 @@ class AudioFocusTest {
     }
 
     @Test
-    void aNewPreviewRequestPausesModePlayersAndNotifies() {
+    void aNewPreviewRequestPausesModePlayersAndSoundsLast() {
         focus.claimForNewPreview();
 
         assertEquals(1, modePauses);
-        assertEquals(1, modePausedNotifications);
         assertTrue(focus.previewSoundedLast());
     }
 }

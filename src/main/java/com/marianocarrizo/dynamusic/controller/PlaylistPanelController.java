@@ -1,5 +1,6 @@
 package com.marianocarrizo.dynamusic.controller;
 
+import com.marianocarrizo.dynamusic.model.NowPlayingSource;
 import com.marianocarrizo.dynamusic.model.PlaylistItem;
 import com.marianocarrizo.dynamusic.service.AudioFileCollector;
 import com.marianocarrizo.dynamusic.service.PlaylistManager;
@@ -51,6 +52,7 @@ public final class PlaylistPanelController {
             host.saveSession();
             refresh();
         });
+        host.nowPlaying().snapshotProperty().addListener((obs, oldValue, newValue) -> refreshPlayingState());
         lstPlaylistTracks.setCellFactory(lv -> new PlaylistTrackCell(trackHost));
         PlaylistTrackCell.acceptFileDropsOnList(lstPlaylistTracks, trackHost);
         lstPlaylistTracks.setOnKeyPressed(e -> {
@@ -81,8 +83,9 @@ public final class PlaylistPanelController {
         lstPlaylistTracks.getItems().add(text);
     }
 
-    void refreshRows() {
+    private void refreshPlayingState() {
         lstPlaylistTracks.refresh();
+        lblTrackCounter.setText(playlistManager.positionLabel());
     }
 
     void addItem(String playlistName, PlaylistItem item) {
@@ -245,7 +248,8 @@ public final class PlaylistPanelController {
     private PlaylistTrackCell.Host trackHost() {
         return new PlaylistTrackCell.Host() {
             @Override public boolean isNowPlaying(int index) {
-                return host.musicService().isPlaylistPlaying() && index == playlistManager.currentDisplayIndex();
+                return host.nowPlaying().get().isSounding(NowPlayingSource.PLAYLIST)
+                        && index == playlistManager.currentDisplayIndex();
             }
             @Override public void filesDropped(List<File> files, int slot) {
                 addDroppedFiles(files, slot);

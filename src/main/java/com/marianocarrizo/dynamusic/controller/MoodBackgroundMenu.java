@@ -1,5 +1,6 @@
 package com.marianocarrizo.dynamusic.controller;
 
+import com.marianocarrizo.dynamusic.config.SessionConfig;
 import com.marianocarrizo.dynamusic.model.AuraSlot;
 import com.marianocarrizo.dynamusic.model.BackgroundConfig;
 import com.marianocarrizo.dynamusic.model.BackgroundTarget;
@@ -7,14 +8,23 @@ import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuItem;
 import javafx.stage.FileChooser;
+import javafx.stage.Window;
 
 import java.io.File;
 
 final class MoodBackgroundMenu {
 
-    private final PlayerHost host;
+    interface Host {
+        SessionConfig session();
 
-    MoodBackgroundMenu(PlayerHost host) {
+        Window window();
+
+        void slotBackgroundEdited();
+    }
+
+    private final Host host;
+
+    MoodBackgroundMenu(Host host) {
         this.host = host;
     }
 

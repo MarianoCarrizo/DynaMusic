@@ -1,24 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
-<?import com.marianocarrizo.dynamusic.component.SeekBar?>
 
-<VBox xmlns:fx="http://javafx.com/fxml/1"
+<HBox xmlns:fx="http://javafx.com/fxml/1"
       fx:id="onDemandPanel"
       fx:controller="com.marianocarrizo.dynamusic.controller.OnDemandPanelController"
-      spacing="6" alignment="CENTER"
-      styleClass="playback-panel, preview-panel, preview-strip"
+      spacing="8" alignment="CENTER_LEFT"
+      styleClass="playback-panel, mode-strip"
       visible="false" managed="false">
-    <HBox spacing="8" alignment="CENTER_LEFT">
-        <Label text="PLAYING NOW" styleClass="lbl-panel-title"/>
-        <Region HBox.hgrow="ALWAYS"/>
-        <Button text="✕" onAction="#onOnDemandClose" styleClass="btn-spotify-flat"/>
-    </HBox>
-    <Label fx:id="lblOnDemandTrack" text="" styleClass="lbl-preview-track" maxWidth="Infinity"/>
-    <HBox spacing="20" alignment="CENTER">
-        <ToggleButton fx:id="btnOnDemandLoop" text="🔁" onAction="#onToggleOnDemandLoop" styleClass="btn-spotify-flat, btn-loop"/>
-        <Button text="■" onAction="#onOnDemandStop" styleClass="btn-spotify-flat, btn-stop"/>
-        <Button fx:id="btnOnDemandPlayPause" text="▶" onAction="#togglePlayPause" styleClass="btn-spotify-circle"/>
-    </HBox>
-    <SeekBar fx:id="onDemandSeekBar"/>
-</VBox>
+    <Label text="PLAYING NOW" styleClass="lbl-panel-title"/>
+    <Region HBox.hgrow="ALWAYS"/>
+    <ToggleButton fx:id="btnOnDemandLoop" text="🔁 Loop" onAction="#onToggleOnDemandLoop" styleClass="btn-toggle">
+        <tooltip>
+            <Tooltip text="Repeat this track"/>
+        </tooltip>
+    </ToggleButton>
+    <Button text="✕" onAction="#onOnDemandClose" styleClass="btn-transport">
+        <tooltip>
+            <Tooltip text="Close and go back to the moods"/>
+        </tooltip>
+    </Button>
+</HBox>

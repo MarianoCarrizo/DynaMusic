@@ -71,6 +71,4 @@ public interface PlayerHost {
     void persistPlaylists();
 
     NowPlayingModel nowPlaying();
-
-    void playbackStateChanged();
 }

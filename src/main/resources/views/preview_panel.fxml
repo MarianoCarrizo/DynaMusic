@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
+<?import com.marianocarrizo.dynamusic.component.PlayPauseButton?>
 <?import com.marianocarrizo.dynamusic.component.SeekBar?>
 
 <VBox xmlns:fx="http://javafx.com/fxml/1"
@@ -13,9 +14,17 @@
     <Label fx:id="lblPreviewTrack" text="No active preview" styleClass="lbl-preview-track"
            maxWidth="Infinity"/>
     <HBox spacing="20" alignment="CENTER">
-        <ToggleButton fx:id="btnPreviewLoop" text="🔁" onAction="#onTogglePreviewLoop" styleClass="btn-spotify-flat, btn-loop"/>
-        <Button text="■" onAction="#onPreviewStop" styleClass="btn-spotify-flat, btn-stop"/>
-        <Button fx:id="btnPreviewPlayPause" text="▶" onAction="#togglePlayPause" styleClass="btn-spotify-circle"/>
+        <ToggleButton fx:id="btnPreviewLoop" text="🔁" onAction="#onTogglePreviewLoop" styleClass="btn-toggle">
+            <tooltip>
+                <Tooltip text="Repeat the preview"/>
+            </tooltip>
+        </ToggleButton>
+        <Button text="■" onAction="#onPreviewStop" styleClass="btn-transport">
+            <tooltip>
+                <Tooltip text="Stop the preview"/>
+            </tooltip>
+        </Button>
+        <PlayPauseButton fx:id="btnPreviewPlayPause" onAction="#onTogglePlayPause"/>
     </HBox>
     <SeekBar fx:id="previewSeekBar"/>
 </VBox>

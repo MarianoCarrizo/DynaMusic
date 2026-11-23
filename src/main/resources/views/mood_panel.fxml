@@ -2,7 +2,6 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <?import javafx.geometry.Insets?>
-<?import com.marianocarrizo.dynamusic.component.SeekBar?>
 
 <VBox xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.marianocarrizo.dynamusic.controller.MoodPanelController"
@@ -10,11 +9,6 @@
     <padding>
         <Insets top="10" right="4" bottom="4" left="4"/>
     </padding>
-
-    <VBox spacing="4" alignment="CENTER" styleClass="track-info-container">
-        <Label fx:id="lblNowPlayingMood" text="NOW PLAYING" styleClass="lbl-session-title"/>
-        <Label fx:id="lblNowPlaying" text="—" styleClass="lbl-track-active"/>
-    </VBox>
 
     <GridPane hgap="10" vgap="10" alignment="CENTER" VBox.vgrow="ALWAYS">
         <columnConstraints>
@@ -41,13 +35,11 @@
         </children>
     </GridPane>
 
-    <VBox spacing="8" alignment="CENTER" styleClass="playback-panel">
-        <Label text="MOOD" styleClass="lbl-panel-title"/>
-        <HBox spacing="20" alignment="CENTER">
-            <ToggleButton fx:id="btnLoopIcon" text="🔁" onAction="#onToggleLoop" styleClass="btn-spotify-flat, btn-loop"/>
-            <Button text="■" onAction="#onStop" styleClass="btn-spotify-flat, btn-stop"/>
-            <Button fx:id="btnPlayPause" text="▶" onAction="#togglePlayPause" styleClass="btn-spotify-circle"/>
-        </HBox>
-        <SeekBar fx:id="moodSeekBar"/>
-    </VBox>
+    <HBox alignment="CENTER_LEFT">
+        <ToggleButton fx:id="btnLoopIcon" text="🔁 Loop mood" styleClass="btn-toggle">
+            <tooltip>
+                <Tooltip text="Repeat the current mood track"/>
+            </tooltip>
+        </ToggleButton>
+    </HBox>
 </VBox>
