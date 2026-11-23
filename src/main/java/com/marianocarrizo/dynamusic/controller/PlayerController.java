@@ -24,7 +24,6 @@ import javafx.animation.Animation;
 import javafx.animation.PauseTransition;
 import javafx.application.HostServices;
 import javafx.application.Platform;
-import javafx.collections.ListChangeListener;
 import javafx.css.PseudoClass;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -40,15 +39,12 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuItem;
-import javafx.scene.control.RadioMenuItem;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.Slider;
-import javafx.scene.control.SplitMenuButton;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputDialog;
-import javafx.scene.control.Toggle;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.TreeCell;
@@ -64,10 +60,9 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
-import javafx.stage.Screen;
 import javafx.stage.Stage;
+import javafx.stage.Window;
 import javafx.util.Duration;
-import javafx.util.StringConverter;
 
 import java.io.File;
 import java.util.Arrays;
@@ -82,7 +77,7 @@ import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-public class PlayerController implements SceneHost {
+public class PlayerController implements SceneHost, PlayerHost {
 
     private static final String CAFECITO_URL = "https://cafecito.app/duhonha";
     private HostServices hostServices;
@@ -91,12 +86,10 @@ public class PlayerController implements SceneHost {
     @FXML private VBox mainRoot;
     @FXML private Button btnMaximize;
 
-    @FXML private ComboBox<Scene> cmbScene;
-    @FXML private SplitMenuButton btnToggleAmbiance;
-
-    // Slider y label del volumen maestro global
-    @FXML private Slider sldMasterVolume;
-    @FXML private Label  lblMasterVolume;
+    @FXML private UpdateBarController updateBarController;
+    @FXML private SceneBarController sceneBarController;
+    @FXML private AmbianceToolbarController ambianceToolbarController;
+    @FXML private VolumeController volumeController;
 
     @FXML private Button btnPaused;
     @FXML private Button btnNormal;
@@ -154,12 +147,6 @@ public class PlayerController implements SceneHost {
     @FXML private Button btnBrowseYoutube;
     @FXML private Label lblYoutubeError;
 
-    @FXML private HBox   updateBar;
-    @FXML private Label  lblUpdate;
-    @FXML private Button btnUpdateNow;
-    @FXML private Button btnUpdateOnClose;
-    private UpdateManager.ReadyUpdate readyUpdate;
-
     private static final PseudoClass DROP_TARGET = PseudoClass.getPseudoClass("drop-target");
 
     private File rootFolder;
@@ -205,8 +192,6 @@ public class PlayerController implements SceneHost {
         final Label preset = new Label();
     }
 
-    private final ToggleGroup screenGroup = new ToggleGroup();
-
     private static final String DEFAULT_PLAYLIST_NAME = "New playlist";
 
     private PlaylistManager playlistManager;
@@ -214,7 +199,10 @@ public class PlayerController implements SceneHost {
     @FXML
     public void initialize() {
         startYtDlpManager();
-        startUpdateCheck();
+        updateBarController.attach(this);
+        sceneBarController.attach(this);
+        ambianceToolbarController.attach(this);
+        volumeController.attach(this);
         buildMoodCards();
         buildLiveAura();
         refreshCards();
@@ -222,20 +210,6 @@ public class PlayerController implements SceneHost {
         updateNowPlayingCaption();
 
         saveDebounce.setOnFinished(e -> manager.save(sessionConfig));
-
-        if (cmbScene != null) {
-            cmbScene.setConverter(new StringConverter<>() {
-                @Override public String toString(Scene s) { return s == null ? "" : s.getName(); }
-                @Override public Scene fromString(String s) { return null; }
-            });
-            cmbScene.setOnAction(e -> {
-                if (refreshingUI) return;
-                Scene chosen = cmbScene.getValue();
-                if (chosen == null || chosen.getId().equals(sessionConfig.getActiveScene().getId())) return;
-                switchScene(chosen);
-            });
-            refreshSceneCombo();
-        }
 
         if (txtSearch != null) {
             txtSearch.textProperty().addListener((obs, oldVal, newVal) -> rebuildTree());
@@ -314,21 +288,6 @@ public class PlayerController implements SceneHost {
 
         updatePreviewPanel(false);
         ambiance.setAudioSource(musicService::getAudioFeatures);
-        ambiance.setOnVisibilityChanged(this::updateAmbianceToggle);
-
-        populateScreenMenu();
-        Screen.getScreens().addListener((ListChangeListener<Screen>) change -> {
-            populateScreenMenu();
-            // Si el monitor recordado volvió a conectarse, la ambiance se mueve de vuelta
-            // a él de inmediato; si sigue ausente, resolveScreen() aplica auto-fallback.
-            int savedIntent = sessionConfig.getAmbianceScreenIndex();
-            int menuTarget = savedIntent < 0 ? 0 : savedIntent + 1;
-            boolean inRange = menuTarget < screenItemCount();
-            selectScreenItem(inRange ? menuTarget : 0);
-            ambiance.applyScreen(savedIntent);
-        });
-
-        wireMasterVolumeSlider();
 
         // T-12: PlaylistManager + wiring de callbacks
         playlistManager = new PlaylistManager();
@@ -798,36 +757,6 @@ public class PlayerController implements SceneHost {
         });
     }
 
-    private void refreshSceneCombo() {
-        if (cmbScene == null) return;
-        refreshingUI = true;
-        try {
-            cmbScene.setValue(null);
-            cmbScene.getItems().setAll(sessionConfig.getScenes());
-            cmbScene.setValue(sessionConfig.getActiveScene());
-        } finally {
-            refreshingUI = false;
-        }
-    }
-
-    private void switchScene(Scene target) {
-        sessionConfig.setActiveScene(target.getId());
-        manager.save(sessionConfig);
-        refreshSceneCombo();
-        applyScene(sessionConfig.getActiveScene());
-        if (sceneEditor != null) sceneEditor.refresh();
-    }
-
-    @FXML
-    private void onNewScene() {
-        TextInputDialog d = new TextInputDialog("New scene");
-        d.setTitle("New scene");
-        d.setHeaderText(null);
-        d.setContentText("Name:");
-        d.showAndWait().map(String::trim).filter(n -> !n.isEmpty()).ifPresent(name ->
-            switchScene(sessionConfig.addScene(name)));
-    }
-
     public void setHostServices(HostServices hostServices) {
         this.hostServices = hostServices;
     }
@@ -837,21 +766,14 @@ public class PlayerController implements SceneHost {
         if (hostServices != null) hostServices.showDocument(CAFECITO_URL);
     }
 
-    @FXML
-    private void onSaveSceneAs() {
-        Scene active = sessionConfig.getActiveScene();
-        TextInputDialog d = new TextInputDialog(active.getName() + " copy");
-        d.setTitle("Save as new scene");
-        d.setHeaderText(null);
-        d.setContentText("Name:");
-        d.showAndWait().map(String::trim).filter(n -> !n.isEmpty()).ifPresent(name -> {
-            Scene copy = sessionConfig.duplicateScene(active.getId(), name);
-            if (copy != null) switchScene(copy);
-        });
+    @Override
+    public void applyActiveScene() {
+        applyScene(sessionConfig.getActiveScene());
+        if (sceneEditor != null) sceneEditor.refresh();
     }
 
-    @FXML
-    private void onEditScene() {
+    @Override
+    public void openSceneEditor() {
         if (sceneEditor == null) {
             sceneEditor = SceneEditorController.create(mainRoot.getScene().getWindow(), this);
         }
@@ -907,22 +829,27 @@ public class PlayerController implements SceneHost {
 
     @Override public SessionConfig session() { return sessionConfig; }
 
+    @Override public MusicService musicService() { return musicService; }
+
+    @Override public AmbianceCoordinator ambiance() { return ambiance; }
+
+    @Override public Window window() { return mainRoot.getScene().getWindow(); }
+
     @Override public void saveSession() { manager.save(sessionConfig); }
 
     @Override public boolean isFfmpegAvailable() { return ambiance.isFfmpegAvailable(); }
 
     @Override
     public void onSceneRenamed() {
-        refreshSceneCombo();
+        sceneBarController.refresh();
     }
 
     @Override
     public boolean deleteActiveScene() {
         if (!sessionConfig.deleteScene(sessionConfig.getActiveScene().getId())) return false;
         manager.save(sessionConfig);
-        refreshSceneCombo();
-        applyScene(sessionConfig.getActiveScene());
-        if (sceneEditor != null) sceneEditor.refresh();
+        sceneBarController.refresh();
+        applyActiveScene();
         return true;
     }
 
@@ -983,105 +910,6 @@ public class PlayerController implements SceneHost {
 
     public void setFfmpegAvailable(boolean available) {
         ambiance.setFfmpegAvailable(available);
-    }
-
-    @FXML
-    private void onToggleAmbiance() {
-        if (ambiance.isVisible()) ambiance.hide();
-        else ambiance.show();
-    }
-
-    private void updateAmbianceToggle(boolean showing) {
-        if (btnToggleAmbiance == null) return;
-        btnToggleAmbiance.setText(showing ? "Hide ambiance" : "Show ambiance");
-    }
-
-    private void populateScreenMenu() {
-        if (btnToggleAmbiance == null) return;
-        int previousIndex = selectedScreenItem();
-        List<Screen> screens = Screen.getScreens();
-
-        btnToggleAmbiance.getItems().clear();
-        screenGroup.getToggles().clear();
-        addScreenItem("Auto (recommended)", 0);
-        for (int i = 0; i < screens.size(); i++) {
-            Screen s = screens.get(i);
-            int w = (int) s.getBounds().getWidth();
-            int h = (int) s.getBounds().getHeight();
-            String tag = s.equals(Screen.getPrimary()) ? " (primary)" : "";
-            addScreenItem("Screen " + (i + 1) + " — " + w + "x" + h + tag, i + 1);
-        }
-
-        selectScreenItem(previousIndex >= 0 && previousIndex < screenItemCount() ? previousIndex : 0);
-    }
-
-    private void addScreenItem(String text, int menuIndex) {
-        RadioMenuItem item = new RadioMenuItem(text);
-        item.setToggleGroup(screenGroup);
-        item.setOnAction(e -> onScreenSelected(menuIndex));
-        btnToggleAmbiance.getItems().add(item);
-    }
-
-    private int screenItemCount() {
-        return btnToggleAmbiance == null ? 0 : btnToggleAmbiance.getItems().size();
-    }
-
-    private int selectedScreenItem() {
-        if (btnToggleAmbiance == null) return -1;
-        Toggle selected = screenGroup.getSelectedToggle();
-        return selected == null ? -1 : btnToggleAmbiance.getItems().indexOf(selected);
-    }
-
-    private void selectScreenItem(int index) {
-        if (btnToggleAmbiance == null || index < 0 || index >= screenItemCount()) return;
-        ((RadioMenuItem) btnToggleAmbiance.getItems().get(index)).setSelected(true);
-    }
-
-    private void onScreenSelected(int menuIndex) {
-        if (refreshingUI) return;
-        int resolvedIndex = menuIndex <= 0 ? -1 : menuIndex - 1;
-        sessionConfig.setAmbianceScreenIndex(resolvedIndex);
-        manager.save(sessionConfig);
-        ambiance.applyScreen(resolvedIndex);
-    }
-
-    // --- Slider de volumen maestro ---
-
-    /** Persiste el valor actual del slider en la sesión. Solo se llama desde gestos del usuario. */
-    private void persistMasterVolume() {
-        double v = sldMasterVolume.getValue();
-        sessionConfig.setMasterVolume(v);
-        manager.save(sessionConfig);
-    }
-
-    /**
-     * Conecta el slider de volumen maestro con el servicio de audio y la persistencia.
-     * El listener de valor aplica el volumen en vivo pero nunca persiste;
-     * la persistencia ocurre solo en los tres handlers de gesto del usuario.
-     */
-    private void wireMasterVolumeSlider() {
-        if (sldMasterVolume == null) return;
-        double initial = sessionConfig.getMasterVolume();
-        sldMasterVolume.setValue(initial);
-        if (lblMasterVolume != null)
-            lblMasterVolume.setText(Math.round(initial * 100) + "%");
-
-        // LIVE: aplica el volumen en tiempo real; nunca persiste aqui
-        sldMasterVolume.valueProperty().addListener((obs, oldV, newV) -> {
-            double v = newV.doubleValue();
-            musicService.setMasterVolume(v);
-            if (lblMasterVolume != null)
-                lblMasterVolume.setText(Math.round(v * 100) + "%");
-        });
-
-        // Triple-trigger de persistencia (solo gestos del usuario)
-        sldMasterVolume.setOnMouseReleased(e -> persistMasterVolume());
-        sldMasterVolume.valueChangingProperty().addListener((o, was, is) -> {
-            if (was && !is) persistMasterVolume();
-        });
-        sldMasterVolume.focusedProperty().addListener((o, had, has) -> {
-            if (had && !has) persistMasterVolume();
-        });
     }
 
     private final PlaylistTrackCell.Host playlistTrackHost = new PlaylistTrackCell.Host() {
@@ -1468,60 +1296,6 @@ public class PlayerController implements SceneHost {
         }
     }
 
-    private void startUpdateCheck() {
-        UpdateManager.get().checkAsync(update -> Platform.runLater(() -> showUpdateNotice(update)));
-    }
-
-    private void showUpdateNotice(UpdateManager.ReadyUpdate update) {
-        if (updateBar == null) return;
-        if (readyUpdate != null && !update.version().isNewerThan(readyUpdate.version())) return;
-        readyUpdate = update;
-        lblUpdate.setText("Version " + update.version() + " is ready");
-        btnUpdateNow.setDisable(false);
-        btnUpdateOnClose.setVisible(true);
-        btnUpdateOnClose.setManaged(true);
-        updateBar.setVisible(true);
-        updateBar.setManaged(true);
-    }
-
-    @FXML
-    private void onInstallUpdateNow() {
-        UpdateManager.ReadyUpdate update = readyUpdate;
-        if (update == null) return;
-        btnUpdateNow.setDisable(true);
-        CompletableFuture.supplyAsync(() -> UpdateManager.get().verify(update)).thenAccept(ok -> Platform.runLater(() -> {
-            if (!ok) {
-                lblUpdate.setText("The downloaded update is damaged. It will be downloaded again on the next start.");
-                btnUpdateOnClose.setVisible(false);
-                btnUpdateOnClose.setManaged(false);
-                return;
-            }
-            UpdateManager.get().installOnClose(update);
-            if (!UpdateManager.get().launchPendingInstaller()) {
-                lblUpdate.setText("The installer could not be started. Try again or install it on close.");
-                btnUpdateNow.setDisable(false);
-                return;
-            }
-            shutdownApp();
-        })).exceptionally(ex -> {
-            Platform.runLater(() -> {
-                lblUpdate.setText("The update could not be checked: " + ex.getMessage());
-                btnUpdateNow.setDisable(false);
-            });
-            return null;
-        });
-    }
-
-    @FXML
-    private void onInstallUpdateOnClose() {
-        UpdateManager.ReadyUpdate update = readyUpdate;
-        if (update == null) return;
-        UpdateManager.get().installOnClose(update);
-        lblUpdate.setText("Version " + update.version() + " will be installed when you close the app");
-        btnUpdateOnClose.setVisible(false);
-        btnUpdateOnClose.setManaged(false);
-    }
-
     private void showYoutubeError(String message) {
         if (lblYoutubeError != null) {
             ytDlpStatusClear.stop();
@@ -1633,12 +1407,7 @@ public class PlayerController implements SceneHost {
         // Restaurar índice de pantalla de ambiance
         int screenIdx = cfg.getAmbianceScreenIndex();
         sessionConfig.setAmbianceScreenIndex(screenIdx);
-        Platform.runLater(() -> {
-            populateScreenMenu();
-            int menuPos = screenIdx < 0 ? 0 : screenIdx + 1;
-            selectScreenItem(menuPos < screenItemCount() ? menuPos : 0);
-            ambiance.applyScreen(screenIdx);
-        });
+        Platform.runLater(() -> ambianceToolbarController.restoreScreen(screenIdx));
 
         String lastPath = cfg.getLastFolderPath();
         if (lastPath != null) {
@@ -1675,13 +1444,8 @@ public class PlayerController implements SceneHost {
         Platform.runLater(() -> {
             // Restaurar volumen maestro desde sesión
             double mv = cfg.getMasterVolume();
-            sessionConfig.setMasterVolume(mv);
-            musicService.setMasterVolume(mv);
-            if (sldMasterVolume != null) sldMasterVolume.setValue(mv); // listener fires -> idempotent
-            if (lblMasterVolume != null)
-                lblMasterVolume.setText(Math.round(mv * 100) + "%");
-
-            refreshSceneCombo();
+            volumeController.restore(mv);
+            sceneBarController.refresh();
             applyScene(sessionConfig.getActiveScene());
         });
     }
@@ -1764,7 +1528,8 @@ public class PlayerController implements SceneHost {
         shutdownApp();
     }
 
-    private void shutdownApp() {
+    @Override
+    public void shutdownApp() {
         if (sceneEditor != null) sceneEditor.dispose();
         if (saveDebounce.getStatus() == Animation.Status.RUNNING) {
             saveDebounce.stop();

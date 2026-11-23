@@ -28,39 +28,17 @@
             <Button text="✕" onAction="#onCloseWindow" styleClass="btn-window-control, btn-window-close"/>
         </HBox>
 
-        <HBox fx:id="updateBar" spacing="10" alignment="CENTER_LEFT" styleClass="update-bar"
-              visible="false" managed="false">
-            <padding>
-                <Insets top="6" right="12" bottom="6" left="12"/>
-            </padding>
-            <Label fx:id="lblUpdate" text="" styleClass="update-label"/>
-            <Region HBox.hgrow="ALWAYS"/>
-            <Button fx:id="btnUpdateNow" text="Install now" onAction="#onInstallUpdateNow" styleClass="btn-primary"/>
-            <Button fx:id="btnUpdateOnClose" text="On close" onAction="#onInstallUpdateOnClose" styleClass="btn-secondary"/>
-        </HBox>
+        <fx:include fx:id="updateBar" source="update_bar.fxml"/>
 
-        <HBox fx:id="sceneBar" spacing="8" alignment="CENTER_LEFT" styleClass="scene-bar">
+        <HBox fx:id="topBar" spacing="8" alignment="CENTER_LEFT" styleClass="scene-bar">
             <padding>
                 <Insets top="8" right="12" bottom="8" left="12"/>
             </padding>
-            <Label text="Scene" styleClass="lbl-session-title"/>
-            <ComboBox fx:id="cmbScene" minWidth="160" prefWidth="180"/>
-            <Button fx:id="btnEditScene" text="Edit scene" onAction="#onEditScene" styleClass="btn-secondary"/>
-            <Button text="Save as..." onAction="#onSaveSceneAs" styleClass="btn-secondary"/>
-            <MenuButton fx:id="btnSceneMenu" text="+" styleClass="btn-menu">
-                <items>
-                    <MenuItem text="New scene" onAction="#onNewScene"/>
-                    <MenuItem text="Save as new scene..." onAction="#onSaveSceneAs"/>
-                </items>
-            </MenuButton>
+            <fx:include fx:id="sceneBar" source="scene_bar.fxml"/>
             <Region HBox.hgrow="ALWAYS"/>
             <Hyperlink text="☕ Support the project" onAction="#onOpenCafecito" styleClass="link-support"/>
-            <SplitMenuButton fx:id="btnToggleAmbiance" text="Show ambiance" onAction="#onToggleAmbiance"
-                             styleClass="btn-menu"/>
-            <Label text="VOLUME" styleClass="lbl-session-title"/>
-            <Slider fx:id="sldMasterVolume" min="0.0" max="1.0" value="1.0"
-                    prefWidth="120" blockIncrement="0.05" styleClass="spotify-slider"/>
-            <Label fx:id="lblMasterVolume" minWidth="40" text="100%" styleClass="lbl-time"/>
+            <fx:include fx:id="ambianceToolbar" source="ambiance_toolbar.fxml"/>
+            <fx:include fx:id="volume" source="volume_control.fxml"/>
         </HBox>
 
         <SplitPane fx:id="mainSplit" VBox.vgrow="ALWAYS" dividerPositions="0.3" styleClass="main-split">
