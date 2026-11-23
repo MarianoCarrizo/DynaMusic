@@ -125,17 +125,7 @@ public class MusicServiceStarter extends Application {
 
         scene.setOnKeyReleased(e -> heldKeys.remove(e.getCode()));
 
-        // Space: filtro en vez de handler para ganarle al botón con foco, que también reacciona a Space
-        scene.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
-            if (!isPlaybackShortcut(e, scene)) return;
-            e.consume();
-            if (heldKeys.add(KeyCode.SPACE)) controller.togglePlayback();
-        });
-        scene.addEventFilter(KeyEvent.KEY_RELEASED, e -> {
-            if (!isPlaybackShortcut(e, scene)) return;
-            e.consume();
-            heldKeys.remove(KeyCode.SPACE);
-        });
+        interceptSpaceBeforeFocusedButton(scene, heldKeys, controller);
 
         addResizeSupport(stage, root);
 
@@ -149,6 +139,20 @@ public class MusicServiceStarter extends Application {
         stage.centerOnScreen();
 
         stage.show();
+    }
+
+    private static void interceptSpaceBeforeFocusedButton(
+            Scene scene, Set<KeyCode> heldKeys, PlayerController controller) {
+        scene.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
+            if (!isPlaybackShortcut(e, scene)) return;
+            e.consume();
+            if (heldKeys.add(KeyCode.SPACE)) controller.toggleLastUsedPlayer();
+        });
+        scene.addEventFilter(KeyEvent.KEY_RELEASED, e -> {
+            if (!isPlaybackShortcut(e, scene)) return;
+            e.consume();
+            heldKeys.remove(KeyCode.SPACE);
+        });
     }
 
     private static boolean isPlaybackShortcut(KeyEvent e, Scene scene) {

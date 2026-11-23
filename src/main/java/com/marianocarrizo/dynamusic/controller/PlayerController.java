@@ -283,7 +283,7 @@ public class PlayerController implements SceneHost {
         // Listener del reproductor de mood
         musicService.setProgressListener((current, total) ->
             Platform.runLater(() -> {
-                moodSeekBar.update(current, total);
+                moodSeekBar.showPlayback(current, total);
                 updateButtons();
                 updatePlayPauseButton();
             }));
@@ -291,34 +291,34 @@ public class PlayerController implements SceneHost {
         // Listener del reproductor de preescucha
         musicService.setPreviewProgressListener((current, total) ->
             Platform.runLater(() -> {
-                previewSeekBar.update(current, total);
+                previewSeekBar.showPlayback(current, total);
                 updatePreviewPlayPauseButton();
             }));
 
         musicService.setOnDemandProgressListener((current, total) ->
             Platform.runLater(() -> {
-                onDemandSeekBar.update(current, total);
+                onDemandSeekBar.showPlayback(current, total);
                 updateOnDemandPlayPauseButton();
             }));
         musicService.setOnDemandStateListener(() -> {
             if (!musicService.isOnDemandPlaying()) {
-                onDemandSeekBar.rewind();
+                onDemandSeekBar.rewindToStart();
             }
             updateOnDemandPlayPauseButton();
         });
         showOnDemandPanel(false);
 
-        moodSeekBar.setOnSeek(musicService::seekCurrentTrack);
-        previewSeekBar.setOnSeek(musicService::seekPreview);
+        moodSeekBar.setOnSeekToFraction(musicService::seekCurrentTrack);
+        previewSeekBar.setOnSeekToFraction(musicService::seekPreview);
 
-        musicService.setOnPreviewInterrupted(() -> setPreviewButtonIcon("▶"));
-        musicService.setOnModeInterrupted(() -> {
+        musicService.setOnPreviewPausedByMode(() -> setPreviewButtonIcon("▶"));
+        musicService.setOnModePausedByPreview(() -> {
             setMoodButtonIcon("▶");
             if (btnOnDemandPlayPause != null) btnOnDemandPlayPause.setText("▶");
             if (btnPlaylistPlayPause != null) btnPlaylistPlayPause.setText("▶");
         });
-        onDemandSeekBar.setOnSeek(musicService::seekOnDemand);
-        playlistSeekBar.setOnSeek(musicService::seekPlaylist);
+        onDemandSeekBar.setOnSeekToFraction(musicService::seekOnDemand);
+        playlistSeekBar.setOnSeekToFraction(musicService::seekPlaylist);
 
         if (lblNowPlaying != null) {
             lblNowPlaying.textProperty().bind(musicService.nowPlayingProperty());
@@ -372,7 +372,7 @@ public class PlayerController implements SceneHost {
         }));
 
         musicService.setPlaylistProgressListener((current, total) ->
-            Platform.runLater(() -> playlistSeekBar.update(current, total)));
+            Platform.runLater(() -> playlistSeekBar.showPlayback(current, total)));
 
         if (cmbPlaylist != null) {
             cmbPlaylist.setOnAction(e -> {
@@ -608,9 +608,8 @@ public class PlayerController implements SceneHost {
     @FXML private void onSwitchToRaged()    { switchTrack(TrackType.RAGED); }
     @FXML private void onSwitchToAdvantage(){ switchTrack(TrackType.ADVANTAGE); }
 
-    /** Plays or pauses the player of the current playback mode, the one used last. */
-    public void togglePlayback() {
-        if (musicService.previewOwnsAudio()) {
+    public void toggleLastUsedPlayer() {
+        if (musicService.previewSoundedLast()) {
             onTogglePreviewPlayPause();
             return;
         }
@@ -696,7 +695,7 @@ public class PlayerController implements SceneHost {
         if (file == null || !file.isFile()) return;
         String label = title != null && !title.isBlank() ? title : stripExtension(file.getName());
         if (lblOnDemandTrack != null) lblOnDemandTrack.setText(label);
-        onDemandSeekBar.reset();
+        onDemandSeekBar.showNoTrack();
         musicService.playOnDemand(file, label, () -> {
             showOnDemandPanel(true);
             activateSlot(AuraSlot.ON_DEMAND);
@@ -730,7 +729,7 @@ public class PlayerController implements SceneHost {
     private void onOnDemandStop() {
         musicService.onDemandPause();
         musicService.seekOnDemand(0);
-        onDemandSeekBar.rewind();
+        onDemandSeekBar.rewindToStart();
         updateOnDemandPlayPauseButton();
     }
 
@@ -792,13 +791,13 @@ public class PlayerController implements SceneHost {
             previewPanel.setManaged(active);
         }
         if (btnPreviewPlayPause != null) btnPreviewPlayPause.setDisable(!active);
-        previewSeekBar.setSeekable(active);
+        previewSeekBar.setSeekEnabled(active);
         if (!active && lblPreviewTrack != null)
             lblPreviewTrack.setText("No active preview");
     }
 
     private void resetPreviewSlider() {
-        previewSeekBar.reset();
+        previewSeekBar.showNoTrack();
         updatePreviewPlayPauseButton();
     }
 
@@ -920,7 +919,7 @@ public class PlayerController implements SceneHost {
 
     private void resetMoodProgressIfEmpty() {
         if (musicService.isLoaded(currentActiveType)) return;
-        moodSeekBar.reset();
+        moodSeekBar.showNoTrack();
     }
 
     private void onTrackLoadFailed(TrackType type, String path) {
