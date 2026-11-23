@@ -714,3 +714,17 @@
     -fx-opacity: 1;
 }
 .filled-slider:disabled { -fx-opacity: 0.4; }
+
+.library-empty {
+    -fx-padding: 24px;
+}
+.empty-state-title {
+    -fx-text-fill: #e0e0e6;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+}
+.empty-state-hint {
+    -fx-text-fill: #8a8f98;
+    -fx-font-size: 12px;
+    -fx-font-style: italic;
+}

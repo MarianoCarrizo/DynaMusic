@@ -68,7 +68,27 @@ public class SessionConfig {
 
     private Map<String, String> repeatModes;
 
+    private Boolean ambianceIntroduced;
+
     public SessionConfig() {}
+
+    public static SessionConfig firstRun() {
+        SessionConfig fresh = new SessionConfig();
+        fresh.ambianceIntroduced = Boolean.FALSE;
+        return fresh;
+    }
+
+    public boolean isAmbianceIntroduced() {
+        return AmbianceIntroduction.isIntroduced(ambianceIntroduced);
+    }
+
+    public void markAmbianceIntroduced() {
+        ambianceIntroduced = Boolean.TRUE;
+    }
+
+    public void adoptAmbianceIntroductionFrom(SessionConfig other) {
+        ambianceIntroduced = other.ambianceIntroduced;
+    }
 
     public List<Scene> getScenes() {
         return (scenes != null) ? Collections.unmodifiableList(scenes) : List.of();

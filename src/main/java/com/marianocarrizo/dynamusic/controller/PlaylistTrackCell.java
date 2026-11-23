@@ -7,6 +7,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.DataFormat;
 import javafx.scene.input.DragEvent;
@@ -22,6 +23,8 @@ import java.util.List;
 final class PlaylistTrackCell extends ListCell<PlaylistRow> {
 
     interface Host {
+        File trackAt(int index);
+        String playlistName();
         RowPlayback playbackOf(int index);
         void filesDropped(List<File> files, int slot);
         void trackMoved(int from, int slot);
@@ -43,8 +46,11 @@ final class PlaylistTrackCell extends ListCell<PlaylistRow> {
     private final Label album = new Label();
     private final HBox row = new HBox(8);
 
-    PlaylistTrackCell(Host host) {
+    PlaylistTrackCell(Host host, FileTrackMenuItems.Host menuHost) {
         this.host = host;
+        menu.getItems().addAll(FileTrackMenuItems.create(
+                menuHost, () -> host.trackAt(getIndex()), host::playlistName));
+        menu.getItems().add(new SeparatorMenuItem());
         MenuItem remove = new MenuItem("Remove from playlist");
         remove.setOnAction(e -> host.removeRequested(getIndex()));
         menu.getItems().add(remove);

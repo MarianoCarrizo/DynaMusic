@@ -20,7 +20,7 @@
         <ColumnConstraints percentWidth="30" hgrow="ALWAYS"/>
     </columnConstraints>
 
-    <HBox spacing="12" alignment="CENTER_LEFT" GridPane.columnIndex="0">
+    <HBox fx:id="trackInfo" spacing="12" alignment="CENTER_LEFT" GridPane.columnIndex="0">
         <CoverView fx:id="cover"/>
         <VBox spacing="2" alignment="CENTER_LEFT" HBox.hgrow="ALWAYS" minWidth="0">
             <Label fx:id="lblTitle" maxWidth="Infinity" styleClass="now-playing-title"/>

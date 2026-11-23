@@ -52,6 +52,10 @@ public final class YouTubeBarController {
         manager.ensureReadyAsync();
     }
 
+    void focusUrl() {
+        txtYoutubeUrl.requestFocus();
+    }
+
     @FXML
     private void onAddYoutubeUrl() {
         hideMessage();

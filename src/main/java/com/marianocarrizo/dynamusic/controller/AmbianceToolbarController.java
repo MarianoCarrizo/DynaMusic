@@ -47,7 +47,14 @@ public final class AmbianceToolbarController {
     @FXML
     private void onToggleAmbiance() {
         if (host.ambiance().isVisible()) host.ambiance().hide();
-        else host.ambiance().show();
+        else showAmbiance();
+    }
+
+    private void showAmbiance() {
+        host.ambiance().show();
+        if (host.session().isAmbianceIntroduced()) return;
+        host.session().markAmbianceIntroduced();
+        host.saveSession();
     }
 
     private void showVisibility(boolean showing) {
