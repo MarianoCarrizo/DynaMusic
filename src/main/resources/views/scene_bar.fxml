@@ -5,11 +5,11 @@
 <HBox xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.marianocarrizo.dynamusic.controller.SceneBarController"
       spacing="8" alignment="CENTER_LEFT">
-    <Label text="Scene" styleClass="lbl-session-title"/>
-    <ComboBox fx:id="cmbScene" minWidth="160" prefWidth="180"/>
-    <Button fx:id="btnEditScene" text="Edit scene" onAction="#onEditScene" styleClass="btn-secondary"/>
-    <Button text="Save as..." onAction="#onSaveSceneAs" styleClass="btn-secondary"/>
-    <MenuButton fx:id="btnSceneMenu" text="+" styleClass="btn-menu">
+    <Label text="Scene" minWidth="-Infinity" styleClass="lbl-session-title"/>
+    <ComboBox fx:id="cmbScene" minWidth="100" prefWidth="180"/>
+    <Button fx:id="btnEditScene" text="Edit scene" minWidth="-Infinity" onAction="#onEditScene" styleClass="btn-secondary"/>
+    <Button text="Save as..." minWidth="-Infinity" onAction="#onSaveSceneAs" styleClass="btn-secondary"/>
+    <MenuButton fx:id="btnSceneMenu" text="+" minWidth="-Infinity" styleClass="btn-menu">
         <items>
             <MenuItem text="New scene" onAction="#onNewScene"/>
             <MenuItem text="Save as new scene..." onAction="#onSaveSceneAs"/>

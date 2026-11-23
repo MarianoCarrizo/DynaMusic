@@ -123,6 +123,9 @@
     -fx-text-fill: #ffffff;
     -fx-background-color: transparent;
 }
+.combo-box > .list-cell {
+    -fx-text-overrun: ellipsis;
+}
 .combo-box > .list-cell:filled:selected, .combo-box > .list-cell:filled {
     -fx-background-color: transparent !important;
     -fx-text-fill: #ffffff !important;
