@@ -4,6 +4,7 @@ import com.marianocarrizo.dynamusic.enums.TrackType;
 import com.marianocarrizo.dynamusic.config.SessionConfig;
 import com.marianocarrizo.dynamusic.config.SessionConfigManager;
 import com.marianocarrizo.dynamusic.model.AuraSlot;
+import com.marianocarrizo.dynamusic.model.NowPlayingModel;
 import com.marianocarrizo.dynamusic.model.PlaylistItem;
 import com.marianocarrizo.dynamusic.model.Scene;
 import com.marianocarrizo.dynamusic.service.MusicService;
@@ -74,9 +75,13 @@ public class PlayerController implements SceneHost, PlayerHost {
             () -> moodPanelController.activeMood(), this::refreshMoodState);
 
     private final PlaylistManager playlistManager = new PlaylistManager();
+    private final NowPlayingModel nowPlaying = new NowPlayingModel();
+    private final NowPlayingTracker nowPlayingTracker = new NowPlayingTracker(
+            musicService, playlistManager, () -> moodPanelController.activeMood(), nowPlaying);
 
     @FXML
     public void initialize() {
+        nowPlaying.titleProperty().bind(musicService.nowPlayingProperty());
         youTubeBarController.attach(this);
         updateBarController.attach(this);
         sceneBarController.attach(this);
@@ -97,6 +102,7 @@ public class PlayerController implements SceneHost, PlayerHost {
             moodPanelController.showPlaying(false);
             onDemandPanelController.showPlaying(false);
             playlistTransportController.showPlaying(false);
+            playbackStateChanged();
         });
         ambiance.setAudioSource(musicService::getAudioFeatures);
 
@@ -160,6 +166,7 @@ public class PlayerController implements SceneHost, PlayerHost {
         moodPanelController.refreshButtonStates();
         moodPanelController.showPlaying(true);
         previewPanelController.hide();
+        playbackStateChanged();
     }
 
     private boolean usesOnDemandAura() {
@@ -188,6 +195,7 @@ public class PlayerController implements SceneHost, PlayerHost {
         ambiance.activateSlot(liveSlot());
         liveAuraController.refresh();
         moodPanelController.syncPlayPauseIcon();
+        playbackStateChanged();
     }
 
     @Override
@@ -203,6 +211,7 @@ public class PlayerController implements SceneHost, PlayerHost {
             playlistTransportController.showPlaying(false);
             playlistPanelController.refreshRows();
             onDemandPanelController.syncPlayPauseIcon();
+            playbackStateChanged();
         });
     }
 
@@ -216,6 +225,7 @@ public class PlayerController implements SceneHost, PlayerHost {
     public void startPreview(File file) {
         previewPanelController.start(file);
         onDemandPanelController.syncPlayPauseIcon();
+        playbackStateChanged();
     }
 
     private void updateWindowMood(TrackType type) {
@@ -387,6 +397,16 @@ public class PlayerController implements SceneHost, PlayerHost {
     @Override
     public Optional<File> selectedLibraryItem() {
         return libraryPanelController.selectedItem();
+    }
+
+    @Override
+    public NowPlayingModel nowPlaying() {
+        return nowPlaying;
+    }
+
+    @Override
+    public void playbackStateChanged() {
+        nowPlayingTracker.sync();
     }
 
     @Override

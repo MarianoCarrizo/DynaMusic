@@ -26,12 +26,14 @@ public final class OnDemandPanelController {
             Platform.runLater(() -> {
                 onDemandSeekBar.showPlayback(current, total);
                 syncPlayPauseIcon();
+                host.playbackStateChanged();
             }));
         musicService.setOnDemandStateListener(() -> {
             if (!musicService.isOnDemandPlaying()) {
                 onDemandSeekBar.rewindToStart();
             }
             syncPlayPauseIcon();
+            host.playbackStateChanged();
         });
         onDemandSeekBar.setOnSeekToFraction(musicService::seekOnDemand);
         show(false);
@@ -61,6 +63,7 @@ public final class OnDemandPanelController {
         if (musicService.isOnDemandPlaying()) musicService.onDemandPause();
         else musicService.onDemandPlay();
         syncPlayPauseIcon();
+        host.playbackStateChanged();
     }
 
     @FXML
@@ -70,6 +73,7 @@ public final class OnDemandPanelController {
         musicService.seekOnDemand(0);
         onDemandSeekBar.rewindToStart();
         syncPlayPauseIcon();
+        host.playbackStateChanged();
     }
 
     @FXML

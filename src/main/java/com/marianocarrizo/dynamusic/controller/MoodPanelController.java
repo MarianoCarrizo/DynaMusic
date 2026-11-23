@@ -71,9 +71,10 @@ public final class MoodPanelController {
                 moodSeekBar.showPlayback(current, total);
                 refreshButtonStates();
                 syncPlayPauseIcon();
+                host.playbackStateChanged();
             }));
         moodSeekBar.setOnSeekToFraction(musicService::seekCurrentTrack);
-        lblNowPlaying.textProperty().bind(musicService.nowPlayingProperty());
+        lblNowPlaying.textProperty().bind(host.nowPlaying().titleProperty());
     }
 
     TrackType activeMood() {
@@ -147,12 +148,14 @@ public final class MoodPanelController {
             host.enterMode(MusicService.PlaybackMode.MOOD);
             musicService.fadeInAndPlay();
         }
+        host.playbackStateChanged();
     }
 
     @FXML
     private void onStop() {
         host.musicService().stop();
         showPlaying(false);
+        host.playbackStateChanged();
     }
 
     @FXML

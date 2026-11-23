@@ -30,9 +30,13 @@ public final class PreviewPanelController {
             Platform.runLater(() -> {
                 previewSeekBar.showPlayback(current, total);
                 syncPlayPauseIcon();
+                host.playbackStateChanged();
             }));
         previewSeekBar.setOnSeekToFraction(musicService::seekPreview);
-        musicService.setOnPreviewPausedByMode(() -> showPlaying(false));
+        musicService.setOnPreviewPausedByMode(() -> {
+            showPlaying(false);
+            host.playbackStateChanged();
+        });
         show(false);
     }
 
@@ -44,12 +48,14 @@ public final class PreviewPanelController {
         musicService.previewTrack(file);
         show(true);
         syncPlayPauseIcon();
+        host.playbackStateChanged();
     }
 
     void hide() {
         show(false);
         previewSeekBar.showNoTrack();
         syncPlayPauseIcon();
+        host.playbackStateChanged();
     }
 
     @FXML
@@ -62,6 +68,7 @@ public final class PreviewPanelController {
             musicService.previewPlay();
             showPlaying(true);
         }
+        host.playbackStateChanged();
     }
 
     @FXML

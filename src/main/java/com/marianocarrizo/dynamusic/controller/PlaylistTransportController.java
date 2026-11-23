@@ -32,9 +32,13 @@ public final class PlaylistTransportController {
                 () -> { musicService.stopPlaylist(); host.refreshPlaylistView(); }
             );
             host.refreshPlaylistView();
+            host.playbackStateChanged();
         }));
         musicService.setPlaylistProgressListener((current, total) ->
-            Platform.runLater(() -> playlistSeekBar.showPlayback(current, total)));
+            Platform.runLater(() -> {
+                playlistSeekBar.showPlayback(current, total);
+                host.playbackStateChanged();
+            }));
     }
 
     void showPlaying(boolean playing) {
@@ -45,6 +49,7 @@ public final class PlaylistTransportController {
         host.enterMode(MusicService.PlaybackMode.PLAYLIST);
         host.musicService().playPlaylistTrack(file);
         showPlaying(true);
+        host.playbackStateChanged();
     }
 
     @FXML
@@ -53,6 +58,7 @@ public final class PlaylistTransportController {
         if (musicService.isPlaylistPlaying()) {
             musicService.playlistPause();
             showPlaying(false);
+            host.playbackStateChanged();
         } else {
             host.playlistManager().startCurrent().ifPresent(this::play);
         }
@@ -71,6 +77,7 @@ public final class PlaylistTransportController {
             showPlaying(false);
         });
         host.refreshPlaylistView();
+        host.playbackStateChanged();
     }
 
     @FXML

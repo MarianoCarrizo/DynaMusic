@@ -3,6 +3,7 @@ package com.marianocarrizo.dynamusic.controller;
 import com.marianocarrizo.dynamusic.config.SessionConfig;
 import com.marianocarrizo.dynamusic.enums.TrackType;
 import com.marianocarrizo.dynamusic.model.AuraSlot;
+import com.marianocarrizo.dynamusic.model.NowPlayingModel;
 import com.marianocarrizo.dynamusic.model.PlaylistItem;
 import com.marianocarrizo.dynamusic.service.PlaylistManager;
 import com.marianocarrizo.dynamusic.service.MusicService;
@@ -68,4 +69,8 @@ public interface PlayerHost {
     Optional<File> selectedLibraryItem();
 
     void persistPlaylists();
+
+    NowPlayingModel nowPlaying();
+
+    void playbackStateChanged();
 }
