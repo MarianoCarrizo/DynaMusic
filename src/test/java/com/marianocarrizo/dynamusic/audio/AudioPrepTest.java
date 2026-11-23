@@ -146,6 +146,7 @@ class AudioPrepTest {
         ffmpeg = true;
         AudioCache cache = new AudioCache(dir.resolve("cache"), CacheLimit.GB_1, System::currentTimeMillis,
                 AudioCache.filesystemDeleter(), flush -> { });
+        cache.initialize();
         AudioPrep prep = new AudioPrep(cache, new RouteResolver(() -> true), javaSound, ffmpegConverter, gains,
                 () -> true, background);
         File ogg = file("a.ogg");

@@ -3,13 +3,17 @@ package com.marianocarrizo.dynamusic.service;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class FfmpegLocatorTest {
 
@@ -17,13 +21,44 @@ class FfmpegLocatorTest {
 
     @Test
     void missingExecutableIsNotAvailable() {
-        assertFalse(FfmpegLocator.answersVersionQuery(Optional.empty()));
-        assertFalse(FfmpegLocator.answersVersionQuery(Optional.of(ROOT.resolve("no-such-ffmpeg").toString())));
+        assertFalse(FfmpegLocator.answersVersionQuery(Optional.empty(), 1000));
+        assertFalse(FfmpegLocator.answersVersionQuery(Optional.of(ROOT.resolve("no-such-ffmpeg").toString()), 1000));
     }
 
     @Test
-    void availabilityIsMemoized() {
-        assertEquals(FfmpegLocator.isAvailable(), FfmpegLocator.isAvailable());
+    void aHungProcessIsGivenUpOnAtTheDeadline() {
+        Optional<String> ffmpeg = FfmpegLocator.executable();
+        assumeTrue(ffmpeg.isPresent(), "ffmpeg not installed");
+        List<String> forever = List.of(ffmpeg.get(), "-hide_banner", "-nostdin", "-v", "error", "-re", "-f", "lavfi",
+                "-i", "anullsrc", "-t", "60", "-f", "null", "-");
+        long started = System.nanoTime();
+
+        boolean answered = FfmpegLocator.answers(forever, 500);
+
+        assertFalse(answered);
+        assertTrue(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started) < 5000);
+    }
+
+    @Test
+    void availabilityNeverBlocksAndResolvesToAStableAnswer() {
+        long started = System.nanoTime();
+
+        boolean immediate = FfmpegLocator.isAvailable();
+
+        assertTrue(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started) < 1000);
+        boolean resolved = FfmpegLocator.awaitAvailability();
+        assertEquals(resolved, FfmpegLocator.awaitAvailability());
+        assertEquals(resolved, FfmpegLocator.isAvailable());
+        assertTrue(immediate || !resolved);
+    }
+
+    @Test
+    void listenersAreNotifiedOnceResolved() throws InterruptedException {
+        CountDownLatch notified = new CountDownLatch(1);
+
+        FfmpegLocator.onResolved(notified::countDown);
+
+        assertTrue(notified.await(10, TimeUnit.SECONDS));
     }
 
     @Test

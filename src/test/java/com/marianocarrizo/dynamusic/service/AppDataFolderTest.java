@@ -17,6 +17,15 @@ class AppDataFolderTest {
     }
 
     @Test
+    void localRootPrefersLocalAppDataOnWindowsAndFallsBackElsewhere() {
+        assertEquals(Paths.get("C:\\Users\\u\\AppData\\Local", "DynaMusic"), AppDataFolder.localRoot("Windows 11",
+                "C:\\Users\\u\\AppData\\Local", "C:\\Users\\u\\AppData\\Roaming", "C:\\Users\\u"));
+        assertEquals(Paths.get("C:\\Users\\u\\AppData\\Roaming", "DynaMusic"), AppDataFolder.localRoot("Windows 11",
+                " ", "C:\\Users\\u\\AppData\\Roaming", "C:\\Users\\u"));
+        assertEquals(Paths.get("/home/u", "DynaMusic"), AppDataFolder.localRoot("Linux", "/x", "/y", "/home/u"));
+    }
+
+    @Test
     void childResolvesInsideRoot() {
         assertEquals(AppDataFolder.root().resolve("audio"), AppDataFolder.child("audio"));
     }

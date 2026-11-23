@@ -26,6 +26,10 @@ final class CacheIndexCodec {
         return text.toString();
     }
 
+    static boolean hasValidHeader(String text) {
+        return text != null && text.split("\r?\n", 2)[0].equals(HEADER);
+    }
+
     static List<CacheEntry> decode(String text) {
         List<CacheEntry> entries = new ArrayList<>();
         if (text == null) return entries;

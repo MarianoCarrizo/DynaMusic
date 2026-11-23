@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.OptionalDouble;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -29,6 +30,7 @@ public final class AudioPrep {
     private final BooleanSupplier ffmpegAvailable;
     private final Executor userExecutor;
     private final Map<CacheKey, CompletableFuture<PreparedAudio>> inFlight = new ConcurrentHashMap<>();
+    private final Set<CacheKey> knownFailures = ConcurrentHashMap.newKeySet();
 
     public AudioPrep(AudioCache cache, RouteResolver resolver, PcmConverter javaSound, PcmConverter ffmpeg,
                      GainMeasurer gains, BooleanSupplier ffmpegAvailable, Executor userExecutor) {
@@ -43,6 +45,14 @@ public final class AudioPrep {
 
     public CompletableFuture<PreparedAudio> prepare(File file) {
         return prepare(file, userExecutor);
+    }
+
+    public CompletableFuture<PreparedAudio> prefetch(File file) {
+        if (knownFailures.contains(CacheKey.of(file))) {
+            return CompletableFuture.failedFuture(
+                    new UnplayableAudioException("Skipped after an earlier failure: " + file.getName()));
+        }
+        return prepare(file, Runnable::run);
     }
 
     public CompletableFuture<PreparedAudio> prepare(File file, Executor executor) {
@@ -69,8 +79,10 @@ public final class AudioPrep {
         }
         inFlight.remove(key, future);
         if (failure != null) {
+            knownFailures.add(key);
             future.completeExceptionally(failure);
         } else {
+            knownFailures.remove(key);
             future.complete(result);
         }
     }

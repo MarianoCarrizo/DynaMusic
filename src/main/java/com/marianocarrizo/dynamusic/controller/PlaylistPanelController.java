@@ -7,6 +7,7 @@ import com.marianocarrizo.dynamusic.config.SessionConfig;
 import com.marianocarrizo.dynamusic.model.NowPlayingSource;
 import com.marianocarrizo.dynamusic.model.PlaylistItem;
 import com.marianocarrizo.dynamusic.service.AudioFileCollector;
+import com.marianocarrizo.dynamusic.service.FfmpegLocator;
 import com.marianocarrizo.dynamusic.service.MusicService;
 import com.marianocarrizo.dynamusic.service.PlaylistManager;
 import javafx.application.Platform;
@@ -80,6 +81,7 @@ public final class PlaylistPanelController {
         });
         host.nowPlaying().snapshotProperty().addListener((obs, oldValue, newValue) -> refreshPlayingState());
         host.musicService().tags().onLoaded(this::refreshRowLabels);
+        FfmpegLocator.onResolved(() -> Platform.runLater(lstPlaylistTracks::refresh));
         lstPlaylistTracks.setPlaceholder(emptyListHint());
         lstPlaylistTracks.setOnDragEntered(e -> dragActivity.begin());
         lstPlaylistTracks.setOnDragExited(e -> dragActivity.end());

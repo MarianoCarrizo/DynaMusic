@@ -2,6 +2,7 @@ package com.marianocarrizo.dynamusic.audio.cache;
 
 import com.marianocarrizo.dynamusic.audio.AudioFormat;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
@@ -10,6 +11,8 @@ import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -17,8 +20,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
+import java.util.function.Supplier;
 
 public final class AudioCache {
 
@@ -33,14 +39,18 @@ public final class AudioCache {
     static final String INDEX_FILE = "index.tsv";
     static final String WAV_SUFFIX = "." + AudioFormat.WAV.primaryExtension();
     static final String TEMPORARY_SUFFIX = ".tmp";
+    static final long READY_TIMEOUT_SECONDS = 20;
 
     private final Path directory;
     private final LongSupplier clock;
     private final FileDeleter deleter;
     private final Consumer<Runnable> flushScheduler;
+    private final CountDownLatch ready = new CountDownLatch(1);
     private final Map<String, CacheEntry> entries = new LinkedHashMap<>();
+    private final Map<String, Integer> pins = new HashMap<>();
     private long limitBytes;
     private boolean flushScheduled;
+    private boolean indexTrusted = true;
 
     public AudioCache(Path directory, CacheLimit limit, LongSupplier clock, FileDeleter deleter,
                       Consumer<Runnable> flushScheduler) {
@@ -67,50 +77,66 @@ public final class AudioCache {
         };
     }
 
-    public synchronized void initialize() {
+    public void initialize(Supplier<CacheLimit> savedLimit) {
+        CacheLimit saved = savedLimit.get();
+        synchronized (this) {
+            if (saved != null) limitBytes = saved.bytes();
+        }
+        initialize();
+    }
+
+    public void initialize() {
         try {
-            Files.createDirectories(directory);
-            deleteTemporaryFiles();
-            loadIndex();
-            dropEntriesWithoutFiles();
-            deleteFilesWithoutEntries();
+            synchronized (this) {
+                loadAndCleanUp();
+            }
             evict(Set.of());
-            flush();
-        } catch (IOException | RuntimeException unreadable) {
-            System.err.println("[audio-cache] initialization failed: " + unreadable);
+            synchronized (this) {
+                flush();
+            }
+        } finally {
+            ready.countDown();
         }
     }
 
-    public synchronized Optional<CachedAudio> lookup(CacheKey key) {
-        CacheEntry entry = entries.get(key.hex());
-        if (entry == null) return Optional.empty();
-        if (entry.hasWav() && !Files.isRegularFile(wavPath(key.hex()))) {
-            entries.remove(key.hex());
+    public Optional<CachedAudio> lookup(CacheKey key) {
+        awaitReady();
+        synchronized (this) {
+            CacheEntry entry = entries.get(key.hex());
+            if (entry == null) return Optional.empty();
+            if (entry.hasWav() && !Files.isRegularFile(wavPath(key.hex()))) {
+                entries.remove(key.hex());
+                markDirty();
+                return Optional.empty();
+            }
+            entries.put(key.hex(), entry.touched(clock.getAsLong()));
             markDirty();
-            return Optional.empty();
+            Optional<Path> wav = entry.hasWav() ? Optional.of(wavPath(key.hex())) : Optional.empty();
+            return Optional.of(new CachedAudio(wav, entry.gain()));
         }
-        entries.put(key.hex(), entry.touched(clock.getAsLong()));
-        markDirty();
-        Optional<Path> wav = entry.hasWav() ? Optional.of(wavPath(key.hex())) : Optional.empty();
-        return Optional.of(new CachedAudio(wav, entry.gain()));
     }
 
     public Path temporaryFile(CacheKey key) throws IOException {
+        awaitReady();
         Files.createDirectories(directory);
         return directory.resolve(key.hex() + "." + UUID.randomUUID() + TEMPORARY_SUFFIX);
     }
 
-    public synchronized Path storeConverted(CacheKey key, Path temporary, double gain) throws IOException {
+    public Path storeConverted(CacheKey key, Path temporary, double gain) throws IOException {
+        awaitReady();
         Path wav = wavPath(key.hex());
-        try {
-            move(temporary, wav);
-            entries.put(key.hex(), new CacheEntry(key.hex(), gain, Files.size(wav), clock.getAsLong()));
-        } catch (IOException failure) {
-            deleter.delete(temporary);
-            throw failure;
+        synchronized (this) {
+            try {
+                move(temporary, wav);
+                long size = sizeOrDelete(wav);
+                entries.put(key.hex(), new CacheEntry(key.hex(), gain, size, clock.getAsLong()));
+            } catch (IOException failure) {
+                deleter.delete(temporary);
+                throw failure;
+            }
+            markDirty();
         }
         evict(Set.of(key.hex()));
-        markDirty();
         return wav;
     }
 
@@ -120,29 +146,47 @@ public final class AudioCache {
         markDirty();
     }
 
-    public synchronized void setLimit(CacheLimit newLimit) {
+    public void setLimit(CacheLimit newLimit) {
         setLimitBytes(newLimit.bytes());
     }
 
-    synchronized void setLimitBytes(long newLimitBytes) {
-        limitBytes = newLimitBytes;
+    void setLimitBytes(long newLimitBytes) {
+        synchronized (this) {
+            limitBytes = newLimitBytes;
+            markDirty();
+        }
         evict(Set.of());
-        markDirty();
     }
 
     public synchronized long usedBytes() {
         return entries.values().stream().mapToLong(CacheEntry::bytes).sum();
     }
 
-    public synchronized void clear() {
-        for (CacheEntry entry : List.copyOf(entries.values())) {
-            if (!entry.hasWav() || deleter.delete(wavPath(entry.key()))) entries.remove(entry.key());
+    public void clear() {
+        List<CacheEntry> removed = new ArrayList<>();
+        synchronized (this) {
+            for (CacheEntry entry : List.copyOf(entries.values())) {
+                if (isPinned(entry.key())) continue;
+                entries.remove(entry.key());
+                if (entry.hasWav()) removed.add(entry);
+            }
+            markDirty();
         }
-        markDirty();
+        restoreUndeleted(deleteAll(removed));
+    }
+
+    public synchronized void pin(File wav) {
+        cacheKeyOf(wav).ifPresent(key -> pins.merge(key, 1, Integer::sum));
+    }
+
+    public synchronized void unpin(File wav) {
+        cacheKeyOf(wav).ifPresent(key -> pins.computeIfPresent(key, (name, count) -> count > 1 ? count - 1 : null));
     }
 
     public synchronized void flush() {
         flushScheduled = false;
+        if (!indexTrusted) retryIndexRead();
+        if (!indexTrusted) return;
         Path temporary = directory.resolve(INDEX_FILE + TEMPORARY_SUFFIX);
         try {
             Files.createDirectories(directory);
@@ -157,41 +201,121 @@ public final class AudioCache {
         return directory.resolve(keyHex + WAV_SUFFIX);
     }
 
+    private void awaitReady() {
+        try {
+            ready.await(READY_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     private void markDirty() {
         if (flushScheduled) return;
         flushScheduled = true;
         flushScheduler.accept(this::flush);
     }
 
+    private boolean isPinned(String keyHex) {
+        return pins.containsKey(keyHex);
+    }
+
+    private Optional<String> cacheKeyOf(File wav) {
+        if (wav == null || !directory.equals(wav.toPath().getParent())) return Optional.empty();
+        String name = wav.getName();
+        if (!name.endsWith(WAV_SUFFIX)) return Optional.empty();
+        return Optional.of(name.substring(0, name.length() - WAV_SUFFIX.length()));
+    }
+
+    private long sizeOrDelete(Path wav) throws IOException {
+        try {
+            return Files.size(wav);
+        } catch (IOException unreadable) {
+            deleter.delete(wav);
+            throw unreadable;
+        }
+    }
+
     private void evict(Set<String> protectedKeys) {
         Set<String> skipped = new HashSet<>(protectedKeys);
-        List<String> victims = LruPlan.wavVictims(entries.values(), limitBytes, skipped);
+        List<CacheEntry> victims = takeVictims(skipped);
         while (!victims.isEmpty()) {
-            for (String victim : victims) {
-                if (deleter.delete(wavPath(victim))) {
-                    entries.remove(victim);
-                } else {
-                    skipped.add(victim);
-                }
+            List<CacheEntry> undeleted = deleteAll(victims);
+            synchronized (this) {
+                for (CacheEntry entry : undeleted) skipped.add(entry.key());
             }
-            victims = LruPlan.wavVictims(entries.values(), limitBytes, skipped);
+            restoreUndeleted(undeleted);
+            victims = takeVictims(skipped);
         }
-        entries.keySet().removeAll(LruPlan.gainOnlyVictims(entries.values()));
+        synchronized (this) {
+            entries.keySet().removeAll(LruPlan.gainOnlyVictims(entries.values()));
+        }
+    }
+
+    private synchronized List<CacheEntry> takeVictims(Set<String> skipped) {
+        Set<String> excluded = new HashSet<>(skipped);
+        excluded.addAll(pins.keySet());
+        List<CacheEntry> victims = new ArrayList<>();
+        for (String key : LruPlan.wavVictims(entries.values(), limitBytes, excluded)) {
+            victims.add(entries.remove(key));
+        }
+        if (!victims.isEmpty()) markDirty();
+        return victims;
+    }
+
+    private List<CacheEntry> deleteAll(List<CacheEntry> victims) {
+        List<CacheEntry> undeleted = new ArrayList<>();
+        for (CacheEntry victim : victims) {
+            if (!deleter.delete(wavPath(victim.key()))) undeleted.add(victim);
+        }
+        return undeleted;
+    }
+
+    private synchronized void restoreUndeleted(List<CacheEntry> undeleted) {
+        for (CacheEntry entry : undeleted) entries.putIfAbsent(entry.key(), entry);
+    }
+
+    private void loadAndCleanUp() {
+        try {
+            Files.createDirectories(directory);
+            deleteTemporaryFiles();
+            indexTrusted = readIndex();
+            if (!indexTrusted) return;
+            dropEntriesWithoutFiles();
+            deleteFilesWithoutEntries();
+        } catch (IOException | RuntimeException unreadable) {
+            System.err.println("[audio-cache] initialization failed: " + unreadable);
+            indexTrusted = false;
+        }
+    }
+
+    private void retryIndexRead() {
+        Map<String, CacheEntry> inMemory = new LinkedHashMap<>(entries);
+        entries.clear();
+        if (readIndex()) {
+            inMemory.forEach(entries::put);
+            indexTrusted = true;
+            dropEntriesWithoutFiles();
+        } else {
+            entries.putAll(inMemory);
+        }
+    }
+
+    private boolean readIndex() {
+        Path index = directory.resolve(INDEX_FILE);
+        if (!Files.exists(index)) return true;
+        try {
+            String text = Files.readString(index, StandardCharsets.UTF_8);
+            if (!text.isEmpty() && !CacheIndexCodec.hasValidHeader(text)) return false;
+            for (CacheEntry entry : CacheIndexCodec.decode(text)) entries.put(entry.key(), entry);
+            return true;
+        } catch (IOException | RuntimeException unreadable) {
+            return false;
+        }
     }
 
     private void deleteTemporaryFiles() throws IOException {
         try (DirectoryStream<Path> files = Files.newDirectoryStream(directory, "*" + TEMPORARY_SUFFIX)) {
             for (Path file : files) deleter.delete(file);
-        }
-    }
-
-    private void loadIndex() {
-        Path index = directory.resolve(INDEX_FILE);
-        try {
-            String text = Files.isRegularFile(index) ? Files.readString(index, StandardCharsets.UTF_8) : "";
-            for (CacheEntry entry : CacheIndexCodec.decode(text)) entries.put(entry.key(), entry);
-        } catch (IOException | RuntimeException corrupt) {
-            entries.clear();
         }
     }
 

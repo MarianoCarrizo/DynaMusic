@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
 public final class FfmpegConverter implements PcmConverter {
 
     public static final int MAX_SAMPLE_RATE = 96000;
-    static final long TIMEOUT_SECONDS = 180;
+    public static final long TIMEOUT_SECONDS = 180;
     static final String PCM_16 = "pcm_s16le";
     static final String PCM_24 = "pcm_s24le";
     private static final List<Integer> ALLOWED_SAMPLE_RATES =

@@ -1,6 +1,7 @@
 package com.marianocarrizo.dynamusic.controller;
 
 import com.marianocarrizo.dynamusic.config.SessionConfig;
+import com.marianocarrizo.dynamusic.service.FfmpegLocator;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -57,6 +58,7 @@ public final class LibraryPanelController {
         treeFiles.visibleProperty().bind(treeFiles.rootProperty().isNotNull());
         txtSearch.textProperty().addListener((obs, oldVal, newVal) -> rebuildTree());
         treeFiles.setCellFactory(tv -> new LibraryCell(host));
+        FfmpegLocator.onResolved(() -> Platform.runLater(treeFiles::refresh));
         treeFiles.setOnKeyPressed(e -> {
             if (e.getCode() == KeyCode.ENTER) {
                 selectedItem().filter(File::isFile).ifPresent(file -> {

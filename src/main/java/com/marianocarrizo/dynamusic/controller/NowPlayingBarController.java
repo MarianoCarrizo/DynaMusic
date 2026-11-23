@@ -151,12 +151,11 @@ public final class NowPlayingBarController {
         loadingIndicator.setManaged(current.isLoading());
         lblDetail.getStyleClass().remove(FAILED_DETAIL_STYLE);
         if (current.state() == LoadState.FAILED) lblDetail.getStyleClass().add(FAILED_DETAIL_STYLE);
-        TransportAvailability available = TransportAvailability.of(current);
         TransportAvailability supported = TransportAvailability.of(current.source());
-        btnShuffle.setDisable(!available.shuffle());
-        btnPrevious.setDisable(!available.previous());
-        btnNext.setDisable(!available.next());
-        btnRepeat.setDisable(!available.repeat());
+        btnShuffle.setDisable(!supported.shuffle());
+        btnPrevious.setDisable(!supported.previous());
+        btnNext.setDisable(!supported.next());
+        btnRepeat.setDisable(!supported.repeat());
         btnShuffle.setSelected(supported.shuffle() && host.isShuffleOn());
         showRepeat(supported.repeat() ? host.repeatMode(current.source()) : RepeatMode.OFF);
         boolean idle = current.source() == NowPlayingSource.NONE;

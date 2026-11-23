@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.marianocarrizo.dynamusic.audio.pcm.FfmpegConverter;
+import com.marianocarrizo.dynamusic.audio.pcm.FfmpegGainProbe;
 import com.marianocarrizo.dynamusic.enums.TrackType;
 import com.marianocarrizo.dynamusic.model.LoadState;
 import com.marianocarrizo.dynamusic.model.NowPlayingSource;
@@ -112,6 +114,33 @@ class PendingLoadsTest {
         loads.begin(NowPlayingSource.PREVIEW, null, SONG, null);
 
         now.addAndGet(PendingLoads.LOADING_TIMEOUT_MILLIS);
+
+        assertTrue(current().isEmpty());
+    }
+
+    @Test
+    void theLoadingTimeoutOutlastsTheLongestPreparation() {
+        long longestPreparationMillis = (FfmpegConverter.TIMEOUT_SECONDS + FfmpegGainProbe.TIMEOUT_SECONDS) * 1000;
+
+        assertTrue(PendingLoads.LOADING_TIMEOUT_MILLIS > longestPreparationMillis);
+    }
+
+    @Test
+    void aSlowLoadIsStillShownJustBeforeTheTimeout() {
+        loads.begin(NowPlayingSource.ON_DEMAND, null, SONG, null);
+
+        now.addAndGet(PendingLoads.LOADING_TIMEOUT_MILLIS - 1);
+
+        assertTrue(current().isPresent());
+    }
+
+    @Test
+    void aLoadThatFinishesAfterExpiryDoesNotResurrectAnything() {
+        int ticket = loads.begin(NowPlayingSource.ON_DEMAND, null, SONG, null);
+        now.addAndGet(PendingLoads.LOADING_TIMEOUT_MILLIS);
+        assertTrue(current().isEmpty());
+
+        assertFalse(loads.finish(ticket));
 
         assertTrue(current().isEmpty());
     }

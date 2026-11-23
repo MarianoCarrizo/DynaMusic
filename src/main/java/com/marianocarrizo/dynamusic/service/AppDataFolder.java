@@ -27,6 +27,16 @@ public final class AppDataFolder {
                 : Paths.get(home);
     }
 
+    public static Path localRoot() {
+        return localRoot(System.getProperty("os.name", ""), System.getenv("LOCALAPPDATA"),
+                System.getenv("APPDATA"), System.getProperty("user.home"));
+    }
+
+    static Path localRoot(String osName, String localAppData, String appdata, String home) {
+        boolean usable = YtDlpManager.isWindows(osName) && localAppData != null && !localAppData.isBlank();
+        return usable ? Paths.get(localAppData).resolve(FOLDER_NAME) : root(osName, appdata, home);
+    }
+
     public static Path child(String name) {
         return root().resolve(name);
     }

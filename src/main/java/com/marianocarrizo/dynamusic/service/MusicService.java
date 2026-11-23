@@ -5,6 +5,7 @@ import com.marianocarrizo.dynamusic.audio.AudioServices;
 import com.marianocarrizo.dynamusic.audio.PreparedAudio;
 import com.marianocarrizo.dynamusic.audio.TrackQualityStore;
 import com.marianocarrizo.dynamusic.audio.UnplayableAudioException;
+import com.marianocarrizo.dynamusic.config.SessionConfigManager;
 import com.marianocarrizo.dynamusic.enums.TrackType;
 import com.marianocarrizo.dynamusic.model.NowPlayingSource;
 import com.marianocarrizo.dynamusic.tags.TrackTagStore;
@@ -22,6 +23,7 @@ import javafx.animation.Timeline;
 import java.io.File;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -94,6 +96,9 @@ public class MusicService {
     private final TrackQualityStore quality = new TrackQualityStore(Platform::runLater);
     private final AudioServices audio;
     private final PendingLoads pending = new PendingLoads(System::currentTimeMillis);
+    private final PauseTransition expiryRefresh = new PauseTransition(
+            Duration.millis(PendingLoads.LOADING_TIMEOUT_MILLIS + PendingLoads.EXPIRY_REFRESH_MARGIN_MILLIS));
+    private final Map<MediaPlayer, File> heldFiles = new IdentityHashMap<>();
     private int playlistPendingTicket = PendingLoads.NO_TICKET;
     private int consecutivePlaylistFailures;
     private CompletableFuture<PreparedAudio> playlistPrep = CompletableFuture.completedFuture(null);
@@ -132,7 +137,7 @@ public class MusicService {
     // =========================================================================
 
     public MusicService() {
-        this(AudioServices.standard());
+        this(AudioServices.standard(() -> new SessionConfigManager().readSavedCacheLimit()));
     }
 
     public MusicService(AudioServices audio) {
@@ -145,6 +150,7 @@ public class MusicService {
         this.previewLoopEnabled = false;
         this.previewPlayer = null;
         tags.onLoaded(this::notifyPlaybackChanged);
+        expiryRefresh.setOnFinished(event -> notifyPlaybackChanged());
     }
 
     public TrackTagStore tags() {
@@ -251,11 +257,24 @@ public class MusicService {
     private int beginPending(NowPlayingSource source, TrackType moodType, File file, String title) {
         int ticket = pending.begin(source, moodType, file, title);
         notifyPlaybackChanged();
+        expiryRefresh.playFromStart();
         return ticket;
     }
 
     private void finishPending(int ticket) {
-        if (pending.finish(ticket)) notifyPlaybackChanged();
+        pending.finish(ticket);
+        notifyPlaybackChanged();
+    }
+
+    private void hold(MediaPlayer player, File playable) {
+        audio.cache().pin(playable);
+        heldFiles.put(player, playable);
+    }
+
+    private void disposePlayer(MediaPlayer player) {
+        File held = heldFiles.remove(player);
+        if (held != null) audio.cache().unpin(held);
+        player.dispose();
     }
 
     private void failPending(int ticket, Throwable error) {
@@ -356,7 +375,7 @@ public class MusicService {
             if (playlistPlayer != null) {
                 playlistPlayer.stop();
                 playlistPlayer.setAudioSpectrumListener(null); // T-16
-                playlistPlayer.dispose();
+                disposePlayer(playlistPlayer);
                 playlistPlayer = null;
             }
             playlistFile = null;
@@ -405,7 +424,8 @@ public class MusicService {
         if (file == null || !file.exists()) return;
 
         final int seq = loadSeq.merge(type, 1, Integer::sum);
-        final int pendingTicket = type == currentTrack
+        final boolean visible = mode == PlaybackMode.MOOD && type == currentTrack;
+        final int pendingTicket = visible
                 ? beginPending(NowPlayingSource.MOOD, type, file, null) : PendingLoads.NO_TICKET;
 
         requestMetadata(file);
@@ -436,6 +456,7 @@ public class MusicService {
             if (onFailed != null) onFailed.run();
             return;
         }
+        hold(player, prepared.playable());
 
         player.setVolume(effectiveGain(gain));
         observeStatus(player);
@@ -444,7 +465,7 @@ public class MusicService {
             System.err.println("Error en pista " + type + ": " + player.getError());
             Platform.runLater(() -> {
                 if (players.get(type) != player && loadSeq.getOrDefault(type, 0) == seq) {
-                    player.dispose();
+                    disposePlayer(player);
                     failPending(pendingTicket, player.getError());
                     if (onFailed != null) onFailed.run();
                 }
@@ -466,7 +487,7 @@ public class MusicService {
 
         player.setOnReady(() -> {
             if (loadSeq.getOrDefault(type, 0) != seq) {
-                player.dispose();
+                disposePlayer(player);
                 finishPending(pendingTicket);
                 return;
             }
@@ -479,7 +500,7 @@ public class MusicService {
                 }
                 replaced.setAudioSpectrumListener(null);
                 replaced.stop();
-                replaced.dispose();
+                disposePlayer(replaced);
             }
             trackFiles.put(type, file);
             trackGains.put(type, gain);
@@ -507,7 +528,7 @@ public class MusicService {
         }
         removed.setAudioSpectrumListener(null);
         removed.stop();
-        removed.dispose();
+        disposePlayer(removed);
         notifyPlaybackChanged();
     }
 
@@ -581,7 +602,7 @@ public class MusicService {
 
         if (previewPlayer != null) {
             previewPlayer.stop();
-            previewPlayer.dispose();
+            disposePlayer(previewPlayer);
             previewPlayer = null;
         }
 
@@ -606,6 +627,7 @@ public class MusicService {
         try {
             Media media = new Media(prepared.playable().toURI().toString());
             MediaPlayer player = new MediaPlayer(media);
+            hold(player, prepared.playable());
             previewGain = prepared.gain();
             player.setVolume(effectiveGain(previewGain));
 
@@ -646,7 +668,7 @@ public class MusicService {
     public void stopPreview() {
         if (previewPlayer != null) {
             previewPlayer.stop();
-            previewPlayer.dispose();
+            disposePlayer(previewPlayer);
             previewPlayer = null;
             notifyPlaybackChanged();
         }
@@ -808,6 +830,15 @@ public class MusicService {
      * Reutiliza el pipeline asíncrono de loadTrack:
      */
     public void playPlaylistTrack(File file) {
+        consecutivePlaylistFailures = 0;
+        requestPlaylistTrack(file);
+    }
+
+    public void skipToPlaylistTrack(File file) {
+        requestPlaylistTrack(file);
+    }
+
+    private void requestPlaylistTrack(File file) {
         if (mode != PlaybackMode.PLAYLIST) return;
         audioFocus.claimForRequest();
         cancelActiveFade();
@@ -847,6 +878,7 @@ public class MusicService {
             failPlaylistLoad(seq, ex);
             return;
         }
+        hold(player, playable);
         player.setVolume(effectiveGain(gain));
         observeStatus(player);
         player.currentTimeProperty().addListener((obs, oldVal, newVal) -> emitProgress(player));
@@ -861,7 +893,7 @@ public class MusicService {
 
     private void commitPlaylistPlayer(MediaPlayer player, File file, double gain, int seq) {
         if (!playlistLoads.isCurrent(seq) || mode != PlaybackMode.PLAYLIST) {
-            player.dispose();
+            disposePlayer(player);
             if (playlistLoads.isCurrent(seq)) finishPending(playlistPendingTicket);
             return;
         }
@@ -883,7 +915,7 @@ public class MusicService {
             if (mode == PlaybackMode.PLAYLIST && onPlaylistTrackFailed != null) onPlaylistTrackFailed.run();
             return;
         }
-        player.dispose();
+        disposePlayer(player);
         failPlaylistLoad(seq, player.getError());
     }
 
@@ -904,7 +936,7 @@ public class MusicService {
         if (playlistPlayer == null) return;
         playlistPlayer.setAudioSpectrumListener(null);
         playlistPlayer.stop();
-        playlistPlayer.dispose();
+        disposePlayer(playlistPlayer);
         playlistPlayer = null;
     }
 
@@ -955,6 +987,7 @@ public class MusicService {
      * T-17: null-guard antes de dispose; null del campo después de dispose.
      */
     public void stopPlaylist() {
+        consecutivePlaylistFailures = 0;
         finishPending(playlistPendingTicket);
         releasePlaylistState();
     }
@@ -999,7 +1032,7 @@ public class MusicService {
         if (onDemandPlayer != null) {
             onDemandPlayer.setAudioSpectrumListener(null);
             onDemandPlayer.stop();
-            onDemandPlayer.dispose();
+            disposePlayer(onDemandPlayer);
             onDemandPlayer = null;
         }
         onDemandFile = null;
@@ -1038,6 +1071,7 @@ public class MusicService {
             failPending(pendingTicket, ex);
             return;
         }
+        hold(player, prepared.playable());
 
         observeStatus(player);
         player.currentTimeProperty().addListener((obs, o, nv) -> emitProgress(player));
@@ -1054,14 +1088,14 @@ public class MusicService {
         player.setOnError(() -> {
             System.err.println("On-demand playback error: " + player.getError());
             Platform.runLater(() -> {
-                if (player != onDemandPlayer) player.dispose();
+                if (player != onDemandPlayer) disposePlayer(player);
                 failPending(pendingTicket, player.getError());
                 notifyPlaybackChanged();
             });
         });
         player.setOnReady(() -> {
             if (seq != onDemandSeq) {
-                player.dispose();
+                disposePlayer(player);
                 finishPending(pendingTicket);
                 return;
             }

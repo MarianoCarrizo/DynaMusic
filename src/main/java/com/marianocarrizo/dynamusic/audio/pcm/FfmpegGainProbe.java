@@ -8,7 +8,7 @@ import java.util.List;
 
 public final class FfmpegGainProbe {
 
-    static final long TIMEOUT_SECONDS = 60;
+    public static final long TIMEOUT_SECONDS = 60;
     private static final int PROBE_BITS = 16;
     private static final int BUFFER_BYTES = 16 * 1024;
 

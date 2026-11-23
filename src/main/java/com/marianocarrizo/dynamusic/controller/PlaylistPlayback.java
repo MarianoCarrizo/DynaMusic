@@ -30,6 +30,11 @@ final class PlaylistPlayback {
         playAndPrefetch(file);
     }
 
+    private void skipAndPrefetch(File file) {
+        musicService.skipToPlaylistTrack(file);
+        playlistManager.peekNext().ifPresent(musicService::prefetch);
+    }
+
     private void playAndPrefetch(File file) {
         musicService.playPlaylistTrack(file);
         playlistManager.peekNext().ifPresent(musicService::prefetch);
@@ -52,7 +57,7 @@ final class PlaylistPlayback {
     }
 
     private void skipFailedTrack() {
-        playlistManager.next().ifPresentOrElse(this::playAndPrefetch, musicService::stopPlaylist);
+        playlistManager.next().ifPresentOrElse(this::skipAndPrefetch, musicService::stopPlaylist);
         refreshView.run();
     }
 

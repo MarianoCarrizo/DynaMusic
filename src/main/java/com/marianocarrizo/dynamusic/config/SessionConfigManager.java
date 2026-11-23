@@ -2,6 +2,7 @@ package com.marianocarrizo.dynamusic.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.marianocarrizo.dynamusic.audio.cache.CacheLimit;
 import com.marianocarrizo.dynamusic.service.AppDataFolder;
 
 import java.io.IOException;
@@ -41,6 +42,15 @@ public class SessionConfigManager {
     private Path configPath() {
         if (pathOverride != null) return pathOverride;
         return AppDataFolder.child("session.json");
+    }
+
+    public CacheLimit readSavedCacheLimit() {
+        try (Reader reader = Files.newBufferedReader(configPath())) {
+            SessionConfig cfg = gson.fromJson(reader, SessionConfig.class);
+            return cfg == null ? CacheLimit.DEFAULT : cfg.getAudioCacheLimit();
+        } catch (Exception unreadable) {
+            return CacheLimit.DEFAULT;
+        }
     }
 
     /**

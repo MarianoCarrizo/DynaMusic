@@ -2,6 +2,7 @@ package com.marianocarrizo.dynamusic.audio;
 
 import com.marianocarrizo.dynamusic.audio.cache.AudioCache;
 import com.marianocarrizo.dynamusic.audio.cache.CacheLimit;
+import com.marianocarrizo.dynamusic.audio.cache.LegacyCacheCleanup;
 import com.marianocarrizo.dynamusic.audio.pcm.FfmpegConverter;
 import com.marianocarrizo.dynamusic.audio.pcm.FfmpegProcess;
 import com.marianocarrizo.dynamusic.audio.pcm.JavaSoundConverter;
@@ -14,6 +15,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 public record AudioServices(AudioCache cache, AudioPrep prep, Prefetcher prefetcher, Executor maintenance) {
 
@@ -22,17 +24,21 @@ public record AudioServices(AudioCache cache, AudioPrep prep, Prefetcher prefetc
     private static final String CACHE_FOLDER = "cache";
     private static final String AUDIO_FOLDER = "audio";
 
-    public static AudioServices standard() {
+    public static AudioServices standard(Supplier<CacheLimit> savedLimit) {
         ScheduledExecutorService maintenance = Executors.newSingleThreadScheduledExecutor(
                 runnable -> daemon(runnable, "audio-cache", Thread.MIN_PRIORITY));
-        Path directory = AppDataFolder.child(CACHE_FOLDER).resolve(AUDIO_FOLDER);
+        Path directory = AppDataFolder.localRoot().resolve(CACHE_FOLDER).resolve(AUDIO_FOLDER);
+        Path legacyDirectory = AppDataFolder.root().resolve(CACHE_FOLDER).resolve(AUDIO_FOLDER);
         AudioCache cache = new AudioCache(directory, CacheLimit.DEFAULT, System::currentTimeMillis,
                 AudioCache.filesystemDeleter(),
                 flush -> maintenance.schedule(flush, INDEX_FLUSH_DELAY_SECONDS, TimeUnit.SECONDS));
-        cache.initialize();
-        AudioPrep prep = new AudioPrep(cache, new RouteResolver(FfmpegLocator::isAvailable), new JavaSoundConverter(),
-                new FfmpegConverter(), new StandardGainMeasurer(FfmpegLocator::isAvailable),
-                FfmpegLocator::isAvailable, Executors.newFixedThreadPool(USER_PREP_THREADS,
+        maintenance.execute(() -> {
+            cache.initialize(savedLimit);
+            LegacyCacheCleanup.deleteOnce(legacyDirectory, directory);
+        });
+        AudioPrep prep = new AudioPrep(cache, new RouteResolver(FfmpegLocator::awaitAvailability), new JavaSoundConverter(),
+                new FfmpegConverter(), new StandardGainMeasurer(FfmpegLocator::awaitAvailability),
+                FfmpegLocator::awaitAvailability, Executors.newFixedThreadPool(USER_PREP_THREADS,
                         runnable -> daemon(runnable, "audio-prep", Thread.NORM_PRIORITY)));
         AudioServices services = new AudioServices(cache, prep, new Prefetcher(prep), maintenance);
         Runtime.getRuntime().addShutdownHook(new Thread(services::shutdown, "audio-shutdown"));

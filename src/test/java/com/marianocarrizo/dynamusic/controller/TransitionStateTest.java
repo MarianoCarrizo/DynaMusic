@@ -78,15 +78,15 @@ class TransitionStateTest {
     }
 
     @Test
-    void transportIsDisabledWhileLoadingAndAfterAFailure() {
+    void onlyPlayPauseAndSeekAreBlockedWhilePreparing() {
         NowPlaying loading = NowPlayingTracker.decide(playlistPlaying(Optional.of(
                 loading(NowPlayingSource.PLAYLIST, ANGEL_FILE, "Angel"))), "mine");
         SoundingTrack failedTrack = new SoundingTrack("Angel", "ogg needs ffmpeg", ANGEL_FILE, false, LoadState.FAILED);
         NowPlaying failed = NowPlayingTracker.decide(playlistPlaying(Optional.of(
                 new PendingLoad(NowPlayingSource.PLAYLIST, null, failedTrack))), "mine");
 
-        assertEquals(new TransportAvailability(false, false, false, false), TransportAvailability.of(loading));
-        assertEquals(new TransportAvailability(false, false, false, false), TransportAvailability.of(failed));
+        assertEquals(new TransportAvailability(true, true, true, true), TransportAvailability.of(loading.source()));
+        assertTrue(loading.isBusy());
         assertEquals("ogg needs ffmpeg", failed.detail());
         assertTrue(failed.isBusy());
         assertFalse(failed.isLoading());
@@ -96,7 +96,7 @@ class TransitionStateTest {
     void readyTracksKeepTheNormalTransport() {
         NowPlaying ready = NowPlayingTracker.decide(playlistPlaying(Optional.empty()), "mine");
 
-        assertEquals(new TransportAvailability(true, true, true, true), TransportAvailability.of(ready));
+        assertEquals(new TransportAvailability(true, true, true, true), TransportAvailability.of(ready.source()));
         assertEquals(RowPlayback.PLAYING, RowPlayback.of(true, ready.playing(), ready.isLoading()));
     }
 

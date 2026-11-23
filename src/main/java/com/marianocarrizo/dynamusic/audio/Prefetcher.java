@@ -70,7 +70,7 @@ public final class Prefetcher {
 
     private void prefetch(File file) {
         try {
-            prep.prepare(file, Runnable::run).join();
+            prep.prefetch(file).join();
         } catch (RuntimeException silentFailure) {
             System.err.println("[prefetch] skipped " + file.getName() + ": " + silentFailure.getMessage());
         } finally {

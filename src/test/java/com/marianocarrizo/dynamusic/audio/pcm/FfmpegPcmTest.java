@@ -28,7 +28,7 @@ class FfmpegPcmTest {
     @TempDir Path dir;
 
     private static void requireFfmpeg() {
-        assumeTrue(FfmpegLocator.isAvailable(), "ffmpeg not available");
+        assumeTrue(FfmpegLocator.awaitAvailability(), "ffmpeg not available");
     }
 
     private static float sampleRateOf(Path wav) throws Exception {

@@ -1,5 +1,7 @@
 package com.marianocarrizo.dynamusic.service;
 
+import com.marianocarrizo.dynamusic.audio.pcm.FfmpegConverter;
+import com.marianocarrizo.dynamusic.audio.pcm.FfmpegGainProbe;
 import com.marianocarrizo.dynamusic.enums.TrackType;
 import com.marianocarrizo.dynamusic.model.LoadState;
 import com.marianocarrizo.dynamusic.model.NowPlayingSource;
@@ -13,7 +15,9 @@ import java.util.function.LongSupplier;
 final class PendingLoads {
 
     static final long FAILURE_DISPLAY_MILLIS = 3000;
-    static final long LOADING_TIMEOUT_MILLIS = 60000;
+    static final long EXPIRY_REFRESH_MARGIN_MILLIS = 1000;
+    static final long LOADING_TIMEOUT_MILLIS =
+            (FfmpegConverter.TIMEOUT_SECONDS + FfmpegGainProbe.TIMEOUT_SECONDS) * 1000 + 60000;
     static final int NO_TICKET = -1;
 
     private record Request(int ticket, NowPlayingSource source, TrackType moodType, File file, String title,
