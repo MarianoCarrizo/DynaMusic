@@ -1,5 +1,6 @@
 package com.marianocarrizo.dynamusic.controller;
 
+import com.marianocarrizo.dynamusic.component.FilledSlider;
 import com.marianocarrizo.dynamusic.enums.TrackType;
 import com.marianocarrizo.dynamusic.model.AuraConfig;
 import com.marianocarrizo.dynamusic.model.AuraPreset;
@@ -14,7 +15,6 @@ import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ColorPicker;
 import javafx.scene.control.Label;
-import javafx.scene.control.Slider;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.HBox;
@@ -47,8 +47,8 @@ final class MoodTabContent extends VBox {
     private final CheckBox cbEdgeGlow = new CheckBox("Edge glow");
     private final CheckBox cbEmbers = new CheckBox("Embers");
     private final CheckBox cbPulse = new CheckBox("Background pulse");
-    private final Slider sldIntensity = new Slider(0, 1, 0.5);
-    private final Slider sldReactivity = new Slider(0, 1, 0.5);
+    private final FilledSlider sldIntensity = new FilledSlider(0, 1, 0.5);
+    private final FilledSlider sldReactivity = new FilledSlider(0, 1, 0.5);
     private final Label lblIntensity = new Label();
     private final Label lblReactivity = new Label();
 
@@ -238,10 +238,9 @@ final class MoodTabContent extends VBox {
         return new VBox(4, l, control);
     }
 
-    private static HBox levelRow(String text, Slider slider, Label value) {
+    private static HBox levelRow(String text, FilledSlider slider, Label value) {
         Label name = new Label(text);
         name.setMinWidth(80);
-        slider.getStyleClass().add("spotify-slider");
         value.getStyleClass().add("lbl-time");
         HBox.setHgrow(slider, Priority.ALWAYS);
         HBox row = new HBox(10, name, slider, value);

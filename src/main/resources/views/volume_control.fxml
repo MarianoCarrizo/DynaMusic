@@ -2,11 +2,12 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <?import com.marianocarrizo.dynamusic.component.IconButton?>
+<?import com.marianocarrizo.dynamusic.component.FilledSlider?>
 
 <HBox xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.marianocarrizo.dynamusic.controller.VolumeController"
       spacing="8" alignment="CENTER_RIGHT">
     <IconButton fx:id="btnMute" onAction="#onToggleMute"/>
-    <Slider fx:id="sldMasterVolume" min="0.0" max="1.0" value="1.0"
-            prefWidth="120" blockIncrement="0.05" styleClass="spotify-slider"/>
+    <FilledSlider fx:id="sldMasterVolume" min="0.0" max="1.0" value="1.0"
+            prefWidth="120" blockIncrement="0.05"/>
 </HBox>

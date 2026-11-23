@@ -1,5 +1,6 @@
 package com.marianocarrizo.dynamusic.controller;
 
+import com.marianocarrizo.dynamusic.component.FilledSlider;
 import com.marianocarrizo.dynamusic.config.SessionConfig;
 import com.marianocarrizo.dynamusic.model.AuraConfig;
 import com.marianocarrizo.dynamusic.model.AuraPreset;
@@ -7,7 +8,6 @@ import com.marianocarrizo.dynamusic.model.AuraSlot;
 import com.marianocarrizo.dynamusic.model.Scene;
 import javafx.fxml.FXML;
 import javafx.scene.control.Label;
-import javafx.scene.control.Slider;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.HBox;
@@ -29,8 +29,8 @@ public final class LiveAuraController {
 
     @FXML private Label lblLiveAura;
     @FXML private HBox livePresetBox;
-    @FXML private Slider sldLiveIntensity;
-    @FXML private Slider sldLiveReactivity;
+    @FXML private FilledSlider sldLiveIntensity;
+    @FXML private FilledSlider sldLiveReactivity;
     @FXML private Label lblLiveIntensity;
     @FXML private Label lblLiveReactivity;
 

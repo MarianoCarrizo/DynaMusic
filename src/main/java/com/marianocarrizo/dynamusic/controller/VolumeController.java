@@ -1,10 +1,10 @@
 package com.marianocarrizo.dynamusic.controller;
 
+import com.marianocarrizo.dynamusic.component.FilledSlider;
 import com.marianocarrizo.dynamusic.component.IconButton;
 import com.marianocarrizo.dynamusic.config.SessionConfig;
 import com.marianocarrizo.dynamusic.service.MusicService;
 import javafx.fxml.FXML;
-import javafx.scene.control.Slider;
 
 public final class VolumeController {
 
@@ -21,7 +21,7 @@ public final class VolumeController {
     }
 
     @FXML private IconButton btnMute;
-    @FXML private Slider sldMasterVolume;
+    @FXML private FilledSlider sldMasterVolume;
 
     private Host host;
     private double volumeBeforeMute = UNMUTE_FALLBACK;

@@ -27,4 +27,6 @@ public interface SceneHost {
     void applyFitMode();
 
     boolean isFfmpegAvailable();
+
+    String windowMoodId();
 }

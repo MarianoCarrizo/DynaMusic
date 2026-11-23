@@ -13,6 +13,7 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TextField;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import javafx.stage.Window;
@@ -24,6 +25,7 @@ import java.util.List;
 
 public class SceneEditorController {
 
+    @FXML private VBox editorRoot;
     @FXML private TextField txtSceneName;
     @FXML private Button btnDeleteScene;
     @FXML private TabPane tabPane;
@@ -114,7 +116,12 @@ public class SceneEditorController {
         if (stage != null) stage.hide();
     }
 
+    void refreshAccent() {
+        editorRoot.setId(host.windowMoodId());
+    }
+
     void refresh() {
+        refreshAccent();
         Scene scene = host.session().getActiveScene();
         stage.setTitle("Edit scene - " + scene.getName());
         txtSceneName.setText(scene.getName());

@@ -258,6 +258,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
             case NORMAL    -> "window-normal";
             case ADVANTAGE -> "window-advantage";
         });
+        if (sceneEditor != null) sceneEditor.refreshAccent();
     }
 
     public void setHostServices(HostServices hostServices) {
@@ -315,6 +316,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
 
     @Override public AmbianceCoordinator ambiance() { return ambiance; }
 
+    @Override public String windowMoodId() { return mainRoot.getId(); }
     @Override public Window window() { return mainRoot.getScene().getWindow(); }
 
     @Override public void saveSession() { manager.save(sessionConfig); }

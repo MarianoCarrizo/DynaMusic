@@ -398,17 +398,6 @@
 
 /* Barra de progreso */
 .progress-container { -fx-padding: 2px 0 0 0; }
-.spotify-slider { -fx-cursor: hand; }
-.spotify-slider .track { -fx-background-color: #2c2c30; -fx-background-radius: 0px; -fx-pref-height: 4px; }
-.spotify-slider .range-bar { -fx-background-radius: 0px; -fx-background-color: -mood-accent; }
-/* Thumb siempre visible: indica el valor/posición actual en todos los sliders */
-.spotify-slider .thumb {
-    -fx-background-color: #ffffff;
-    -fx-background-radius: 0px;
-    -fx-pref-width: 10px;
-    -fx-pref-height: 10px;
-    -fx-background-insets: 0;
-}
 .lbl-time { -fx-font-family: "Segoe UI", Arial, sans-serif; -fx-font-size: 11px; -fx-text-fill: #a7a7a7; -fx-min-width: 30px; }
 
 /* =========================================================================
@@ -419,36 +408,24 @@
 #window-paused.main-container { -mood-accent: #95a5a6; -mood-selection: #3a3a3e; -fx-background-color: #151517; -fx-background-radius: 0px !important; -fx-border-radius: 0px !important; }
 #window-paused .window-header { -fx-background-color: #222226; }
 #window-paused .window-title { -fx-text-fill: #95a5a6; }
-#window-paused .slider .track { -fx-background-color: #3e3e40; }
-#window-paused .slider .thumb { -fx-background-color: #7f8c8d; }
-#window-paused .slider .range-bar { -fx-background-color: #95a5a6; }
 #window-paused .text-field:focused { -fx-border-color: #7f8c8d; }
 
 /* --- 2. RAGED (Rojo Combate) --- */
 #window-raged.main-container { -mood-accent: #e74c3c; -mood-selection: #4a1c1c; -fx-background-color: #160e0e; -fx-background-radius: 0px !important; -fx-border-radius: 0px !important; }
 #window-raged .window-header { -fx-background-color: #2c1616; }
 #window-raged .window-title { -fx-text-fill: #e74c3c; }
-#window-raged .slider .track { -fx-background-color: #451b1b; }
-#window-raged .slider .thumb { -fx-background-color: #e74c3c; }
-#window-raged .slider .range-bar { -fx-background-color: #c0392b; }
 #window-raged .text-field:focused { -fx-border-color: #e74c3c; }
 
 /* --- 3. NORMAL (Verde Exploración) --- */
 #window-normal.main-container { -mood-accent: #2ecc71; -mood-selection: #1e4a2b; -fx-background-color: #0e1410; -fx-background-radius: 0px !important; -fx-border-radius: 0px !important; }
 #window-normal .window-header { -fx-background-color: #16241b; }
 #window-normal .window-title { -fx-text-fill: #2ecc71; }
-#window-normal .slider .track { -fx-background-color: #14331d; }
-#window-normal .slider .thumb { -fx-background-color: #2ecc71; }
-#window-normal .slider .range-bar { -fx-background-color: #27ae60; }
 #window-normal .text-field:focused { -fx-border-color: #2ecc71; }
 
 /* --- 4. ADVANTAGE (Azul) --- */
 #window-advantage.main-container { -mood-accent: #3498db; -mood-selection: #1e354a; -fx-background-color: #0f1318; -fx-background-radius: 0px !important; -fx-border-radius: 0px !important; }
 #window-advantage .window-header { -fx-background-color: #16222f; }
 #window-advantage .window-title { -fx-text-fill: #3498db; }
-#window-advantage .slider .track { -fx-background-color: #112233; }
-#window-advantage .slider .thumb { -fx-background-color: #3498db; }
-#window-advantage .slider .range-bar { -fx-background-color: #2980b9; }
 #window-advantage .text-field:focused { -fx-border-color: #3498db; }
 
 .btn-phase-active {
@@ -583,8 +560,6 @@
     -fx-font-style: italic;
 }
 
-/* bgPreviewSlider inherits spotify-slider — no additional rule needed */
-
 /* Segment info label in preview */
 #lblBgSegmentInfo {
     -fx-text-fill: #909098;
@@ -699,31 +674,43 @@
     -fx-background-color: transparent;
     -fx-padding: 0;
 }
-.seek-progress .track {
+
+.filled-slider { -fx-cursor: hand; }
+.filled-slider .track {
     -fx-background-color: #4d4d55;
     -fx-background-radius: 2px;
     -fx-background-insets: 0;
+    -fx-padding: 0;
     -fx-pref-height: 4px;
     -fx-min-height: 4px;
     -fx-max-height: 4px;
 }
-.seek-progress .bar {
+.filled-slider:vertical .track {
+    -fx-pref-height: -1;
+    -fx-min-height: -1;
+    -fx-max-height: -1;
+    -fx-pref-width: 4px;
+    -fx-min-width: 4px;
+    -fx-max-width: 4px;
+}
+.filled-slider .fill {
     -fx-background-color: -mood-accent;
     -fx-background-radius: 2px;
+}
+.filled-slider:hover .fill {
+    -fx-background-color: -mood-accent-hover;
+}
+.filled-slider .thumb {
+    -fx-background-color: #ffffff;
+    -fx-background-radius: 6px;
     -fx-background-insets: 0;
-    -fx-padding: 2px;
-}
-.seek-slider .track {
-    -fx-background-color: transparent !important;
-}
-.seek-slider .thumb {
-    -fx-background-color: #ffffff !important;
-    -fx-background-radius: 6px !important;
-    -fx-pref-width: 12px;
-    -fx-pref-height: 12px;
+    -fx-padding: 6px;
+    -fx-effect: none;
     -fx-opacity: 0;
 }
-.seek-slider:hover .thumb {
+.filled-slider:hover .thumb,
+.filled-slider:focused .thumb,
+.filled-slider .thumb:pressed {
     -fx-opacity: 1;
 }
-
+.filled-slider:disabled { -fx-opacity: 0.4; }

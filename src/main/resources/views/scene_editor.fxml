@@ -8,7 +8,7 @@
       styleClass="window-root-transparent"
       spacing="0">
 
-    <VBox styleClass="main-container" VBox.vgrow="ALWAYS" spacing="10">
+    <VBox fx:id="editorRoot" styleClass="main-container" VBox.vgrow="ALWAYS" spacing="10">
         <padding>
             <Insets top="12" right="12" bottom="12" left="12"/>
         </padding>
