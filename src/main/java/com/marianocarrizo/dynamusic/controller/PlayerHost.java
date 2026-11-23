@@ -62,4 +62,10 @@ public interface PlayerHost {
     void addPlaylistItem(String playlistName, PlaylistItem item);
 
     void refreshPlaylistView();
+
+    void playPlaylistTrack(File file);
+
+    Optional<File> selectedLibraryItem();
+
+    void persistPlaylists();
 }

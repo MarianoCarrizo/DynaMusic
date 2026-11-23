@@ -1,7 +1,6 @@
 package com.marianocarrizo.dynamusic.controller;
 
 import com.marianocarrizo.dynamusic.enums.TrackType;
-import com.marianocarrizo.dynamusic.component.SeekBar;
 import com.marianocarrizo.dynamusic.config.SessionConfig;
 import com.marianocarrizo.dynamusic.config.SessionConfigManager;
 import com.marianocarrizo.dynamusic.model.AuraSlot;
@@ -19,17 +18,9 @@ import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
-import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
-import javafx.scene.control.ButtonType;
-import javafx.scene.control.ComboBox;
-import javafx.scene.control.Label;
-import javafx.scene.control.ListView;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
-import javafx.scene.control.TextInputDialog;
-import javafx.scene.control.ToggleButton;
-import javafx.scene.input.KeyCode;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import javafx.stage.Window;
@@ -37,14 +28,11 @@ import javafx.util.Duration;
 
 import java.io.File;
 import java.util.EnumMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.function.Consumer;
-import java.util.function.Supplier;
 
 public class PlayerController implements SceneHost, PlayerHost {
 
@@ -71,21 +59,8 @@ public class PlayerController implements SceneHost, PlayerHost {
     @FXML private Tab moodsTab;
     @FXML private Tab playlistsTab;
 
-    // T-11: Panel de gestión de playlists
-    @FXML private VBox playlistPanel;
-    @FXML private ComboBox<String> cmbPlaylist;
-    @FXML private ListView<String> lstPlaylistTracks;
-    @FXML private Label lblTrackCounter;
-
-    // T-11: Transporte del playlist
-    @FXML private ToggleButton btnShuffle;
-    @FXML private Button btnPrev;
-    @FXML private Button btnPlaylistPlayPause;
-    @FXML private Button btnNext;
-    @FXML private ToggleButton btnPlaylistLoop;
-
-    // T-11: Progreso del playlist
-    @FXML private SeekBar playlistSeekBar;
+    @FXML private PlaylistPanelController playlistPanelController;
+    @FXML private PlaylistTransportController playlistTransportController;
 
     @FXML private LibraryPanelController libraryPanelController;
     @FXML private YouTubeBarController youTubeBarController;
@@ -98,7 +73,6 @@ public class PlayerController implements SceneHost, PlayerHost {
     private SceneEditorController sceneEditor;
 
     private boolean applyingSession = false;
-    private boolean refreshingUI = false;
 
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "track-io");
@@ -110,9 +84,7 @@ public class PlayerController implements SceneHost, PlayerHost {
 
     private final Map<TrackType, String> loadedPaths = new EnumMap<>(TrackType.class);
 
-    private static final String DEFAULT_PLAYLIST_NAME = "New playlist";
-
-    private PlaylistManager playlistManager;
+    private final PlaylistManager playlistManager = new PlaylistManager();
 
     @FXML
     public void initialize() {
@@ -126,6 +98,8 @@ public class PlayerController implements SceneHost, PlayerHost {
         libraryPanelController.attach(this);
         previewPanelController.attach(this);
         onDemandPanelController.attach(this);
+        playlistPanelController.attach(this);
+        playlistTransportController.attach(this);
         liveAuraController.refresh();
 
         saveDebounce.setOnFinished(e -> manager.save(sessionConfig));
@@ -133,57 +107,9 @@ public class PlayerController implements SceneHost, PlayerHost {
         musicService.setOnModePausedByPreview(() -> {
             moodPanelController.showPlaying(false);
             onDemandPanelController.showPlaying(false);
-            if (btnPlaylistPlayPause != null) btnPlaylistPlayPause.setText("▶");
+            playlistTransportController.showPlaying(false);
         });
-        playlistSeekBar.setOnSeekToFraction(musicService::seekPlaylist);
-
         ambiance.setAudioSource(musicService::getAudioFeatures);
-
-        // T-12: PlaylistManager + wiring de callbacks
-        playlistManager = new PlaylistManager();
-
-        musicService.setOnPlaylistEnd(() -> Platform.runLater(() -> {
-            playlistManager.next().ifPresentOrElse(
-                f -> musicService.playPlaylistTrack(f),
-                () -> { musicService.stopPlaylist(); refreshPlaylistUI(); }
-            );
-            refreshPlaylistUI();
-        }));
-
-        musicService.setPlaylistProgressListener((current, total) ->
-            Platform.runLater(() -> playlistSeekBar.showPlayback(current, total)));
-
-        if (cmbPlaylist != null) {
-            cmbPlaylist.setOnAction(e -> {
-                String name = cmbPlaylist.getValue();
-                if (name == null || refreshingUI) return;
-                playlistManager.setActivePlaylist(name);
-                sessionConfig.setActivePlaylistName(name);
-                manager.save(sessionConfig);
-                refreshPlaylistUI();
-            });
-        }
-
-        if (lstPlaylistTracks != null) {
-            lstPlaylistTracks.setCellFactory(lv -> new PlaylistTrackCell(playlistTrackHost));
-            PlaylistTrackCell.acceptFileDropsOnList(lstPlaylistTracks, playlistTrackHost);
-            lstPlaylistTracks.setOnKeyPressed(e -> {
-                if (e.getCode() == KeyCode.DELETE) onRemoveTrack();
-            });
-            lstPlaylistTracks.setOnMouseClicked(e -> {
-                if (e.getClickCount() == 2) {
-                    int idx = lstPlaylistTracks.getSelectionModel().getSelectedIndex();
-                    if (idx >= 0) {
-                        playlistManager.startAt(idx).ifPresent(f -> {
-                            enterMode(MusicService.PlaybackMode.PLAYLIST);
-                            musicService.playPlaylistTrack(f);
-                            if (btnPlaylistPlayPause != null) btnPlaylistPlayPause.setText("⏸");
-                            refreshPlaylistUI();
-                        });
-                    }
-                }
-            });
-        }
 
         if (modeTabPane != null) {
             modeTabPane.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
@@ -191,7 +117,7 @@ public class PlayerController implements SceneHost, PlayerHost {
                 boolean isPlaylist = newTab == playlistsTab;
                 sessionConfig.setActiveMode(isPlaylist ? "playlist" : "mood");
                 manager.save(sessionConfig);
-                if (isPlaylist) refreshPlaylistUI();
+                if (isPlaylist) playlistPanelController.refresh();
             });
         }
 
@@ -226,7 +152,7 @@ public class PlayerController implements SceneHost, PlayerHost {
         }
         switch (musicService.getPlaybackMode()) {
             case MOOD -> moodPanelController.togglePlayPause();
-            case PLAYLIST -> onPlaylistPlayPause();
+            case PLAYLIST -> playlistTransportController.togglePlayPause();
             case ON_DEMAND -> onDemandPanelController.togglePlayPause();
         }
     }
@@ -267,8 +193,8 @@ public class PlayerController implements SceneHost, PlayerHost {
         MusicService.PlaybackMode mode = musicService.getPlaybackMode();
         if (mode != MusicService.PlaybackMode.ON_DEMAND) onDemandPanelController.show(false);
         if (mode != MusicService.PlaybackMode.PLAYLIST) {
-            if (btnPlaylistPlayPause != null) btnPlaylistPlayPause.setText("▶");
-            if (lstPlaylistTracks != null) lstPlaylistTracks.refresh();
+            playlistTransportController.showPlaying(false);
+            playlistPanelController.refreshRows();
         }
         ambiance.activateSlot(liveSlot());
         liveAuraController.refresh();
@@ -285,8 +211,8 @@ public class PlayerController implements SceneHost, PlayerHost {
             ambiance.activateSlot(AuraSlot.ON_DEMAND);
             liveAuraController.refresh();
             moodPanelController.showPlaying(false);
-            if (btnPlaylistPlayPause != null) btnPlaylistPlayPause.setText("▶");
-            if (lstPlaylistTracks != null) lstPlaylistTracks.refresh();
+            playlistTransportController.showPlaying(false);
+            playlistPanelController.refreshRows();
             onDemandPanelController.syncPlayPauseIcon();
         });
     }
@@ -463,230 +389,44 @@ public class PlayerController implements SceneHost, PlayerHost {
         ambiance.setFfmpegAvailable(available);
     }
 
-    private final PlaylistTrackCell.Host playlistTrackHost = new PlaylistTrackCell.Host() {
-        @Override public boolean isNowPlaying(int index) {
-            return musicService.isPlaylistPlaying() && index == playlistManager.currentDisplayIndex();
-        }
-        @Override public void filesDropped(List<File> files, int slot) {
-            addDroppedFilesToPlaylist(files, slot);
-        }
-        @Override public void trackMoved(int from, int slot) {
-            moveTrackToSlot(from, slot);
-        }
-        @Override public void removeRequested(int index) {
-            removeTrackAt(index);
-        }
-    };
-
-    // --- T-13: CRUD de playlists ---
-
-    @FXML private void onNewPlaylist() {
-        promptNewPlaylistName();
+    @Override
+    public void playPlaylistTrack(File file) {
+        playlistTransportController.play(file);
     }
 
     @Override
     public Optional<String> promptNewPlaylistName() {
-        TextInputDialog d = new TextInputDialog();
-        d.setTitle("New Playlist");
-        d.setHeaderText(null);
-        d.setContentText("Name:");
-        Optional<String> created = d.showAndWait().map(String::trim).filter(n -> !n.isEmpty()).flatMap(name -> {
-            if (playlistManager.createPlaylist(name) == null) {
-                new Alert(Alert.AlertType.WARNING, "Name already exists or is blank.").showAndWait();
-                return Optional.empty();
-            }
-            return Optional.of(name);
-        });
-        if (created.isPresent()) {
-            activatePlaylist(created.get());
-            refreshPlaylistUI();
-            persistPlaylists();
-        }
-        return created;
+        return playlistPanelController.promptNewName();
     }
 
     @Override
     public void addToPlaylist(String playlistName, File source) {
-        if (source == null) return;
-        boolean isFolder = source.isDirectory();
-        collectInBackground(() -> AudioFileCollector.collect(source), tracks -> {
-            if (tracks.isEmpty()) {
-                if (isFolder) showNoAudioFilesMessage();
-                return;
-            }
-            addTracksToPlaylist(playlistName, tracks, Integer.MAX_VALUE, false);
-        });
+        playlistPanelController.addLibraryItem(playlistName, source);
     }
 
     @Override
     public void createPlaylistFromFolder(File folder) {
-        if (folder == null || !folder.isDirectory()) return;
-        collectInBackground(() -> AudioFileCollector.collect(folder), tracks -> {
-            if (tracks.isEmpty()) {
-                showNoAudioFilesMessage();
-                return;
-            }
-            String name = playlistManager.ensurePlaylist(playlistNameFor(folder)).getName();
-            addTracksToPlaylist(name, tracks, Integer.MAX_VALUE, true);
-        });
-    }
-
-    private void addDroppedFilesToPlaylist(List<File> dropped, int slot) {
-        collectInBackground(() -> AudioFileCollector.collectAll(dropped), tracks -> {
-            if (tracks.isEmpty()) return;
-            String target = playlistManager.getActivePlaylistName();
-            if (target == null) target = playlistManager.ensurePlaylist(DEFAULT_PLAYLIST_NAME).getName();
-            addTracksToPlaylist(target, tracks, slot, false);
-        });
-    }
-
-    private void collectInBackground(Supplier<List<File>> collector, Consumer<List<File>> onCollected) {
-        CompletableFuture.supplyAsync(collector, ioExecutor).whenComplete((tracks, error) ->
-                Platform.runLater(() -> onCollected.accept(error == null ? tracks : List.of())));
-    }
-
-    private void showNoAudioFilesMessage() {
-        new Alert(Alert.AlertType.INFORMATION, "No audio files (mp3, wav, flac) found in that folder.").showAndWait();
-    }
-
-    private static String playlistNameFor(File folder) {
-        String name = folder.getName();
-        if (name.isEmpty()) name = folder.getPath().replaceAll("[\\\\/]+$", "");
-        return name.isEmpty() ? DEFAULT_PLAYLIST_NAME : name;
-    }
-
-    private void addTracksToPlaylist(String playlistName, List<File> tracks, int slot, boolean activate) {
-        String activeBefore = playlistManager.getActivePlaylistName();
-        boolean isActive = playlistName.equalsIgnoreCase(activeBefore);
-        int selected = lstPlaylistTracks.getSelectionModel().getSelectedIndex();
-        int added = playlistManager.insertTracks(playlistName, tracks, slot);
-        if (activate || activeBefore == null) {
-            activatePlaylist(playlistName);
-            if (!isActive) selected = -1;
-        }
-        if (isActive && slot <= selected) selected += added;
-        refreshPlaylistUI();
-        selectTrackRow(selected);
-        persistPlaylists();
-    }
-
-    private void selectTrackRow(int index) {
-        if (lstPlaylistTracks == null || index < 0 || index >= lstPlaylistTracks.getItems().size()) return;
-        lstPlaylistTracks.getSelectionModel().select(index);
-    }
-
-    private void activatePlaylist(String name) {
-        playlistManager.setActivePlaylist(name);
-        sessionConfig.setActivePlaylistName(name);
-    }
-
-    private void moveTrackToSlot(int from, int slot) {
-        String active = playlistManager.getActivePlaylistName();
-        if (active == null) return;
-        int to = slot > from ? slot - 1 : slot;
-        if (to == from) return;
-        playlistManager.reorderTrack(active, from, to);
-        refreshPlaylistUI();
-        lstPlaylistTracks.getSelectionModel().select(to);
-        persistPlaylists();
-    }
-
-    private void removeTrackAt(int index) {
-        String active = playlistManager.getActivePlaylistName();
-        if (active == null || index < 0) return;
-        playlistManager.removeTrack(active, index);
-        refreshPlaylistUI();
-        selectTrackRow(Math.min(index, lstPlaylistTracks.getItems().size() - 1));
-        persistPlaylists();
-    }
-
-    @FXML private void onRenamePlaylist() {
-        String current = cmbPlaylist.getValue();
-        if (current == null) return;
-        TextInputDialog d = new TextInputDialog(current);
-        d.setTitle("Rename");
-        d.setHeaderText(null);
-        d.setContentText("New name:");
-        d.showAndWait().map(String::trim).filter(n -> !n.isEmpty()).ifPresent(name -> {
-            if (!playlistManager.renamePlaylist(current, name)) {
-                new Alert(Alert.AlertType.WARNING, "Name already exists or is blank.").showAndWait();
-                return;
-            }
-            refreshPlaylistUI();
-            persistPlaylists();
-        });
-    }
-
-    @FXML private void onDeletePlaylist() {
-        String name = cmbPlaylist.getValue();
-        if (name == null) return;
-        boolean isEmpty = playlistManager.getPlaylists().stream()
-            .filter(p -> p.getName().equals(name))
-            .findFirst()
-            .map(p -> p.getPaths().isEmpty())
-            .orElse(true);
-        if (!isEmpty) {
-            Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
-                "Delete playlist \"" + name + "\" and all its tracks?");
-            if (confirm.showAndWait().filter(b -> b == ButtonType.OK).isEmpty()) return;
-        }
-        playlistManager.deletePlaylist(name);
-        refreshPlaylistUI();
-        persistPlaylists();
-    }
-
-    @FXML private void onAddToPlaylist() {
-        String pname = cmbPlaylist.getValue();
-        if (pname == null) return;
-        libraryPanelController.selectedItem().ifPresent(file -> addToPlaylist(pname, file));
-    }
-
-    @FXML private void onRemoveTrack() {
-        removeTrackAt(lstPlaylistTracks.getSelectionModel().getSelectedIndex());
-    }
-
-    @FXML private void onMoveUp() {
-        String pname = cmbPlaylist.getValue();
-        if (pname == null) return;
-        int idx = lstPlaylistTracks.getSelectionModel().getSelectedIndex();
-        if (idx <= 0) return;
-        playlistManager.reorderTrack(pname, idx, idx - 1);
-        refreshPlaylistUI();
-        lstPlaylistTracks.getSelectionModel().select(idx - 1);
-        persistPlaylists();
-    }
-
-    @FXML private void onMoveDown() {
-        String pname = cmbPlaylist.getValue();
-        if (pname == null) return;
-        int idx = lstPlaylistTracks.getSelectionModel().getSelectedIndex();
-        if (idx < 0 || idx >= lstPlaylistTracks.getItems().size() - 1) return;
-        playlistManager.reorderTrack(pname, idx, idx + 1);
-        refreshPlaylistUI();
-        lstPlaylistTracks.getSelectionModel().select(idx + 1);
-        persistPlaylists();
+        playlistPanelController.createFromFolder(folder);
     }
 
     @Override
     public String selectedPlaylistName() {
-        return cmbPlaylist.getValue();
+        return playlistPanelController.selectedPlaylistName();
     }
 
     @Override
     public void showPendingPlaylistEntry(String text) {
-        lstPlaylistTracks.getItems().add(text);
+        playlistPanelController.showPendingEntry(text);
     }
 
     @Override
     public void addPlaylistItem(String playlistName, PlaylistItem item) {
-        playlistManager.addItem(playlistName, item);
-        persistPlaylists();
-        refreshPlaylistUI();
+        playlistPanelController.addItem(playlistName, item);
     }
 
     @Override
     public void refreshPlaylistView() {
-        refreshPlaylistUI();
+        playlistPanelController.refresh();
     }
 
     @Override
@@ -694,92 +434,16 @@ public class PlayerController implements SceneHost, PlayerHost {
         return playlistManager;
     }
 
-    private void persistPlaylists() {
+    @Override
+    public Optional<File> selectedLibraryItem() {
+        return libraryPanelController.selectedItem();
+    }
+
+    @Override
+    public void persistPlaylists() {
         sessionConfig.setPlaylists(playlistManager.getPlaylists());
         manager.save(sessionConfig);
     }
-
-    // --- T-14: Transporte y refresh del playlist ---
-
-    @FXML private void onPlaylistPlayPause() {
-        if (musicService.isPlaylistPlaying()) {
-            musicService.playlistPause();
-            if (btnPlaylistPlayPause != null) btnPlaylistPlayPause.setText("▶");
-        } else {
-            playlistManager.startCurrent().ifPresent(f -> {
-                enterMode(MusicService.PlaybackMode.PLAYLIST);
-                musicService.playPlaylistTrack(f);
-                if (btnPlaylistPlayPause != null) btnPlaylistPlayPause.setText("⏸");
-            });
-        }
-    }
-
-    @FXML private void onPrev() {
-        playlistManager.prev().ifPresent(f -> {
-            enterMode(MusicService.PlaybackMode.PLAYLIST);
-            musicService.playPlaylistTrack(f);
-            if (btnPlaylistPlayPause != null) btnPlaylistPlayPause.setText("⏸");
-        });
-        refreshPlaylistUI();
-    }
-
-    @FXML private void onNext() {
-        playlistManager.next().ifPresentOrElse(f -> {
-            enterMode(MusicService.PlaybackMode.PLAYLIST);
-            musicService.playPlaylistTrack(f);
-            if (btnPlaylistPlayPause != null) btnPlaylistPlayPause.setText("⏸");
-        }, () -> {
-            musicService.stopPlaylist();
-            if (btnPlaylistPlayPause != null) btnPlaylistPlayPause.setText("▶");
-        });
-        refreshPlaylistUI();
-    }
-
-    @FXML private void onToggleShuffle() {
-        playlistManager.setShuffle(btnShuffle != null && btnShuffle.isSelected());
-        refreshPlaylistUI();
-    }
-
-    @FXML private void onTogglePlaylistLoop() {
-        playlistManager.setLoop(btnPlaylistLoop != null && btnPlaylistLoop.isSelected());
-    }
-
-    private void refreshPlaylistUI() {
-        if (cmbPlaylist == null || refreshingUI) return;
-        refreshingUI = true;
-        try {
-        // Repopulate playlist ComboBox
-        String current = cmbPlaylist.getValue();
-        cmbPlaylist.getItems().setAll(
-            playlistManager.getPlaylists().stream()
-                .map(p -> p.getName())
-                .toList()
-        );
-        String active = playlistManager.getActivePlaylistName();
-        if (active != null && cmbPlaylist.getItems().contains(active))
-            cmbPlaylist.setValue(active);
-        else if (current != null && cmbPlaylist.getItems().contains(current))
-            cmbPlaylist.setValue(current);
-
-        if (lstPlaylistTracks != null) {
-            int selected = lstPlaylistTracks.getSelectionModel().getSelectedIndex();
-            lstPlaylistTracks.getItems().setAll(
-                playlistManager.getActiveItems().stream()
-                    .map(PlaylistItem::displayName)
-                    .toList()
-            );
-            selectTrackRow(selected);
-            lstPlaylistTracks.refresh();
-        }
-
-        // Update counter
-        if (lblTrackCounter != null)
-            lblTrackCounter.setText(playlistManager.positionLabel());
-        } finally {
-            refreshingUI = false;
-        }
-    }
-
 
     public void applySession(SessionConfig cfg) {
         if (cfg == null) return;
@@ -790,39 +454,32 @@ public class PlayerController implements SceneHost, PlayerHost {
             sessionConfig.setLastImageFolderPath(lastImgDir);
         }
 
-        // Restaurar índice de pantalla de ambiance
         int screenIdx = cfg.getAmbianceScreenIndex();
         sessionConfig.setAmbianceScreenIndex(screenIdx);
         Platform.runLater(() -> ambianceToolbarController.restoreScreen(screenIdx));
 
         libraryPanelController.restoreFolder(cfg.getLastFolderPath());
 
-        // T-15: Restore playlists
         playlistManager.setPlaylists(cfg.getPlaylists());
         sessionConfig.setPlaylists(cfg.getPlaylists());
         sessionConfig.setActiveMode(cfg.getActiveMode());
         sessionConfig.setActivePlaylistName(cfg.getActivePlaylistName());
-        refreshPlaylistUI();
+        playlistPanelController.refresh();
 
-        // T-15: Restore active mode
-        String savedMode = cfg.getActiveMode();
-        if ("playlist".equalsIgnoreCase(savedMode) && modeTabPane != null && playlistsTab != null) {
+        if ("playlist".equalsIgnoreCase(cfg.getActiveMode())) {
             applyingSession = true;
             modeTabPane.getSelectionModel().select(playlistsTab);
-            String savedPl = cfg.getActivePlaylistName();
-            if (savedPl != null) {
-                playlistManager.setActivePlaylist(savedPl);
-                if (cmbPlaylist != null) cmbPlaylist.setValue(savedPl);
+            String savedPlaylist = cfg.getActivePlaylistName();
+            if (savedPlaylist != null) {
+                playlistManager.setActivePlaylist(savedPlaylist);
+                playlistPanelController.selectPlaylist(savedPlaylist);
             }
-            refreshPlaylistUI();
+            playlistPanelController.refresh();
             applyingSession = false;
         }
 
-        // Aplicar en UI (puede ejecutarse antes de show(); Platform.runLater es seguro)
         Platform.runLater(() -> {
-            // Restaurar volumen maestro desde sesión
-            double mv = cfg.getMasterVolume();
-            volumeController.restore(mv);
+            volumeController.restore(cfg.getMasterVolume());
             sceneBarController.refresh();
             applyScene(sessionConfig.getActiveScene());
         });
