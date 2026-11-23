@@ -62,6 +62,8 @@ public class MusicService {
 
     // Reproductor dedicado a preescucha — nunca entra al mapa 'players'
     private MediaPlayer previewPlayer;
+    private final AudioFocus audioFocus =
+            new AudioFocus(() -> previewPlayer != null, this::pausePreviewPlayer, this::pauseModePlayers);
 
     // Propiedad reactiva con el nombre de la pista actualmente sonando
     private final StringProperty nowPlaying = new SimpleStringProperty("—");
@@ -423,6 +425,7 @@ public class MusicService {
         if (mode != PlaybackMode.MOOD) return; // guard T-08
         if (!players.containsKey(newTrack)) return;
 
+        audioFocus.claimForMode();
         cancelActiveFade();
 
         if (previewPlayer != null) {
@@ -457,20 +460,8 @@ public class MusicService {
     public void previewTrack(File file) {
         if (file == null || !file.exists()) return;
 
-        // (1) Pausar el reproductor de mood activo si estaba sonando
-        if (currentTrack != null && players.containsKey(currentTrack)) {
-            players.get(currentTrack).pause();
-        }
-        // T-08: pausar también el reproductor de playlist si está sonando
-        if (playlistPlayer != null && playlistPlayer.getStatus() == MediaPlayer.Status.PLAYING) {
-            playlistPlayer.pause();
-        }
+        audioFocus.claimForPreview();
 
-        if (onDemandPlayer != null && onDemandPlayer.getStatus() == MediaPlayer.Status.PLAYING) {
-            onDemandPlayer.pause();
-        }
-
-        // (2) Detener y descartar la preescucha previa si existía
         if (previewPlayer != null) {
             previewPlayer.stop();
             previewPlayer.dispose();
@@ -566,6 +557,7 @@ public class MusicService {
 
     public void play() {
         if (mode != PlaybackMode.MOOD) return; // guard T-08
+        audioFocus.claimForMode();
         if (currentTrack != null && players.containsKey(currentTrack))
             players.get(currentTrack).play();
     }
@@ -614,6 +606,7 @@ public class MusicService {
      */
     public void fadeInAndPlay() {
         if (mode != PlaybackMode.MOOD) return; // guard T-08
+        audioFocus.claimForMode();
         cancelActiveFade();
         if (currentTrack == null || !players.containsKey(currentTrack)) return;
         MediaPlayer player = players.get(currentTrack);
@@ -661,7 +654,34 @@ public class MusicService {
     // =========================================================================
 
     public void previewPlay() {
-        if (previewPlayer != null) previewPlayer.play();
+        if (previewPlayer == null) return;
+        audioFocus.claimForPreview();
+        previewPlayer.play();
+    }
+
+    public boolean previewSoundedLast() {
+        return audioFocus.previewSoundedLast();
+    }
+
+    public void setOnPreviewPausedByMode(Runnable listener) {
+        audioFocus.setOnPreviewPausedByMode(listener);
+    }
+
+    public void setOnModePausedByPreview(Runnable listener) {
+        audioFocus.setOnModePausedByPreview(listener);
+    }
+
+    private void pausePreviewPlayer() {
+        previewPlayer.pause();
+    }
+
+    private void pauseModePlayers() {
+        cancelActiveFade();
+        if (currentTrack != null && players.containsKey(currentTrack)) {
+            players.get(currentTrack).pause();
+        }
+        if (playlistPlayer != null) playlistPlayer.pause();
+        if (onDemandPlayer != null) onDemandPlayer.pause();
     }
 
     public void previewPause() {
@@ -704,6 +724,7 @@ public class MusicService {
      */
     public void playPlaylistTrack(File file) {
         if (mode != PlaybackMode.PLAYLIST) return; // guard T-09
+        audioFocus.claimForMode();
 
         audioPrep.submit(() -> {
             try {
@@ -788,6 +809,7 @@ public class MusicService {
      */
     public void playlistPlay() {
         if (mode != PlaybackMode.PLAYLIST) return;
+        audioFocus.claimForMode();
         if (playlistPlayer != null
                 && playlistPlayer.getStatus() != MediaPlayer.Status.PLAYING) {
             playlistPlayer.play();
@@ -874,6 +896,7 @@ public class MusicService {
 
     public void playOnDemand(File file, String title, Runnable onStarted) {
         if (file == null || !file.exists()) return;
+        audioFocus.claimForMode();
         final int seq = ++onDemandSeq;
 
         audioPrep.submit(() -> {
@@ -948,7 +971,9 @@ public class MusicService {
     }
 
     public void onDemandPlay() {
-        if (mode == PlaybackMode.ON_DEMAND && onDemandPlayer != null) onDemandPlayer.play();
+        if (mode != PlaybackMode.ON_DEMAND || onDemandPlayer == null) return;
+        audioFocus.claimForMode();
+        onDemandPlayer.play();
     }
 
     public void onDemandPause() {

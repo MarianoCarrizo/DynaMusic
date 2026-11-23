@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import com.marianocarrizo.dynamusic.component.SeekBar?>
+
+<VBox xmlns:fx="http://javafx.com/fxml/1"
+      fx:id="previewPanel"
+      fx:controller="com.marianocarrizo.dynamusic.controller.PreviewPanelController"
+      spacing="6" alignment="CENTER"
+      styleClass="playback-panel, preview-panel, preview-strip"
+      visible="false" managed="false">
+    <Label text="PREVIEW" styleClass="lbl-panel-title"/>
+    <Label fx:id="lblPreviewTrack" text="No active preview" styleClass="lbl-preview-track"
+           maxWidth="Infinity"/>
+    <HBox spacing="20" alignment="CENTER">
+        <ToggleButton fx:id="btnPreviewLoop" text="🔁" onAction="#onTogglePreviewLoop" styleClass="btn-spotify-flat, btn-loop"/>
+        <Button text="■" onAction="#onPreviewStop" styleClass="btn-spotify-flat, btn-stop"/>
+        <Button fx:id="btnPreviewPlayPause" text="▶" onAction="#togglePlayPause" styleClass="btn-spotify-circle"/>
+    </HBox>
+    <SeekBar fx:id="previewSeekBar"/>
+</VBox>

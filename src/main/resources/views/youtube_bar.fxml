@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.marianocarrizo.dynamusic.controller.YouTubeBarController"
+      spacing="10">
+    <HBox spacing="8" alignment="CENTER_LEFT">
+        <TextField fx:id="txtYoutubeUrl" HBox.hgrow="ALWAYS" maxWidth="Infinity"
+                   promptText="Paste YouTube URL..."/>
+        <Button fx:id="btnPlayYoutube" text="Play" onAction="#onPlayYoutubeUrl"
+                minWidth="60" styleClass="btn-secondary"/>
+        <Button fx:id="btnAddYoutube" text="Add" onAction="#onAddYoutubeUrl"
+                minWidth="60" styleClass="btn-secondary"/>
+        <Button fx:id="btnBrowseYoutube" text="Browse" onAction="#onBrowseYouTube"
+                minWidth="60" styleClass="btn-secondary"/>
+    </HBox>
+    <Label fx:id="lblYoutubeError" styleClass="error-label" text=""
+           visible="false" managed="false" wrapText="true"/>
+</VBox>

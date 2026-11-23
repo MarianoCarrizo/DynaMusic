@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.marianocarrizo.dynamusic.controller.LiveAuraController"
+      spacing="6" styleClass="playback-panel">
+    <Label fx:id="lblLiveAura" text="LIVE AURA" styleClass="lbl-panel-title"/>
+    <HBox fx:id="livePresetBox" spacing="6" alignment="CENTER"/>
+    <HBox spacing="8" alignment="CENTER_LEFT">
+        <Label text="Intensity" minWidth="70" styleClass="lbl-session-title"/>
+        <Slider fx:id="sldLiveIntensity" min="0" max="1" HBox.hgrow="ALWAYS" styleClass="spotify-slider"/>
+        <Label fx:id="lblLiveIntensity" text="50%" minWidth="40" styleClass="lbl-time"/>
+    </HBox>
+    <HBox spacing="8" alignment="CENTER_LEFT">
+        <Label text="Reactivity" minWidth="70" styleClass="lbl-session-title"/>
+        <Slider fx:id="sldLiveReactivity" min="0" max="1" HBox.hgrow="ALWAYS" styleClass="spotify-slider"/>
+        <Label fx:id="lblLiveReactivity" text="50%" minWidth="40" styleClass="lbl-time"/>
+    </HBox>
+</VBox>

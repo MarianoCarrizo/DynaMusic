@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.marianocarrizo.dynamusic.controller.LibraryPanelController"
+      spacing="10" VBox.vgrow="ALWAYS">
+    <Button text="📂 Open Folder" onAction="#onOpenFolder" maxWidth="Infinity" styleClass="btn-secondary"/>
+    <TextField fx:id="txtSearch" promptText="Search track by name..."/>
+    <TreeView fx:id="treeFiles" VBox.vgrow="ALWAYS" showRoot="false"/>
+</VBox>
