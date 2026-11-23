@@ -460,7 +460,7 @@ public class MusicService {
     public void previewTrack(File file) {
         if (file == null || !file.exists()) return;
 
-        audioFocus.claimForPreview();
+        final PreviewTicket ticket = audioFocus.claimForNewPreview();
 
         if (previewPlayer != null) {
             previewPlayer.stop();
@@ -483,6 +483,8 @@ public class MusicService {
 
                 // (4) Construcción del reproductor en el hilo FX
                 Platform.runLater(() -> {
+                    PreviewReadiness readiness = audioFocus.readinessOf(ticket);
+                    if (readiness == PreviewReadiness.DISCARD) return;
                     try {
                         String sourceUrl = finalFile.toURI().toString();
                         Media media = new Media(sourceUrl);
@@ -521,7 +523,7 @@ public class MusicService {
                         attachSpectrumListener(player);
 
                         player.setOnReady(() -> {
-                            player.play();
+                            if (readiness == PreviewReadiness.PLAY) player.play();
                             nowPlaying.set(previewLabel);
                             if (previewProgressListener != null) {
                                 previewProgressListener.accept(Duration.ZERO, player.getTotalDuration());

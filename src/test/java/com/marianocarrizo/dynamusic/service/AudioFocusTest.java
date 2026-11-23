@@ -95,4 +95,53 @@ class AudioFocusTest {
         assertEquals(1, previewPauses);
         assertEquals(1, modePauses);
     }
+
+    @Test
+    void aPreviewThatIsStillTheLatestRequestPlaysWhenReady() {
+        PreviewTicket ticket = focus.claimForNewPreview();
+
+        assertEquals(PreviewReadiness.PLAY, focus.readinessOf(ticket));
+    }
+
+    @Test
+    void aPreviewStaysPausedWhenAModePlayerClaimedAudioWhileItLoaded() {
+        PreviewTicket ticket = focus.claimForNewPreview();
+        focus.claimForMode();
+
+        assertEquals(PreviewReadiness.KEEP_PAUSED, focus.readinessOf(ticket));
+    }
+
+    @Test
+    void anOlderPreviewRequestIsDiscardedWhenANewerOneStarted() {
+        PreviewTicket older = focus.claimForNewPreview();
+        PreviewTicket newer = focus.claimForNewPreview();
+
+        assertEquals(PreviewReadiness.DISCARD, focus.readinessOf(older));
+        assertEquals(PreviewReadiness.PLAY, focus.readinessOf(newer));
+    }
+
+    @Test
+    void resumingTheLoadedPreviewDoesNotInvalidateItsTicket() {
+        PreviewTicket ticket = focus.claimForNewPreview();
+        focus.claimForPreview();
+
+        assertEquals(PreviewReadiness.PLAY, focus.readinessOf(ticket));
+    }
+
+    @Test
+    void aModeClaimBeforeTheNewPreviewDoesNotBlockIt() {
+        focus.claimForMode();
+        PreviewTicket ticket = focus.claimForNewPreview();
+
+        assertEquals(PreviewReadiness.PLAY, focus.readinessOf(ticket));
+    }
+
+    @Test
+    void aNewPreviewRequestPausesModePlayersAndNotifies() {
+        focus.claimForNewPreview();
+
+        assertEquals(1, modePauses);
+        assertEquals(1, modePausedNotifications);
+        assertTrue(focus.previewSoundedLast());
+    }
 }
