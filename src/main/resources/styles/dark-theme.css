@@ -61,10 +61,29 @@
 .tree-cell:filled:selected:focused {
     -fx-background-color: #4a4a5a;
 }
-/* Track actualmente sonando en la playlist */
-.list-cell-now-playing {
-    -fx-background-color: #1a3a2a !important;
-    -fx-text-fill: #1db954 !important;
+.playlist-row-title {
+    -fx-text-fill: #e0e0e0;
+    -fx-font-size: 13px;
+}
+.playlist-row-album {
+    -fx-text-fill: #808085;
+    -fx-font-size: 11px;
+}
+.playlist-row-marker {
+    -fx-text-fill: #1db954;
+    -fx-font-size: 12px;
+}
+.list-cell:filled:selected .playlist-row-title {
+    -fx-text-fill: #ffffff;
+}
+.list-cell-now-playing .playlist-row-title,
+.list-cell-now-playing:filled:selected .playlist-row-title {
+    -fx-text-fill: #1db954;
+    -fx-font-weight: bold;
+}
+.playlist-counter {
+    -fx-text-fill: #b0b0b8;
+    -fx-font-size: 12px;
     -fx-font-weight: bold;
 }
 
@@ -362,10 +381,11 @@
     -fx-text-fill: #000000 !important;
     -fx-background-radius: 40px !important;
     -fx-border-radius: 40px !important;
-    -fx-min-width: 38px;
-    -fx-max-width: 38px;
-    -fx-min-height: 38px;
-    -fx-max-height: 38px;
+    -fx-font-size: 16px;
+    -fx-min-width: 46px;
+    -fx-max-width: 46px;
+    -fx-min-height: 46px;
+    -fx-max-height: 46px;
     -fx-cursor: hand;
     -fx-alignment: CENTER;
     -fx-padding: 0;
@@ -427,7 +447,6 @@
 #window-paused .slider .track { -fx-background-color: #3e3e40; }
 #window-paused .slider .thumb { -fx-background-color: #7f8c8d; }
 #window-paused .slider .range-bar { -fx-background-color: #95a5a6; }
-#window-paused .list-cell:filled:selected { -fx-background-color: #4a4a4a; }
 #window-paused .text-field:focused { -fx-border-color: #7f8c8d; }
 #window-paused .btn-spotify-flat:selected { -fx-text-fill: #95a5a6; }
 
@@ -438,7 +457,6 @@
 #window-raged .slider .track { -fx-background-color: #451b1b; }
 #window-raged .slider .thumb { -fx-background-color: #e74c3c; }
 #window-raged .slider .range-bar { -fx-background-color: #c0392b; }
-#window-raged .list-cell:filled:selected { -fx-background-color: #8a1f1f; }
 #window-raged .text-field:focused { -fx-border-color: #e74c3c; }
 #window-raged .btn-spotify-flat:selected { -fx-text-fill: #e74c3c; }
 
@@ -449,7 +467,6 @@
 #window-normal .slider .track { -fx-background-color: #14331d; }
 #window-normal .slider .thumb { -fx-background-color: #2ecc71; }
 #window-normal .slider .range-bar { -fx-background-color: #27ae60; }
-#window-normal .list-cell:filled:selected { -fx-background-color: #1e4a2b; }
 #window-normal .text-field:focused { -fx-border-color: #2ecc71; }
 #window-normal .btn-spotify-flat:selected { -fx-text-fill: #2ecc71; }
 
@@ -460,7 +477,6 @@
 #window-advantage .slider .track { -fx-background-color: #112233; }
 #window-advantage .slider .thumb { -fx-background-color: #3498db; }
 #window-advantage .slider .range-bar { -fx-background-color: #2980b9; }
-#window-advantage .list-cell:filled:selected { -fx-background-color: #1e354a; }
 #window-advantage .text-field:focused { -fx-border-color: #3498db; }
 #window-advantage .btn-spotify-flat:selected { -fx-text-fill: #3498db; }
 

@@ -1,7 +1,9 @@
 package com.marianocarrizo.dynamusic.controller;
 
 import javafx.css.PseudoClass;
+import javafx.geometry.Pos;
 import javafx.scene.control.ContextMenu;
+import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.MenuItem;
@@ -11,14 +13,16 @@ import javafx.scene.input.DragEvent;
 import javafx.scene.input.Dragboard;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.TransferMode;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
 
 import java.io.File;
 import java.util.List;
 
-final class PlaylistTrackCell extends ListCell<String> {
+final class PlaylistTrackCell extends ListCell<PlaylistRow> {
 
     interface Host {
-        boolean isNowPlaying(int index);
+        RowPlayback playbackOf(int index);
         void filesDropped(List<File> files, int slot);
         void trackMoved(int from, int slot);
         void removeRequested(int index);
@@ -28,15 +32,21 @@ final class PlaylistTrackCell extends ListCell<String> {
     private static final PseudoClass DROP_ABOVE = PseudoClass.getPseudoClass("drop-above");
     private static final PseudoClass DROP_BELOW = PseudoClass.getPseudoClass("drop-below");
     private static final String NOW_PLAYING_STYLE = "list-cell-now-playing";
+    private static final double MARKER_WIDTH = 16;
 
     private final Host host;
     private final ContextMenu menu = new ContextMenu();
+    private final Label marker = new Label();
+    private final Label title = new Label();
+    private final Label album = new Label();
+    private final HBox row = new HBox(8);
 
     PlaylistTrackCell(Host host) {
         this.host = host;
         MenuItem remove = new MenuItem("Remove from playlist");
         remove.setOnAction(e -> host.removeRequested(getIndex()));
         menu.getItems().add(remove);
+        buildRow();
 
         setOnDragDetected(this::startRowDrag);
         setOnDragOver(this::acceptDrag);
@@ -45,20 +55,36 @@ final class PlaylistTrackCell extends ListCell<String> {
     }
 
     @Override
-    protected void updateItem(String item, boolean empty) {
+    protected void updateItem(PlaylistRow item, boolean empty) {
         super.updateItem(item, empty);
         getStyleClass().remove(NOW_PLAYING_STYLE);
         if (empty || item == null) {
-            setText(null);
+            setGraphic(null);
             setContextMenu(null);
             return;
         }
-        setText(item);
+        RowPlayback playback = host.playbackOf(getIndex());
+        marker.setText(playback.marker());
+        title.setText(item.title());
+        album.setText(item.album());
+        album.setVisible(item.hasAlbum());
+        album.setManaged(item.hasAlbum());
+        setGraphic(row);
         setContextMenu(menu);
-        if (host.isNowPlaying(getIndex())) getStyleClass().add(NOW_PLAYING_STYLE);
+        if (playback.isCurrent()) getStyleClass().add(NOW_PLAYING_STYLE);
     }
 
-    static void acceptFileDropsOnList(ListView<String> list, Host host) {
+    private void buildRow() {
+        marker.getStyleClass().add("playlist-row-marker");
+        marker.setMinWidth(MARKER_WIDTH);
+        title.getStyleClass().add("playlist-row-title");
+        album.getStyleClass().add("playlist-row-album");
+        VBox text = new VBox(1, title, album);
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.getChildren().addAll(marker, text);
+    }
+
+    static void acceptFileDropsOnList(ListView<PlaylistRow> list, Host host) {
         list.setOnDragOver(event -> {
             if (!event.getDragboard().hasFiles()) return;
             event.acceptTransferModes(TransferMode.COPY);
