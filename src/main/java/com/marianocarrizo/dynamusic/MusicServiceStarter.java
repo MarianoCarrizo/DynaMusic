@@ -111,6 +111,9 @@ public class MusicServiceStarter extends Application {
 
         // Set de teclas actualmente presionadas para ignorar key-repeat del SO
         Set<KeyCode> heldKeys = new HashSet<>();
+        stage.focusedProperty().addListener((obs, wasFocused, isFocused) -> {
+            if (!isFocused) heldKeys.clear();
+        });
 
         scene.setOnKeyPressed(e -> {
             if (heldKeys.contains(e.getCode())) return; // ignorar repetición
