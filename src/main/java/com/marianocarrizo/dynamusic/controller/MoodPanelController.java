@@ -16,7 +16,6 @@ import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.Label;
-import javafx.scene.control.ToggleButton;
 import javafx.scene.input.Dragboard;
 import javafx.scene.input.TransferMode;
 import javafx.scene.layout.HBox;
@@ -50,7 +49,6 @@ public final class MoodPanelController {
     @FXML private Button btnNormal;
     @FXML private Button btnRaged;
     @FXML private Button btnAdvantage;
-    @FXML private ToggleButton btnLoopIcon;
 
     private final Map<TrackType, Button> moodButtons = new EnumMap<>(TrackType.class);
     private final Map<TrackType, MoodCard> moodCards = new EnumMap<>(TrackType.class);
@@ -76,7 +74,6 @@ public final class MoodPanelController {
         refreshCards();
         refreshButtonStates();
 
-        btnLoopIcon.selectedProperty().addListener((obs, oldVal, newVal) -> musicService.setLoop(newVal));
         host.nowPlaying().snapshotProperty().addListener((obs, oldValue, newValue) -> refreshButtonStates());
     }
 

@@ -40,7 +40,6 @@
             <Region HBox.hgrow="ALWAYS"/>
             <Hyperlink text="☕ Support the project" onAction="#onOpenCafecito" styleClass="link-support"/>
             <fx:include fx:id="ambianceToolbar" source="ambiance_toolbar.fxml"/>
-            <fx:include fx:id="volume" source="volume_control.fxml"/>
         </HBox>
 
         <SplitPane fx:id="mainSplit" VBox.vgrow="ALWAYS" dividerPositions="0.3" styleClass="main-split">
@@ -52,8 +51,6 @@
                 </padding>
                 <fx:include fx:id="libraryPanel" source="library_panel.fxml"/>
 
-                <fx:include fx:id="previewPanel" source="preview_panel.fxml"/>
-
                 <fx:include fx:id="youTubeBar" source="youtube_bar.fxml"/>
             </VBox>
 
@@ -61,8 +58,6 @@
                 <padding>
                     <Insets top="10" right="10" bottom="10" left="10"/>
                 </padding>
-
-                <fx:include fx:id="onDemandPanel" source="on_demand_panel.fxml"/>
 
                 <!-- T-10: TabPane que agrupa los modos Moods y Playlists -->
                 <TabPane fx:id="modeTabPane" VBox.vgrow="ALWAYS" tabClosingPolicy="UNAVAILABLE">
@@ -81,7 +76,6 @@
                                     <Insets top="10" right="4" bottom="4" left="4"/>
                                 </padding>
                                 <fx:include fx:id="playlistPanel" source="playlist_panel.fxml"/>
-                                <fx:include fx:id="playlistTransport" source="playlist_transport.fxml"/>
                             </VBox>
                         </content>
                     </Tab>

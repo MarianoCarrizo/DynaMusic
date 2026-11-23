@@ -2,41 +2,44 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <?import javafx.geometry.Insets?>
+<?import com.marianocarrizo.dynamusic.component.CoverView?>
+<?import com.marianocarrizo.dynamusic.component.IconButton?>
+<?import com.marianocarrizo.dynamusic.component.IconToggleButton?>
 <?import com.marianocarrizo.dynamusic.component.PlayPauseButton?>
 <?import com.marianocarrizo.dynamusic.component.SeekBar?>
 
-<HBox xmlns:fx="http://javafx.com/fxml/1"
-      fx:controller="com.marianocarrizo.dynamusic.controller.NowPlayingBarController"
-      spacing="24" alignment="CENTER_LEFT" styleClass="now-playing-bar">
+<GridPane xmlns:fx="http://javafx.com/fxml/1"
+          fx:controller="com.marianocarrizo.dynamusic.controller.NowPlayingBarController"
+          hgap="16" styleClass="now-playing-bar">
     <padding>
         <Insets top="10" right="16" bottom="10" left="16"/>
     </padding>
+    <columnConstraints>
+        <ColumnConstraints percentWidth="30" hgrow="ALWAYS"/>
+        <ColumnConstraints percentWidth="40" hgrow="ALWAYS"/>
+        <ColumnConstraints percentWidth="30" hgrow="ALWAYS"/>
+    </columnConstraints>
 
-    <VBox spacing="2" alignment="CENTER_LEFT" minWidth="200" prefWidth="300" maxWidth="360">
-        <Label fx:id="lblSourceBadge" styleClass="now-playing-badge"/>
-        <Label fx:id="lblTitle" maxWidth="Infinity" styleClass="now-playing-title"/>
-        <Label fx:id="lblDetail" maxWidth="Infinity" styleClass="now-playing-detail"/>
-    </VBox>
+    <HBox spacing="12" alignment="CENTER_LEFT" GridPane.columnIndex="0">
+        <CoverView fx:id="cover"/>
+        <VBox spacing="2" alignment="CENTER_LEFT" HBox.hgrow="ALWAYS" minWidth="0">
+            <Label fx:id="lblTitle" maxWidth="Infinity" styleClass="now-playing-title"/>
+            <Label fx:id="lblDetail" maxWidth="Infinity" styleClass="now-playing-detail"/>
+            <Label fx:id="lblSource" maxWidth="Infinity" styleClass="now-playing-source"/>
+        </VBox>
+    </HBox>
 
-    <VBox spacing="6" alignment="CENTER" HBox.hgrow="ALWAYS">
+    <VBox spacing="4" alignment="CENTER" GridPane.columnIndex="1">
         <HBox spacing="14" alignment="CENTER">
-            <Button fx:id="btnPrevious" text="|◁" onAction="#onPrevious" styleClass="btn-transport">
-                <tooltip>
-                    <Tooltip text="Previous track"/>
-                </tooltip>
-            </Button>
+            <IconToggleButton fx:id="btnShuffle" onAction="#onShuffle"/>
+            <IconButton fx:id="btnPrevious" onAction="#onPrevious"/>
             <PlayPauseButton fx:id="btnPlayPause" onAction="#onTogglePlayPause"/>
-            <Button fx:id="btnNext" text="▷|" onAction="#onNext" styleClass="btn-transport">
-                <tooltip>
-                    <Tooltip text="Next track"/>
-                </tooltip>
-            </Button>
-            <Button fx:id="btnStop" text="■" onAction="#onStop" styleClass="btn-transport">
-                <tooltip>
-                    <Tooltip text="Stop"/>
-                </tooltip>
-            </Button>
+            <IconButton fx:id="btnNext" onAction="#onNext"/>
+            <IconToggleButton fx:id="btnRepeat" onAction="#onRepeat"/>
         </HBox>
         <SeekBar fx:id="seekBar"/>
     </VBox>
-</HBox>
+
+    <fx:include fx:id="volume" source="volume_control.fxml" GridPane.columnIndex="2"
+                GridPane.halignment="RIGHT"/>
+</GridPane>

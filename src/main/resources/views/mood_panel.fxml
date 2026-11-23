@@ -34,12 +34,4 @@
                     GridPane.columnIndex="1" GridPane.rowIndex="1"/>
         </children>
     </GridPane>
-
-    <HBox alignment="CENTER_LEFT">
-        <ToggleButton fx:id="btnLoopIcon" text="🔁 Loop mood" styleClass="btn-toggle">
-            <tooltip>
-                <Tooltip text="Repeat the current mood track"/>
-            </tooltip>
-        </ToggleButton>
-    </HBox>
 </VBox>

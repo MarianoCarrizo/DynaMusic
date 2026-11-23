@@ -65,7 +65,6 @@ public class MusicService {
     private TrackType currentTrack;
     private boolean loopEnabled;
     private boolean previewLoopEnabled;
-    private BiConsumer<Duration, Duration> previewProgressListener;
     private BiConsumer<Duration, Duration> activeProgressListener = (current, total) -> { };
     private Runnable onPlaybackChanged = () -> { };
     private MediaPlayer fadingOutPlayer;
@@ -131,7 +130,6 @@ public class MusicService {
         this.currentTrack = null;
         this.loopEnabled = false;
         this.previewLoopEnabled = false;
-        this.previewProgressListener = null;
         this.previewPlayer = null;
     }
 
@@ -574,15 +572,7 @@ public class MusicService {
                             if (player == previewPlayer) stopPreview();
                         }));
 
-                        player.currentTimeProperty().addListener((obs, oldVal, newVal) -> {
-                            if (previewProgressListener != null) {
-                                Duration total = player.getTotalDuration();
-                                if (total != null && !total.isUnknown()) {
-                                    previewProgressListener.accept(newVal, total);
-                                }
-                            }
-                            emitProgress(player);
-                        });
+                        player.currentTimeProperty().addListener((obs, oldVal, newVal) -> emitProgress(player));
 
                         previewPlayer = player;
                         observeStatus(player);
@@ -592,9 +582,6 @@ public class MusicService {
                         player.setOnReady(() -> {
                             if (player != previewPlayer) return;
                             if (audioFocus.readinessOf(ticket) == PreviewReadiness.PLAY) player.play();
-                            if (previewProgressListener != null) {
-                                previewProgressListener.accept(Duration.ZERO, player.getTotalDuration());
-                            }
                         });
 
                     } catch (Exception e) {
@@ -639,13 +626,6 @@ public class MusicService {
         if (mode != PlaybackMode.MOOD) return; // guard T-08
         if (currentTrack != null && players.containsKey(currentTrack))
             players.get(currentTrack).pause();
-    }
-
-    public void stop() {
-        if (mode != PlaybackMode.MOOD) return; // guard T-08
-        cancelActiveFade();
-        if (currentTrack != null && players.containsKey(currentTrack))
-            players.get(currentTrack).stop();
     }
 
     /**
@@ -767,10 +747,6 @@ public class MusicService {
 
     public void setPreviewLoop(boolean enabled) {
         this.previewLoopEnabled = enabled;
-    }
-
-    public void setPreviewProgressListener(BiConsumer<Duration, Duration> listener) {
-        this.previewProgressListener = listener;
     }
 
     public void seekPreview(double fraction) {

@@ -5,6 +5,7 @@ import javafx.animation.PauseTransition;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
 import javafx.scene.control.Slider;
 import javafx.scene.layout.HBox;
 import javafx.util.Duration;
@@ -19,6 +20,7 @@ public final class SeekBar extends HBox {
     private static final Duration SEEK_COOLDOWN = Duration.millis(150);
 
     @FXML private Label lblCurrentTime;
+    @FXML private ProgressBar progress;
     @FXML private Slider slider;
     @FXML private Label lblTotalTime;
 
@@ -36,6 +38,7 @@ public final class SeekBar extends HBox {
         } catch (IOException e) {
             throw new UncheckedIOException("Could not load the SeekBar layout", e);
         }
+        progress.progressProperty().bind(slider.valueProperty().divide(slider.maxProperty()));
         slider.valueProperty().addListener((obs, oldValue, newValue) -> {
             if (!showingPlayback) {
                 requestSeek();

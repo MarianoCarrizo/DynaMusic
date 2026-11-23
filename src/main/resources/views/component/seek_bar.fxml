@@ -1,12 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ProgressBar?>
 <?import javafx.scene.control.Slider?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.StackPane?>
 
 <fx:root type="javafx.scene.layout.HBox"
          xmlns:fx="http://javafx.com/fxml/1"
          spacing="8" alignment="CENTER" styleClass="progress-container">
     <Label fx:id="lblCurrentTime" text="0:00" styleClass="lbl-time"/>
-    <Slider fx:id="slider" HBox.hgrow="ALWAYS" styleClass="spotify-slider"/>
+    <StackPane HBox.hgrow="ALWAYS">
+        <ProgressBar fx:id="progress" maxWidth="Infinity" mouseTransparent="true" styleClass="seek-progress"/>
+        <Slider fx:id="slider" styleClass="spotify-slider, seek-slider"/>
+    </StackPane>
     <Label fx:id="lblTotalTime" text="0:00" styleClass="lbl-time"/>
 </fx:root>

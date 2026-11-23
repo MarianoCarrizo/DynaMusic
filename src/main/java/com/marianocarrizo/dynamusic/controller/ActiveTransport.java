@@ -22,16 +22,6 @@ final class ActiveTransport {
         }
     }
 
-    void stop() {
-        switch (musicService.activeSource()) {
-            case PREVIEW -> musicService.stopPreview();
-            case MOOD -> musicService.stop();
-            case PLAYLIST -> musicService.stopPlaylist();
-            case ON_DEMAND -> rewindOnDemand();
-            default -> { }
-        }
-    }
-
     void seek(double fraction) {
         switch (musicService.activeSource()) {
             case PREVIEW -> musicService.seekPreview(fraction);
@@ -61,10 +51,5 @@ final class ActiveTransport {
     private void toggleOnDemand() {
         if (musicService.isOnDemandPlaying()) musicService.onDemandPause();
         else musicService.onDemandPlay();
-    }
-
-    private void rewindOnDemand() {
-        musicService.onDemandPause();
-        musicService.seekOnDemand(0);
     }
 }

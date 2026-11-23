@@ -34,9 +34,8 @@ import java.util.List;
 import java.util.Optional;
 
 public class PlayerController implements SceneHost, UpdateBarController.Host, SceneBarController.Host,
-        AmbianceToolbarController.Host, VolumeController.Host, LiveAuraController.Host, MoodPanelController.Host,
-        LibraryPanelController.Host, PreviewPanelController.Host, OnDemandPanelController.Host,
-        PlaylistPanelController.Host, PlaylistTransportController.Host, YouTubeBarController.Host,
+        AmbianceToolbarController.Host, LiveAuraController.Host, MoodPanelController.Host,
+        LibraryPanelController.Host, PlaylistPanelController.Host, YouTubeBarController.Host,
         NowPlayingBarController.Host {
 
     private static final String CAFECITO_URL = "https://cafecito.app/duhonha";
@@ -52,13 +51,10 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
     @FXML private UpdateBarController updateBarController;
     @FXML private SceneBarController sceneBarController;
     @FXML private AmbianceToolbarController ambianceToolbarController;
-    @FXML private VolumeController volumeController;
 
     @FXML private MoodPanelController moodPanelController;
     @FXML private LiveAuraController liveAuraController;
 
-    @FXML private PreviewPanelController previewPanelController;
-    @FXML private OnDemandPanelController onDemandPanelController;
     @FXML private NowPlayingBarController nowPlayingBarController;
 
     // T-10: TabPane de modos
@@ -67,7 +63,6 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
     @FXML private Tab playlistsTab;
 
     @FXML private PlaylistPanelController playlistPanelController;
-    @FXML private PlaylistTransportController playlistTransportController;
 
     @FXML private LibraryPanelController libraryPanelController;
     @FXML private YouTubeBarController youTubeBarController;
@@ -92,8 +87,12 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
     private final NowPlayingModel nowPlaying = new NowPlayingModel();
     private final NowPlayingTracker nowPlayingTracker = new NowPlayingTracker(
             musicService::playbackState, playlistManager::getActivePlaylistName, nowPlaying);
-    private final ActiveTransport transport = new ActiveTransport(
-            musicService, () -> playlistTransportController.startCurrent());
+    private final PlaylistPlayback playlistPlayback = new PlaylistPlayback(
+            musicService, playlistManager, this::enterMode, this::refreshPlaylistView);
+    private final ActiveTransport transport = new ActiveTransport(musicService, playlistPlayback::startCurrent);
+    private final RepeatSettings repeatSettings = new RepeatSettings(
+            musicService::setLoop, playlistManager::setLoop, musicService::setOnDemandLoop,
+            musicService::setPreviewLoop);
 
     @FXML
     public void initialize() {
@@ -104,14 +103,10 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
         updateBarController.attach(this);
         sceneBarController.attach(this);
         ambianceToolbarController.attach(this);
-        volumeController.attach(this);
         liveAuraController.attach(this);
         moodPanelController.attach(this);
         libraryPanelController.attach(this);
-        previewPanelController.attach(this);
-        onDemandPanelController.attach(this);
         playlistPanelController.attach(this);
-        playlistTransportController.attach(this);
         nowPlayingBarController.attach(this);
         nowPlayingTracker.sync();
         liveAuraController.refresh();
@@ -155,7 +150,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
     }
 
     public void toggleLastUsedPlayer() {
-        if (shouldStartPlaylist() && playlistTransportController.startCurrent()) return;
+        if (shouldStartPlaylist() && playlistPlayback.startCurrent()) return;
         transport.togglePlayPause();
     }
 
@@ -171,20 +166,34 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
     }
 
     @Override
-    public void stopPlayback() {
-        boolean wasPreview = musicService.previewSoundedLast();
-        transport.stop();
-        if (wasPreview) previewPanelController.hide();
-    }
-
-    @Override
     public void playPrevious() {
-        playlistTransportController.previous();
+        playlistPlayback.previous();
     }
 
     @Override
     public void playNext() {
-        playlistTransportController.next();
+        playlistPlayback.next();
+    }
+
+    @Override
+    public boolean isShuffleOn() {
+        return playlistManager.isShuffle();
+    }
+
+    @Override
+    public void setShuffle(boolean on) {
+        playlistManager.setShuffle(on);
+        refreshPlaylistView();
+    }
+
+    @Override
+    public boolean isRepeatOn(NowPlayingSource source) {
+        return repeatSettings.isOn(source);
+    }
+
+    @Override
+    public void setRepeat(NowPlayingSource source, boolean on) {
+        repeatSettings.set(source, on);
     }
 
     @Override
@@ -204,7 +213,6 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
         ambiance.activateSlot(AuraSlot.of(type));
         liveAuraController.refresh();
         moodPanelController.refreshButtonStates();
-        previewPanelController.hide();
     }
 
     private boolean usesOnDemandAura() {
@@ -217,15 +225,12 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
         return usesOnDemandAura() ? AuraSlot.ON_DEMAND : AuraSlot.of(moodPanelController.activeMood());
     }
 
-    @Override
-    public void enterMode(MusicService.PlaybackMode target) {
+    private void enterMode(MusicService.PlaybackMode target) {
         musicService.setPlaybackMode(target);
         syncSourceUi();
     }
 
     private void syncSourceUi() {
-        MusicService.PlaybackMode mode = musicService.getPlaybackMode();
-        if (mode != MusicService.PlaybackMode.ON_DEMAND) onDemandPanelController.show(false);
         ambiance.activateSlot(liveSlot());
         liveAuraController.refresh();
     }
@@ -235,20 +240,14 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
         if (file == null || !file.isFile()) return;
         String label = DisplayNames.trackLabel(file, title);
         musicService.playOnDemand(file, label, () -> {
-            onDemandPanelController.show(true);
             ambiance.activateSlot(AuraSlot.ON_DEMAND);
             liveAuraController.refresh();
         });
     }
 
     @Override
-    public void closeOnDemand() {
-        enterMode(MusicService.PlaybackMode.MOOD);
-    }
-
-    @Override
     public void startPreview(File file) {
-        previewPanelController.start(file);
+        musicService.previewTrack(file);
     }
 
     private void updateWindowMood(TrackType type) {
@@ -381,7 +380,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
 
     @Override
     public void playPlaylistTrack(File file) {
-        playlistTransportController.play(file);
+        playlistPlayback.play(file);
     }
 
     @Override
@@ -483,7 +482,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
         }
 
         Platform.runLater(() -> {
-            volumeController.restore(cfg.getMasterVolume());
+            nowPlayingBarController.restoreVolume(cfg.getMasterVolume());
             sceneBarController.refresh();
             applyScene(sessionConfig.getActiveScene());
         });

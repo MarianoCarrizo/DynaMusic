@@ -391,12 +391,6 @@
     -fx-font-style: italic;
 }
 
-/* Panel de preescucha: borde superior para separación visual */
-.preview-panel {
-    -fx-border-color: #2a2a35 transparent transparent transparent;
-    -fx-border-width: 1px;
-}
-
 /* Barra de progreso */
 .progress-container { -fx-padding: 2px 0 0 0; }
 .spotify-slider { -fx-cursor: hand; }
@@ -621,26 +615,6 @@
     -fx-border-width: 0 0 2px 0;
 }
 
-.btn-transport {
-    -fx-background-color: #2a2a32;
-    -fx-text-fill: #e0e0e0;
-    -fx-font-size: 16px;
-    -fx-background-radius: 0px;
-    -fx-min-width: 40px;
-    -fx-min-height: 40px;
-    -fx-cursor: hand;
-    -fx-padding: 0;
-    -fx-alignment: CENTER;
-}
-.btn-transport:hover {
-    -fx-background-color: #3e3e4a;
-    -fx-text-fill: #ffffff;
-}
-.btn-transport:disabled {
-    -fx-opacity: 0.35;
-    -fx-cursor: default;
-}
-
 .btn-toggle {
     -fx-background-color: #2a2a32;
     -fx-text-fill: #b0b0b8;
@@ -672,22 +646,79 @@
     -fx-border-color: #2d2d35 transparent transparent transparent;
     -fx-border-width: 1px 0 0 0;
 }
-.now-playing-badge {
-    -fx-text-fill: #1db954;
-    -fx-font-size: 11px;
-    -fx-font-weight: bold;
-    -fx-letter-spacing: 1px;
-}
 .now-playing-title {
     -fx-text-fill: #ffffff;
-    -fx-font-size: 15px;
+    -fx-font-size: 14px;
     -fx-font-weight: bold;
 }
 .now-playing-detail {
-    -fx-text-fill: #808085;
+    -fx-text-fill: #b3b3b3;
     -fx-font-size: 12px;
 }
-
-.mode-strip {
-    -fx-padding: 6px 12px;
+.now-playing-source {
+    -fx-text-fill: #6a6a72;
+    -fx-font-size: 11px;
 }
+
+.icon {
+    -fx-fill: #b3b3b3;
+}
+.btn-icon, .btn-icon-toggle {
+    -fx-background-color: transparent;
+    -fx-background-radius: 0px;
+    -fx-border-width: 0;
+    -fx-padding: 6px;
+    -fx-cursor: hand;
+}
+.btn-icon:hover .icon, .btn-icon-toggle:hover .icon {
+    -fx-fill: #ffffff;
+}
+.btn-icon:disabled, .btn-icon-toggle:disabled {
+    -fx-opacity: 0.3;
+    -fx-cursor: default;
+}
+.btn-icon-toggle:selected .icon {
+    -fx-fill: #1db954;
+}
+.btn-icon-toggle:selected:hover .icon {
+    -fx-fill: #3ad06c;
+}
+.icon-dot {
+    -fx-fill: #1db954;
+}
+.btn-spotify-circle .icon {
+    -fx-fill: #121214;
+}
+
+.seek-progress {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+.seek-progress .track {
+    -fx-background-color: #4d4d55;
+    -fx-background-radius: 2px;
+    -fx-background-insets: 0;
+    -fx-pref-height: 4px;
+    -fx-min-height: 4px;
+    -fx-max-height: 4px;
+}
+.seek-progress .bar {
+    -fx-background-color: #1db954;
+    -fx-background-radius: 2px;
+    -fx-background-insets: 0;
+    -fx-padding: 2px;
+}
+.seek-slider .track {
+    -fx-background-color: transparent !important;
+}
+.seek-slider .thumb {
+    -fx-background-color: #ffffff !important;
+    -fx-background-radius: 6px !important;
+    -fx-pref-width: 12px;
+    -fx-pref-height: 12px;
+    -fx-opacity: 0;
+}
+.seek-slider:hover .thumb {
+    -fx-opacity: 1;
+}
+
