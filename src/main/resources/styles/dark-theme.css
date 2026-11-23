@@ -12,6 +12,9 @@
 
 /* El contenedor interno real */
 .main-container {
+    -mood-accent: #2ecc71;
+    -mood-accent-hover: derive(-mood-accent, 25%);
+    -mood-accent-text: #0b0b0e;
     -fx-background-color: #1e1e24;
     -fx-font-family: "Segoe UI", Helvetica, Arial, sans-serif;
 
@@ -70,7 +73,7 @@
     -fx-font-size: 11px;
 }
 .playlist-row-marker {
-    -fx-text-fill: #1db954;
+    -fx-text-fill: -mood-accent;
     -fx-font-size: 12px;
 }
 .list-cell:filled:selected .playlist-row-title {
@@ -78,7 +81,7 @@
 }
 .list-cell-now-playing .playlist-row-title,
 .list-cell-now-playing:filled:selected .playlist-row-title {
-    -fx-text-fill: #1db954;
+    -fx-text-fill: -mood-accent;
     -fx-font-weight: bold;
 }
 .playlist-counter {
@@ -395,7 +398,7 @@
 .progress-container { -fx-padding: 2px 0 0 0; }
 .spotify-slider { -fx-cursor: hand; }
 .spotify-slider .track { -fx-background-color: #2c2c30; -fx-background-radius: 0px; -fx-pref-height: 4px; }
-.spotify-slider .range-bar { -fx-background-radius: 0px; -fx-background-color: #1db954; }
+.spotify-slider .range-bar { -fx-background-radius: 0px; -fx-background-color: -mood-accent; }
 /* Thumb siempre visible: indica el valor/posición actual en todos los sliders */
 .spotify-slider .thumb {
     -fx-background-color: #ffffff;
@@ -411,7 +414,7 @@
    ========================================================================= */
 
 /* --- 1. PAUSED (Gris / Platino) --- */
-#window-paused.main-container { -fx-background-color: #151517; -fx-background-radius: 0px !important; -fx-border-radius: 0px !important; }
+#window-paused.main-container { -mood-accent: #95a5a6; -fx-background-color: #151517; -fx-background-radius: 0px !important; -fx-border-radius: 0px !important; }
 #window-paused .window-header { -fx-background-color: #222226; }
 #window-paused .window-title { -fx-text-fill: #95a5a6; }
 #window-paused .slider .track { -fx-background-color: #3e3e40; }
@@ -420,7 +423,7 @@
 #window-paused .text-field:focused { -fx-border-color: #7f8c8d; }
 
 /* --- 2. RAGED (Rojo Combate) --- */
-#window-raged.main-container { -fx-background-color: #160e0e; -fx-background-radius: 0px !important; -fx-border-radius: 0px !important; }
+#window-raged.main-container { -mood-accent: #e74c3c; -fx-background-color: #160e0e; -fx-background-radius: 0px !important; -fx-border-radius: 0px !important; }
 #window-raged .window-header { -fx-background-color: #2c1616; }
 #window-raged .window-title { -fx-text-fill: #e74c3c; }
 #window-raged .slider .track { -fx-background-color: #451b1b; }
@@ -429,7 +432,7 @@
 #window-raged .text-field:focused { -fx-border-color: #e74c3c; }
 
 /* --- 3. NORMAL (Verde Exploración) --- */
-#window-normal.main-container { -fx-background-color: #0e1410; -fx-background-radius: 0px !important; -fx-border-radius: 0px !important; }
+#window-normal.main-container { -mood-accent: #2ecc71; -fx-background-color: #0e1410; -fx-background-radius: 0px !important; -fx-border-radius: 0px !important; }
 #window-normal .window-header { -fx-background-color: #16241b; }
 #window-normal .window-title { -fx-text-fill: #2ecc71; }
 #window-normal .slider .track { -fx-background-color: #14331d; }
@@ -438,7 +441,7 @@
 #window-normal .text-field:focused { -fx-border-color: #2ecc71; }
 
 /* --- 4. ADVANTAGE (Azul) --- */
-#window-advantage.main-container { -fx-background-color: #0f1318; -fx-background-radius: 0px !important; -fx-border-radius: 0px !important; }
+#window-advantage.main-container { -mood-accent: #3498db; -fx-background-color: #0f1318; -fx-background-radius: 0px !important; -fx-border-radius: 0px !important; }
 #window-advantage .window-header { -fx-background-color: #16222f; }
 #window-advantage .window-title { -fx-text-fill: #3498db; }
 #window-advantage .slider .track { -fx-background-color: #112233; }
@@ -607,11 +610,11 @@
 }
 
 .list-cell:drop-above {
-    -fx-border-color: #1db954 transparent transparent transparent;
+    -fx-border-color: -mood-accent transparent transparent transparent;
     -fx-border-width: 2px 0 0 0;
 }
 .list-cell:drop-below {
-    -fx-border-color: transparent transparent #1db954 transparent;
+    -fx-border-color: transparent transparent -mood-accent transparent;
     -fx-border-width: 0 0 2px 0;
 }
 
@@ -631,14 +634,14 @@
     -fx-text-fill: #ffffff;
 }
 .btn-toggle:selected {
-    -fx-background-color: #1db954;
-    -fx-border-color: #1db954;
-    -fx-text-fill: #08140d;
+    -fx-background-color: -mood-accent;
+    -fx-border-color: -mood-accent;
+    -fx-text-fill: -mood-accent-text;
     -fx-font-weight: bold;
 }
 .btn-toggle:selected:hover {
-    -fx-background-color: #3ad06c;
-    -fx-border-color: #3ad06c;
+    -fx-background-color: -mood-accent-hover;
+    -fx-border-color: -mood-accent-hover;
 }
 
 .now-playing-bar {
@@ -678,13 +681,13 @@
     -fx-cursor: default;
 }
 .btn-icon-toggle:selected .icon {
-    -fx-fill: #1db954;
+    -fx-fill: -mood-accent;
 }
 .btn-icon-toggle:selected:hover .icon {
-    -fx-fill: #3ad06c;
+    -fx-fill: -mood-accent-hover;
 }
 .icon-dot {
-    -fx-fill: #1db954;
+    -fx-fill: -mood-accent;
 }
 .btn-spotify-circle .icon {
     -fx-fill: #121214;
@@ -703,7 +706,7 @@
     -fx-max-height: 4px;
 }
 .seek-progress .bar {
-    -fx-background-color: #1db954;
+    -fx-background-color: -mood-accent;
     -fx-background-radius: 2px;
     -fx-background-insets: 0;
     -fx-padding: 2px;
