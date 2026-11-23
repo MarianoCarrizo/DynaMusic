@@ -20,8 +20,10 @@ import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import javafx.stage.Window;
@@ -43,6 +45,9 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
     // Layout
     @FXML private VBox mainRoot;
     @FXML private Button btnMaximize;
+    @FXML private SplitPane mainSplit;
+    @FXML private VBox leftPanel;
+    @FXML private ToggleButton btnToggleLibrary;
 
     @FXML private UpdateBarController updateBarController;
     @FXML private SceneBarController sceneBarController;
@@ -73,6 +78,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
     private final AmbianceCoordinator ambiance = new AmbianceCoordinator(
             sessionConfig, () -> manager.save(sessionConfig), this::liveSlot, this::refreshSceneEditorBackground);
     private SceneEditorController sceneEditor;
+    private LibraryVisibility libraryVisibility;
 
     private boolean applyingSession = false;
 
@@ -91,6 +97,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
 
     @FXML
     public void initialize() {
+        libraryVisibility = new LibraryVisibility(mainSplit, leftPanel, btnToggleLibrary);
         musicService.setOnPlaybackChanged(nowPlayingTracker::sync);
         youTubeBarController.attach(this);
         updateBarController.attach(this);
@@ -255,6 +262,13 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
 
     public void setHostServices(HostServices hostServices) {
         this.hostServices = hostServices;
+    }
+
+    @FXML
+    private void onToggleLibrary() {
+        libraryVisibility.set(btnToggleLibrary.isSelected());
+        sessionConfig.setLibraryCollapsed(!libraryVisibility.isVisible());
+        manager.save(sessionConfig);
     }
 
     @FXML
@@ -439,6 +453,8 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
         Platform.runLater(() -> ambianceToolbarController.restoreScreen(screenIdx));
 
         libraryPanelController.restoreFolder(cfg.getLastFolderPath());
+        sessionConfig.setLibraryCollapsed(cfg.isLibraryCollapsed());
+        libraryVisibility.set(!cfg.isLibraryCollapsed());
 
         playlistManager.setPlaylists(cfg.getPlaylists());
         sessionConfig.setPlaylists(cfg.getPlaylists());

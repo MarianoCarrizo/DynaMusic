@@ -54,6 +54,8 @@ public class SessionConfig {
     // Nombre de la playlist activa al cerrar la sesión; null si ninguna
     private String activePlaylistName;
 
+    private boolean libraryCollapsed;
+
     // Sensibilidad por mood: TrackType.name() -> Double; null en sesiones antiguas (defecto 2.0)
     private Map<String, Double> moodSensitivities;
 
@@ -276,6 +278,9 @@ public class SessionConfig {
     }
 
     // --- Active playlist name ---
+
+    public boolean isLibraryCollapsed() { return libraryCollapsed; }
+    public void setLibraryCollapsed(boolean collapsed) { this.libraryCollapsed = collapsed; }
 
     public String getActivePlaylistName() { return activePlaylistName; }
     public void setActivePlaylistName(String name) { this.activePlaylistName = name; }

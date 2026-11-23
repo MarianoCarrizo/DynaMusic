@@ -35,6 +35,8 @@
                 <Insets top="8" right="12" bottom="8" left="12"/>
             </padding>
             <fx:include fx:id="sceneBar" source="scene_bar.fxml"/>
+            <ToggleButton fx:id="btnToggleLibrary" text="Library" onAction="#onToggleLibrary" selected="true"
+                          styleClass="btn-toggle"/>
             <Region HBox.hgrow="ALWAYS"/>
             <Hyperlink text="☕ Support the project" onAction="#onOpenCafecito" styleClass="link-support"/>
             <fx:include fx:id="ambianceToolbar" source="ambiance_toolbar.fxml"/>
