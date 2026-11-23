@@ -638,6 +638,12 @@
     -fx-text-fill: #b3b3b3;
     -fx-font-size: 12px;
 }
+.now-playing-failed {
+    -fx-text-fill: #e07070;
+}
+.now-playing-loading {
+    -fx-progress-color: #b3b3b3;
+}
 .now-playing-source {
     -fx-text-fill: #6a6a72;
     -fx-font-size: 11px;

@@ -23,7 +23,12 @@
     <HBox fx:id="trackInfo" spacing="12" alignment="CENTER_LEFT" GridPane.columnIndex="0">
         <CoverView fx:id="cover"/>
         <VBox spacing="2" alignment="CENTER_LEFT" HBox.hgrow="ALWAYS" minWidth="0">
-            <Label fx:id="lblTitle" maxWidth="Infinity" styleClass="now-playing-title"/>
+            <HBox spacing="6" alignment="CENTER_LEFT">
+                <Label fx:id="lblTitle" maxWidth="Infinity" styleClass="now-playing-title" HBox.hgrow="ALWAYS"/>
+                <ProgressIndicator fx:id="loadingIndicator" styleClass="now-playing-loading" prefWidth="14"
+                                   prefHeight="14" minWidth="14" minHeight="14" maxWidth="14" maxHeight="14"
+                                   visible="false" managed="false"/>
+            </HBox>
             <Label fx:id="lblDetail" maxWidth="Infinity" styleClass="now-playing-detail"/>
             <Label fx:id="lblSource" maxWidth="Infinity" styleClass="now-playing-source"/>
         </VBox>

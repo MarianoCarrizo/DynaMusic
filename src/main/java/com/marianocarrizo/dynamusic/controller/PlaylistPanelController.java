@@ -293,7 +293,7 @@ public final class PlaylistPanelController {
                 NowPlaying current = host.nowPlaying().get();
                 boolean currentRow = current.source() == NowPlayingSource.PLAYLIST
                         && index == playlistManager.currentDisplayIndex();
-                return RowPlayback.of(currentRow, current.playing());
+                return RowPlayback.of(currentRow, current.playing(), current.isLoading());
             }
             @Override public File trackAt(int index) {
                 List<PlaylistItem> items = playlistManager.getActiveItems();
