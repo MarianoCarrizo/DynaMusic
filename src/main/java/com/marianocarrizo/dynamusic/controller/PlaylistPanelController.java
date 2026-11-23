@@ -59,6 +59,8 @@ public final class PlaylistPanelController {
     private Host host;
     private PlaylistManager playlistManager;
     private boolean refreshing = false;
+    private final DragActivity dragActivity = new DragActivity();
+    private File followedTrack;
 
     void attach(Host host) {
         this.host = host;
@@ -72,6 +74,8 @@ public final class PlaylistPanelController {
             refresh();
         });
         host.nowPlaying().snapshotProperty().addListener((obs, oldValue, newValue) -> refreshPlayingState());
+        lstPlaylistTracks.setOnDragEntered(e -> dragActivity.begin());
+        lstPlaylistTracks.setOnDragExited(e -> dragActivity.end());
         lstPlaylistTracks.setCellFactory(lv -> new PlaylistTrackCell(trackHost));
         PlaylistTrackCell.acceptFileDropsOnList(lstPlaylistTracks, trackHost);
         lstPlaylistTracks.setOnKeyPressed(e -> {
@@ -105,6 +109,23 @@ public final class PlaylistPanelController {
     private void refreshPlayingState() {
         lstPlaylistTracks.refresh();
         lblTrackCounter.setText(playlistManager.positionLabel());
+        File previous = followedTrack;
+        File playing = playingPlaylistTrack();
+        followedTrack = playing;
+        Platform.runLater(() -> followPlayingRow(previous, playing));
+    }
+
+    private File playingPlaylistTrack() {
+        NowPlaying current = host.nowPlaying().get();
+        return current.source() == NowPlayingSource.PLAYLIST ? current.file() : null;
+    }
+
+    private void followPlayingRow(File previous, File playing) {
+        if (dragActivity.isActive()) return;
+        int index = playlistManager.currentDisplayIndex();
+        RowRange visible = VisibleRows.of(lstPlaylistTracks);
+        if (!PlayingRowScroll.shouldScroll(previous, playing, index, visible)) return;
+        lstPlaylistTracks.scrollTo(PlayingRowScroll.topIndexFor(index, visible));
     }
 
     void addItem(String playlistName, PlaylistItem item) {
@@ -250,6 +271,12 @@ public final class PlaylistPanelController {
             }
             @Override public void removeRequested(int index) {
                 removeTrackAt(index);
+            }
+            @Override public void rowDragStarted() {
+                dragActivity.begin();
+            }
+            @Override public void rowDragFinished() {
+                dragActivity.end();
             }
         };
     }

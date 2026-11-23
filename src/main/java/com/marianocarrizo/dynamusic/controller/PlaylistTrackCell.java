@@ -26,6 +26,8 @@ final class PlaylistTrackCell extends ListCell<PlaylistRow> {
         void filesDropped(List<File> files, int slot);
         void trackMoved(int from, int slot);
         void removeRequested(int index);
+        void rowDragStarted();
+        void rowDragFinished();
     }
 
     private static final DataFormat TRACK_ROW = new DataFormat("application/x-dynamusic-playlist-row");
@@ -51,6 +53,7 @@ final class PlaylistTrackCell extends ListCell<PlaylistRow> {
         setOnDragDetected(this::startRowDrag);
         setOnDragOver(this::acceptDrag);
         setOnDragExited(e -> showIndicator(false, false));
+        setOnDragDone(e -> host.rowDragFinished());
         setOnDragDropped(this::handleDrop);
     }
 
@@ -100,6 +103,7 @@ final class PlaylistTrackCell extends ListCell<PlaylistRow> {
 
     private void startRowDrag(MouseEvent event) {
         if (isEmpty()) return;
+        host.rowDragStarted();
         Dragboard board = startDragAndDrop(TransferMode.MOVE);
         ClipboardContent content = new ClipboardContent();
         content.put(TRACK_ROW, getIndex());

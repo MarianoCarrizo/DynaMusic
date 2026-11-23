@@ -6,6 +6,7 @@ import com.marianocarrizo.dynamusic.config.SessionConfigManager;
 import com.marianocarrizo.dynamusic.model.AuraSlot;
 import com.marianocarrizo.dynamusic.model.NowPlayingModel;
 import com.marianocarrizo.dynamusic.model.NowPlayingSource;
+import com.marianocarrizo.dynamusic.model.RepeatMode;
 import com.marianocarrizo.dynamusic.model.Playlist;
 import com.marianocarrizo.dynamusic.model.PlaylistItem;
 import com.marianocarrizo.dynamusic.model.Scene;
@@ -91,8 +92,9 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
             musicService, playlistManager, this::enterMode, this::refreshPlaylistView);
     private final ActiveTransport transport = new ActiveTransport(musicService, playlistPlayback::startCurrent);
     private final RepeatSettings repeatSettings = new RepeatSettings(
-            musicService::setLoop, playlistManager::setLoop, musicService::setOnDemandLoop,
-            musicService::setPreviewLoop);
+            mode -> musicService.setLoop(mode.repeatsTrack()), playlistManager::setRepeat,
+            mode -> musicService.setOnDemandLoop(mode.repeatsTrack()),
+            mode -> musicService.setPreviewLoop(mode.repeatsTrack()));
 
     @FXML
     public void initialize() {
@@ -187,13 +189,28 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
     }
 
     @Override
-    public boolean isRepeatOn(NowPlayingSource source) {
-        return repeatSettings.isOn(source);
+    public RepeatMode repeatMode(NowPlayingSource source) {
+        return repeatSettings.modeOf(source);
     }
 
     @Override
-    public void setRepeat(NowPlayingSource source, boolean on) {
-        repeatSettings.set(source, on);
+    public RepeatMode cycleRepeat(NowPlayingSource source) {
+        RepeatMode mode = repeatSettings.cycle(source);
+        sessionConfig.setRepeatMode(source, mode);
+        manager.save(sessionConfig);
+        return mode;
+    }
+
+    public boolean moodKeysEnabled() {
+        return MoodShortcuts.enabled(modeTabPane.getSelectionModel().getSelectedItem(), moodsTab);
+    }
+
+    private void restoreRepeatModes(SessionConfig saved) {
+        for (NowPlayingSource source : NowPlayingSource.values()) {
+            if (!source.isRepeatable()) continue;
+            repeatSettings.set(source, saved.getRepeatMode(source));
+            sessionConfig.setRepeatMode(source, repeatSettings.modeOf(source));
+        }
     }
 
     @Override
@@ -465,6 +482,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
         libraryVisibility.setDividerPosition(cfg.getLibraryDividerPosition());
         libraryVisibility.set(!cfg.isLibraryCollapsed());
 
+        restoreRepeatModes(cfg);
         playlistManager.setPlaylists(cfg.getPlaylists());
         sessionConfig.setPlaylists(cfg.getPlaylists());
         sessionConfig.setActiveMode(cfg.getActiveMode());

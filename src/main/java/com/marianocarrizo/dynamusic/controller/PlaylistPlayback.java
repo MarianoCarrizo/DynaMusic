@@ -46,7 +46,7 @@ final class PlaylistPlayback {
     }
 
     private void advanceAfterEnd() {
-        playlistManager.next().ifPresentOrElse(musicService::playPlaylistTrack, musicService::stopPlaylist);
+        playlistManager.nextAfterEnd().ifPresentOrElse(musicService::playPlaylistTrack, musicService::stopPlaylist);
         refreshView.run();
     }
 }

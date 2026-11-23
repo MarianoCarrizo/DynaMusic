@@ -9,6 +9,7 @@ import com.marianocarrizo.dynamusic.component.SeekBar;
 import com.marianocarrizo.dynamusic.model.NowPlaying;
 import com.marianocarrizo.dynamusic.model.NowPlayingModel;
 import com.marianocarrizo.dynamusic.model.NowPlayingSource;
+import com.marianocarrizo.dynamusic.model.RepeatMode;
 import com.marianocarrizo.dynamusic.service.CoverArtLoader;
 import javafx.fxml.FXML;
 import javafx.scene.control.Label;
@@ -37,9 +38,9 @@ public final class NowPlayingBarController {
 
         void setShuffle(boolean on);
 
-        boolean isRepeatOn(NowPlayingSource source);
+        RepeatMode repeatMode(NowPlayingSource source);
 
-        void setRepeat(NowPlayingSource source, boolean on);
+        RepeatMode cycleRepeat(NowPlayingSource source);
     }
 
     @FXML private CoverView cover;
@@ -71,8 +72,7 @@ public final class NowPlayingBarController {
         btnPrevious.setHint("Previous track");
         btnNext.setIcon(Icons.NEXT);
         btnNext.setHint("Next track");
-        btnRepeat.setIcon(Icons.REPEAT);
-        btnRepeat.setHint("Repeat");
+        showRepeat(RepeatMode.OFF);
     }
 
     void attach(Host host) {
@@ -110,7 +110,13 @@ public final class NowPlayingBarController {
 
     @FXML
     private void onRepeat() {
-        host.setRepeat(host.nowPlaying().get().source(), btnRepeat.isSelected());
+        showRepeat(host.cycleRepeat(host.nowPlaying().get().source()));
+    }
+
+    private void showRepeat(RepeatMode mode) {
+        btnRepeat.setIcon(mode == RepeatMode.ONE ? Icons.REPEAT_ONE : Icons.REPEAT);
+        btnRepeat.setHint(mode.hint());
+        btnRepeat.setSelected(mode.isActive());
     }
 
     private void render(NowPlaying current) {
@@ -124,7 +130,7 @@ public final class NowPlayingBarController {
         btnNext.setDisable(!available.next());
         btnRepeat.setDisable(!available.repeat());
         btnShuffle.setSelected(available.shuffle() && host.isShuffleOn());
-        btnRepeat.setSelected(available.repeat() && host.isRepeatOn(current.source()));
+        showRepeat(available.repeat() ? host.repeatMode(current.source()) : RepeatMode.OFF);
         boolean idle = current.source() == NowPlayingSource.NONE;
         seekBar.setSeekEnabled(!idle);
         showProgress(current, idle);

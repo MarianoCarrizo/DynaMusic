@@ -118,6 +118,7 @@ public class MusicServiceStarter extends Application {
         scene.setOnKeyPressed(e -> {
             if (heldKeys.contains(e.getCode())) return; // ignorar repetición
             heldKeys.add(e.getCode());
+            if (!controller.moodKeysEnabled()) return;
             switch (e.getCode()) {
                 case DIGIT1 -> controller.switchTrack(TrackType.PAUSED);
                 case DIGIT2 -> controller.switchTrack(TrackType.NORMAL);
