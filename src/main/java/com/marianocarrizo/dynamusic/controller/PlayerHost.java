@@ -45,6 +45,8 @@ public interface PlayerHost {
 
     void startPreview(File file);
 
+    void closeOnDemand();
+
     PlaylistManager playlistManager();
 
     Optional<String> promptNewPlaylistName();

@@ -50,36 +50,9 @@
                 </padding>
                 <fx:include fx:id="libraryPanel" source="library_panel.fxml"/>
 
-                <VBox fx:id="previewPanel" spacing="6" alignment="CENTER"
-                      styleClass="playback-panel, preview-panel, preview-strip"
-                      visible="false" managed="false">
-                    <Label text="PREVIEW" styleClass="lbl-panel-title"/>
-                    <Label fx:id="lblPreviewTrack" text="No active preview" styleClass="lbl-preview-track"
-                           maxWidth="Infinity"/>
-                    <HBox spacing="20" alignment="CENTER">
-                        <ToggleButton fx:id="btnPreviewLoop" text="🔁" onAction="#onTogglePreviewLoop" styleClass="btn-spotify-flat, btn-loop"/>
-                        <Button text="■" onAction="#onPreviewStop" styleClass="btn-spotify-flat, btn-stop"/>
-                        <Button fx:id="btnPreviewPlayPause" text="▶" onAction="#onTogglePreviewPlayPause" styleClass="btn-spotify-circle"/>
-                    </HBox>
-                    <SeekBar fx:id="previewSeekBar"/>
-                </VBox>
+                <fx:include fx:id="previewPanel" source="preview_panel.fxml"/>
 
-                <VBox fx:id="onDemandPanel" spacing="6" alignment="CENTER"
-                      styleClass="playback-panel, preview-panel, preview-strip"
-                      visible="false" managed="false">
-                    <HBox spacing="8" alignment="CENTER_LEFT">
-                        <Label text="PLAYING NOW" styleClass="lbl-panel-title"/>
-                        <Region HBox.hgrow="ALWAYS"/>
-                        <Button text="✕" onAction="#onOnDemandClose" styleClass="btn-spotify-flat"/>
-                    </HBox>
-                    <Label fx:id="lblOnDemandTrack" text="" styleClass="lbl-preview-track" maxWidth="Infinity"/>
-                    <HBox spacing="20" alignment="CENTER">
-                        <ToggleButton fx:id="btnOnDemandLoop" text="🔁" onAction="#onToggleOnDemandLoop" styleClass="btn-spotify-flat, btn-loop"/>
-                        <Button text="■" onAction="#onOnDemandStop" styleClass="btn-spotify-flat, btn-stop"/>
-                        <Button fx:id="btnOnDemandPlayPause" text="▶" onAction="#onToggleOnDemandPlayPause" styleClass="btn-spotify-circle"/>
-                    </HBox>
-                    <SeekBar fx:id="onDemandSeekBar"/>
-                </VBox>
+                <fx:include fx:id="onDemandPanel" source="on_demand_panel.fxml"/>
 
                 <fx:include fx:id="youTubeBar" source="youtube_bar.fxml"/>
             </VBox>

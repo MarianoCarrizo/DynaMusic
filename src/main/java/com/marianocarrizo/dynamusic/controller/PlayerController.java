@@ -63,17 +63,8 @@ public class PlayerController implements SceneHost, PlayerHost {
     @FXML private MoodPanelController moodPanelController;
     @FXML private LiveAuraController liveAuraController;
 
-    @FXML private VBox previewPanel;
-    @FXML private ToggleButton btnPreviewLoop;
-    @FXML private Button btnPreviewPlayPause;
-    @FXML private SeekBar previewSeekBar;
-    @FXML private Label lblPreviewTrack;
-
-    @FXML private VBox onDemandPanel;
-    @FXML private Label lblOnDemandTrack;
-    @FXML private ToggleButton btnOnDemandLoop;
-    @FXML private Button btnOnDemandPlayPause;
-    @FXML private SeekBar onDemandSeekBar;
+    @FXML private PreviewPanelController previewPanelController;
+    @FXML private OnDemandPanelController onDemandPanelController;
 
     // T-10: TabPane de modos
     @FXML private TabPane modeTabPane;
@@ -133,42 +124,19 @@ public class PlayerController implements SceneHost, PlayerHost {
         liveAuraController.attach(this);
         moodPanelController.attach(this);
         libraryPanelController.attach(this);
+        previewPanelController.attach(this);
+        onDemandPanelController.attach(this);
         liveAuraController.refresh();
 
         saveDebounce.setOnFinished(e -> manager.save(sessionConfig));
 
-        // Listener del reproductor de preescucha
-        musicService.setPreviewProgressListener((current, total) ->
-            Platform.runLater(() -> {
-                previewSeekBar.showPlayback(current, total);
-                updatePreviewPlayPauseButton();
-            }));
-
-        musicService.setOnDemandProgressListener((current, total) ->
-            Platform.runLater(() -> {
-                onDemandSeekBar.showPlayback(current, total);
-                updateOnDemandPlayPauseButton();
-            }));
-        musicService.setOnDemandStateListener(() -> {
-            if (!musicService.isOnDemandPlaying()) {
-                onDemandSeekBar.rewindToStart();
-            }
-            updateOnDemandPlayPauseButton();
-        });
-        showOnDemandPanel(false);
-
-        previewSeekBar.setOnSeekToFraction(musicService::seekPreview);
-
-        musicService.setOnPreviewPausedByMode(() -> setPreviewButtonIcon("▶"));
         musicService.setOnModePausedByPreview(() -> {
             moodPanelController.showPlaying(false);
-            if (btnOnDemandPlayPause != null) btnOnDemandPlayPause.setText("▶");
+            onDemandPanelController.showPlaying(false);
             if (btnPlaylistPlayPause != null) btnPlaylistPlayPause.setText("▶");
         });
-        onDemandSeekBar.setOnSeekToFraction(musicService::seekOnDemand);
         playlistSeekBar.setOnSeekToFraction(musicService::seekPlaylist);
 
-        updatePreviewPanel(false);
         ambiance.setAudioSource(musicService::getAudioFeatures);
 
         // T-12: PlaylistManager + wiring de callbacks
@@ -253,13 +221,13 @@ public class PlayerController implements SceneHost, PlayerHost {
 
     public void toggleLastUsedPlayer() {
         if (musicService.previewSoundedLast()) {
-            onTogglePreviewPlayPause();
+            previewPanelController.togglePlayPause();
             return;
         }
         switch (musicService.getPlaybackMode()) {
             case MOOD -> moodPanelController.togglePlayPause();
             case PLAYLIST -> onPlaylistPlayPause();
-            case ON_DEMAND -> onToggleOnDemandPlayPause();
+            case ON_DEMAND -> onDemandPanelController.togglePlayPause();
         }
     }
 
@@ -276,8 +244,7 @@ public class PlayerController implements SceneHost, PlayerHost {
         liveAuraController.refresh();
         moodPanelController.refreshButtonStates();
         moodPanelController.showPlaying(true);
-        updatePreviewPanel(false);
-        resetPreviewSlider();
+        previewPanelController.hide();
     }
 
     private boolean usesOnDemandAura() {
@@ -298,7 +265,7 @@ public class PlayerController implements SceneHost, PlayerHost {
 
     private void syncSourceUi() {
         MusicService.PlaybackMode mode = musicService.getPlaybackMode();
-        if (mode != MusicService.PlaybackMode.ON_DEMAND) showOnDemandPanel(false);
+        if (mode != MusicService.PlaybackMode.ON_DEMAND) onDemandPanelController.show(false);
         if (mode != MusicService.PlaybackMode.PLAYLIST) {
             if (btnPlaylistPlayPause != null) btnPlaylistPlayPause.setText("▶");
             if (lstPlaylistTracks != null) lstPlaylistTracks.refresh();
@@ -311,113 +278,29 @@ public class PlayerController implements SceneHost, PlayerHost {
     @Override
     public void playNow(File file, String title) {
         if (file == null || !file.isFile()) return;
-        String label = title != null && !title.isBlank() ? title : DisplayNames.stripExtension(file.getName());
-        if (lblOnDemandTrack != null) lblOnDemandTrack.setText(label);
-        onDemandSeekBar.showNoTrack();
+        String label = DisplayNames.trackLabel(file, title);
+        onDemandPanelController.showTrack(label);
         musicService.playOnDemand(file, label, () -> {
-            showOnDemandPanel(true);
+            onDemandPanelController.show(true);
             ambiance.activateSlot(AuraSlot.ON_DEMAND);
             liveAuraController.refresh();
             moodPanelController.showPlaying(false);
             if (btnPlaylistPlayPause != null) btnPlaylistPlayPause.setText("▶");
             if (lstPlaylistTracks != null) lstPlaylistTracks.refresh();
-            updateOnDemandPlayPauseButton();
+            onDemandPanelController.syncPlayPauseIcon();
         });
     }
 
-    private void showOnDemandPanel(boolean show) {
-        if (onDemandPanel == null) return;
-        onDemandPanel.setVisible(show);
-        onDemandPanel.setManaged(show);
-    }
-
-    private void updateOnDemandPlayPauseButton() {
-        if (btnOnDemandPlayPause != null)
-            btnOnDemandPlayPause.setText(musicService.isOnDemandPlaying() ? "⏸" : "▶");
-    }
-
-    @FXML
-    private void onToggleOnDemandPlayPause() {
-        if (musicService.isOnDemandPlaying()) musicService.onDemandPause();
-        else musicService.onDemandPlay();
-        updateOnDemandPlayPauseButton();
-    }
-
-    @FXML
-    private void onOnDemandStop() {
-        musicService.onDemandPause();
-        musicService.seekOnDemand(0);
-        onDemandSeekBar.rewindToStart();
-        updateOnDemandPlayPauseButton();
-    }
-
-    @FXML
-    private void onOnDemandClose() {
+    @Override
+    public void closeOnDemand() {
         enterMode(MusicService.PlaybackMode.MOOD);
         moodPanelController.showPlaying(false);
     }
 
-    @FXML
-    private void onToggleOnDemandLoop() {
-        if (btnOnDemandLoop != null) musicService.setOnDemandLoop(btnOnDemandLoop.isSelected());
-    }
-
-    // --- Controles de preescucha ---
-
     @Override
     public void startPreview(File file) {
-        if (musicService.isPlaying()) musicService.fadeOutAndPause(null);
-        if (musicService.isPlaylistPlaying()) musicService.playlistPause();
-        if (lblPreviewTrack != null)
-            lblPreviewTrack.setText(file.getName());
-        musicService.previewTrack(file);
-        updatePreviewPanel(true);
-        updatePreviewPlayPauseButton();
-        updateOnDemandPlayPauseButton();
-    }
-
-    @FXML
-    private void onTogglePreviewPlayPause() {
-        if (musicService.isPreviewPlaying()) {
-            musicService.previewPause();
-            setPreviewButtonIcon("▶");
-        } else {
-            musicService.previewPlay();
-            setPreviewButtonIcon("⏸");
-        }
-    }
-
-    private void setPreviewButtonIcon(String icon) {
-        if (btnPreviewPlayPause != null) btnPreviewPlayPause.setText(icon);
-    }
-
-    @FXML
-    private void onPreviewStop() {
-        musicService.stopPreview();
-        updatePreviewPanel(false);
-        resetPreviewSlider();
-    }
-
-    // Llamado desde el listener de progreso del preview
-    private void updatePreviewPlayPauseButton() {
-        if (btnPreviewPlayPause != null)
-            btnPreviewPlayPause.setText(musicService.isPreviewPlaying() ? "⏸" : "▶");
-    }
-
-    private void updatePreviewPanel(boolean active) {
-        if (previewPanel != null) {
-            previewPanel.setVisible(active);
-            previewPanel.setManaged(active);
-        }
-        if (btnPreviewPlayPause != null) btnPreviewPlayPause.setDisable(!active);
-        previewSeekBar.setSeekEnabled(active);
-        if (!active && lblPreviewTrack != null)
-            lblPreviewTrack.setText("No active preview");
-    }
-
-    private void resetPreviewSlider() {
-        previewSeekBar.showNoTrack();
-        updatePreviewPlayPauseButton();
+        previewPanelController.start(file);
+        onDemandPanelController.syncPlayPauseIcon();
     }
 
     private void updateWindowMood(TrackType type) {
@@ -946,11 +829,6 @@ public class PlayerController implements SceneHost, PlayerHost {
     }
 
     // --- Controles de ventana ---
-
-    @FXML
-    private void onTogglePreviewLoop() {
-        if (btnPreviewLoop != null) musicService.setPreviewLoop(btnPreviewLoop.isSelected());
-    }
 
     @FXML
     public void onMaximizeRestoreWindow(ActionEvent event) {
