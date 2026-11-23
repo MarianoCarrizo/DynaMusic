@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 import java.util.Set;
 
 final class Mp4Probe {
@@ -16,9 +17,59 @@ final class Mp4Probe {
     private static final String MOVIE = "moov";
     private static final String SAMPLE_DESCRIPTION = "stsd";
     private static final String LOSSLESS_ENTRY = "alac";
+    private static final String AAC_ENTRY = "mp4a";
+    private static final int AUDIO_ENTRY_BYTES = 36;
+    private static final int SAMPLE_SIZE_OFFSET = 26;
+    private static final int SAMPLE_RATE_OFFSET = 32;
     private static final Set<String> CONTAINERS = Set.of("trak", "mdia", "minf", "stbl");
 
     private Mp4Probe() {}
+
+    record SampleEntry(String type, int bitsPerSample, int sampleRate) {
+        boolean isLossless() {
+            return LOSSLESS_ENTRY.equals(type);
+        }
+    }
+
+    static Optional<SampleEntry> sampleEntry(File file) {
+        try (RandomAccessFile source = new RandomAccessFile(file, "r")) {
+            byte[] movie = readMovieAtom(source);
+            return movie == null ? Optional.empty() : findSampleEntry(movie, 0, movie.length);
+        } catch (IOException | RuntimeException unreadable) {
+            return Optional.empty();
+        }
+    }
+
+    static Optional<SampleEntry> findSampleEntry(byte[] atoms, int start, int end) {
+        int position = start;
+        while (position + HEADER_BYTES <= end) {
+            long size = unsigned32(atoms, position);
+            String type = new String(atoms, position + 4, 4, StandardCharsets.ISO_8859_1);
+            if (size < HEADER_BYTES || position + size > end) return Optional.empty();
+            int contentStart = position + HEADER_BYTES;
+            int atomEnd = (int) (position + size);
+            if (CONTAINERS.contains(type)) {
+                Optional<SampleEntry> nested = findSampleEntry(atoms, contentStart, atomEnd);
+                if (nested.isPresent()) return nested;
+            }
+            if (SAMPLE_DESCRIPTION.equals(type)) {
+                Optional<SampleEntry> entry = firstAudioEntry(atoms, contentStart, atomEnd);
+                if (entry.isPresent()) return entry;
+            }
+            position = atomEnd;
+        }
+        return Optional.empty();
+    }
+
+    private static Optional<SampleEntry> firstAudioEntry(byte[] atoms, int start, int end) {
+        int entry = start + SAMPLE_DESCRIPTION_PREFIX_BYTES;
+        if (entry + AUDIO_ENTRY_BYTES > end) return Optional.empty();
+        String format = new String(atoms, entry + 4, 4, StandardCharsets.ISO_8859_1);
+        if (!LOSSLESS_ENTRY.equals(format) && !AAC_ENTRY.equals(format)) return Optional.empty();
+        int bits = ((atoms[entry + SAMPLE_SIZE_OFFSET] & 0xFF) << 8) | (atoms[entry + SAMPLE_SIZE_OFFSET + 1] & 0xFF);
+        int rate = ((atoms[entry + SAMPLE_RATE_OFFSET] & 0xFF) << 8) | (atoms[entry + SAMPLE_RATE_OFFSET + 1] & 0xFF);
+        return Optional.of(new SampleEntry(format, LOSSLESS_ENTRY.equals(format) ? bits : 0, rate));
+    }
 
     static boolean isAlac(File file) {
         try (RandomAccessFile source = new RandomAccessFile(file, "r")) {

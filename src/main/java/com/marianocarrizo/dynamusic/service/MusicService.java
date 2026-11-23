@@ -3,6 +3,7 @@ package com.marianocarrizo.dynamusic.service;
 import com.marianocarrizo.dynamusic.audio.AudioFormat;
 import com.marianocarrizo.dynamusic.audio.AudioServices;
 import com.marianocarrizo.dynamusic.audio.PreparedAudio;
+import com.marianocarrizo.dynamusic.audio.TrackQualityStore;
 import com.marianocarrizo.dynamusic.audio.UnplayableAudioException;
 import com.marianocarrizo.dynamusic.enums.TrackType;
 import com.marianocarrizo.dynamusic.model.NowPlayingSource;
@@ -90,6 +91,7 @@ public class MusicService {
     private static final int MAX_CONSECUTIVE_PLAYLIST_FAILURES = 5;
 
     private final TrackTagStore tags = new TrackTagStore(AudioFormat::tagFormatOf, Platform::runLater);
+    private final TrackQualityStore quality = new TrackQualityStore(Platform::runLater);
     private final AudioServices audio;
     private final PendingLoads pending = new PendingLoads(System::currentTimeMillis);
     private int playlistPendingTicket = PendingLoads.NO_TICKET;
@@ -147,6 +149,15 @@ public class MusicService {
 
     public TrackTagStore tags() {
         return tags;
+    }
+
+    public TrackQualityStore quality() {
+        return quality;
+    }
+
+    private void requestMetadata(File file) {
+        tags.request(file);
+        quality.request(file);
     }
 
     // =========================================================================
@@ -397,7 +408,7 @@ public class MusicService {
         final int pendingTicket = type == currentTrack
                 ? beginPending(NowPlayingSource.MOOD, type, file, null) : PendingLoads.NO_TICKET;
 
-        tags.request(file);
+        requestMetadata(file);
         audio.prep().prepare(file).whenComplete((prepared, error) -> Platform.runLater(() -> {
             if (loadSeq.getOrDefault(type, 0) != seq) {
                 finishPending(pendingTicket);
@@ -575,7 +586,7 @@ public class MusicService {
         }
 
         final int pendingTicket = beginPending(NowPlayingSource.PREVIEW, null, file, null);
-        tags.request(file);
+        requestMetadata(file);
         audio.prep().prepare(file).whenComplete((prepared, error) -> Platform.runLater(
                 () -> openPreviewPlayer(file, prepared, error, ticket, pendingTicket)));
         return true;
@@ -803,7 +814,7 @@ public class MusicService {
         final int seq = playlistLoads.begin();
         playlistPendingTicket = beginPending(NowPlayingSource.PLAYLIST, null, file, null);
 
-        tags.request(file);
+        requestMetadata(file);
         playlistPrep = audio.prep().prepare(file);
         playlistPrep.whenComplete((prepared, error) -> Platform.runLater(() -> {
             if (error != null) {
@@ -1002,7 +1013,7 @@ public class MusicService {
         final int seq = ++onDemandSeq;
         final int pendingTicket = beginPending(NowPlayingSource.ON_DEMAND, null, file, title);
 
-        tags.request(file);
+        requestMetadata(file);
         audio.prep().prepare(file).whenComplete((prepared, error) -> Platform.runLater(
                 () -> openOnDemandPlayer(file, title, onStarted, prepared, error, seq, pendingTicket)));
     }

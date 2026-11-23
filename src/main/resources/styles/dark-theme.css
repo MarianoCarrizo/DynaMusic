@@ -644,6 +644,13 @@
 .now-playing-loading {
     -fx-progress-color: #b3b3b3;
 }
+.now-playing-quality {
+    -fx-text-fill: #6a6a72;
+    -fx-font-size: 11px;
+}
+.now-playing-quality-hires {
+    -fx-text-fill: -mood-accent;
+}
 .now-playing-source {
     -fx-text-fill: #6a6a72;
     -fx-font-size: 11px;
