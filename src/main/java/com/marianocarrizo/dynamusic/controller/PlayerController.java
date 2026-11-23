@@ -6,10 +6,8 @@ import com.marianocarrizo.dynamusic.config.SessionConfigManager;
 import com.marianocarrizo.dynamusic.model.AuraSlot;
 import com.marianocarrizo.dynamusic.model.PlaylistItem;
 import com.marianocarrizo.dynamusic.model.Scene;
-import com.marianocarrizo.dynamusic.service.AudioFileCollector;
 import com.marianocarrizo.dynamusic.service.MusicService;
 import com.marianocarrizo.dynamusic.service.PlaylistManager;
-import com.marianocarrizo.dynamusic.service.TrackLibrary;
 import com.marianocarrizo.dynamusic.service.UpdateManager;
 import javafx.animation.Animation;
 import javafx.animation.PauseTransition;
@@ -27,12 +25,7 @@ import javafx.stage.Window;
 import javafx.util.Duration;
 
 import java.io.File;
-import java.util.EnumMap;
-import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 public class PlayerController implements SceneHost, PlayerHost {
 
@@ -74,15 +67,11 @@ public class PlayerController implements SceneHost, PlayerHost {
 
     private boolean applyingSession = false;
 
-    private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor(r -> {
-        Thread t = new Thread(r, "track-io");
-        t.setDaemon(true);
-        return t;
-    });
-
     private final PauseTransition saveDebounce = new PauseTransition(Duration.millis(400));
 
-    private final Map<TrackType, String> loadedPaths = new EnumMap<>(TrackType.class);
+    private final MoodTrackLoader trackLoader = new MoodTrackLoader(
+            musicService, sessionConfig, () -> manager.save(sessionConfig),
+            () -> moodPanelController.activeMood(), this::refreshMoodState);
 
     private final PlaylistManager playlistManager = new PlaylistManager();
 
@@ -263,19 +252,7 @@ public class PlayerController implements SceneHost, PlayerHost {
     }
 
     private void applyScene(Scene scene) {
-        Map<TrackType, String> assignments = scene.getAssignments();
-        for (TrackType t : TrackType.values()) {
-            String path = assignments.get(t);
-            if (path != null && new File(path).isFile()) {
-                if (!path.equals(loadedPaths.get(t))) {
-                    loadedPaths.put(t, path);
-                    musicService.loadTrack(t, new File(path), () -> onTrackLoaded(t), () -> onTrackLoadFailed(t, path));
-                }
-            } else {
-                loadedPaths.remove(t);
-                musicService.unloadTrack(t);
-            }
-        }
+        trackLoader.loadAssignments(scene);
 
         ambiance.applyScene(scene);
 
@@ -285,20 +262,7 @@ public class PlayerController implements SceneHost, PlayerHost {
         moodPanelController.resetProgressIfEmpty();
     }
 
-    private void onTrackLoadFailed(TrackType type, String path) {
-        if (!path.equals(loadedPaths.get(type))) return;
-        loadedPaths.remove(type);
-        musicService.unloadTrack(type);
-        refreshCards();
-        moodPanelController.refreshButtonStates();
-        moodPanelController.syncPlayPauseIcon();
-    }
-
-    private void onTrackLoaded(TrackType type) {
-        if (type == moodPanelController.activeMood() && !musicService.isPlaying()
-                && musicService.getCurrentTrack() != type) {
-            musicService.selectTrack(type);
-        }
+    private void refreshMoodState() {
         refreshCards();
         moodPanelController.refreshButtonStates();
         moodPanelController.syncPlayPauseIcon();
@@ -340,30 +304,16 @@ public class PlayerController implements SceneHost, PlayerHost {
 
     @Override
     public void assignTrack(TrackType type, File file) {
-        if (type == null || file == null || !file.isFile() || !AudioFileCollector.isAudioFile(file)) return;
-        final Scene target = sessionConfig.getActiveScene();
-        final String source = file.getAbsolutePath();
-        CompletableFuture.supplyAsync(() -> TrackLibrary.pin(source), ioExecutor)
-            .whenComplete((pinned, err) -> Platform.runLater(() -> {
-                String path = (err == null && pinned != null) ? pinned : source;
-                target.setAssignment(type, path);
-                manager.save(sessionConfig);
-                if (target == sessionConfig.getActiveScene()) {
-                    loadedPaths.put(type, path);
-                    musicService.loadTrack(type, new File(path), () -> onTrackLoaded(type), () -> onTrackLoadFailed(type, path));
-                    refreshCards();
-                    if (sceneEditor != null) sceneEditor.refreshTracks();
-                }
-            }));
+        trackLoader.assign(type, file, () -> {
+            refreshCards();
+            if (sceneEditor != null) sceneEditor.refreshTracks();
+        });
     }
 
     @Override
     public void clearTrack(TrackType type) {
         if (type == null) return;
-        sessionConfig.getActiveScene().setAssignment(type, null);
-        manager.save(sessionConfig);
-        loadedPaths.remove(type);
-        musicService.unloadTrack(type);
+        trackLoader.clear(type);
         moodPanelController.refreshButtonStates();
         moodPanelController.syncPlayPauseIcon();
         moodPanelController.resetProgressIfEmpty();
