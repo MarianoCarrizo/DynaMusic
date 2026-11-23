@@ -27,7 +27,12 @@ final class PlaylistPlayback {
 
     void play(File file) {
         enterMode.accept(MusicService.PlaybackMode.PLAYLIST);
+        playAndPrefetch(file);
+    }
+
+    private void playAndPrefetch(File file) {
         musicService.playPlaylistTrack(file);
+        playlistManager.peekNext().ifPresent(musicService::prefetch);
     }
 
     boolean startCurrent() {
@@ -47,12 +52,12 @@ final class PlaylistPlayback {
     }
 
     private void skipFailedTrack() {
-        playlistManager.next().ifPresentOrElse(musicService::playPlaylistTrack, musicService::stopPlaylist);
+        playlistManager.next().ifPresentOrElse(this::playAndPrefetch, musicService::stopPlaylist);
         refreshView.run();
     }
 
     private void advanceAfterEnd() {
-        playlistManager.nextAfterEnd().ifPresentOrElse(musicService::playPlaylistTrack, musicService::stopPlaylist);
+        playlistManager.nextAfterEnd().ifPresentOrElse(this::playAndPrefetch, musicService::stopPlaylist);
         refreshView.run();
     }
 }
