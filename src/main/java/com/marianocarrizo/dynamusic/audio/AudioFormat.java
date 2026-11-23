@@ -70,6 +70,10 @@ public enum AudioFormat {
         return file == null ? Optional.empty() : fromFileName(file.getName());
     }
 
+    public static TagFormat tagFormatOf(File file) {
+        return fromFile(file).map(AudioFormat::tagFormat).orElse(TagFormat.NONE);
+    }
+
     public static boolean isSupported(File file) {
         return fromFile(file).isPresent();
     }
