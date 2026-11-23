@@ -15,6 +15,8 @@
     -mood-accent: #2ecc71;
     -mood-accent-hover: derive(-mood-accent, 25%);
     -mood-accent-text: #0b0b0e;
+    -mood-selection: #1e4a2b;
+    -mood-selection-focused: derive(-mood-selection, 18%);
     -fx-background-color: #1e1e24;
     -fx-font-family: "Segoe UI", Helvetica, Arial, sans-serif;
 
@@ -58,11 +60,11 @@
     -fx-background-color: #383842;
 }
 .tree-cell:filled:selected {
-    -fx-background-color: #3a3a48;
+    -fx-background-color: -mood-selection;
     -fx-text-fill: #ffffff;
 }
 .tree-cell:filled:selected:focused {
-    -fx-background-color: #4a4a5a;
+    -fx-background-color: -mood-selection-focused;
 }
 .playlist-row-title {
     -fx-text-fill: #e0e0e0;
@@ -414,7 +416,7 @@
    ========================================================================= */
 
 /* --- 1. PAUSED (Gris / Platino) --- */
-#window-paused.main-container { -mood-accent: #95a5a6; -fx-background-color: #151517; -fx-background-radius: 0px !important; -fx-border-radius: 0px !important; }
+#window-paused.main-container { -mood-accent: #95a5a6; -mood-selection: #3a3a3e; -fx-background-color: #151517; -fx-background-radius: 0px !important; -fx-border-radius: 0px !important; }
 #window-paused .window-header { -fx-background-color: #222226; }
 #window-paused .window-title { -fx-text-fill: #95a5a6; }
 #window-paused .slider .track { -fx-background-color: #3e3e40; }
@@ -423,7 +425,7 @@
 #window-paused .text-field:focused { -fx-border-color: #7f8c8d; }
 
 /* --- 2. RAGED (Rojo Combate) --- */
-#window-raged.main-container { -mood-accent: #e74c3c; -fx-background-color: #160e0e; -fx-background-radius: 0px !important; -fx-border-radius: 0px !important; }
+#window-raged.main-container { -mood-accent: #e74c3c; -mood-selection: #4a1c1c; -fx-background-color: #160e0e; -fx-background-radius: 0px !important; -fx-border-radius: 0px !important; }
 #window-raged .window-header { -fx-background-color: #2c1616; }
 #window-raged .window-title { -fx-text-fill: #e74c3c; }
 #window-raged .slider .track { -fx-background-color: #451b1b; }
@@ -432,7 +434,7 @@
 #window-raged .text-field:focused { -fx-border-color: #e74c3c; }
 
 /* --- 3. NORMAL (Verde Exploración) --- */
-#window-normal.main-container { -mood-accent: #2ecc71; -fx-background-color: #0e1410; -fx-background-radius: 0px !important; -fx-border-radius: 0px !important; }
+#window-normal.main-container { -mood-accent: #2ecc71; -mood-selection: #1e4a2b; -fx-background-color: #0e1410; -fx-background-radius: 0px !important; -fx-border-radius: 0px !important; }
 #window-normal .window-header { -fx-background-color: #16241b; }
 #window-normal .window-title { -fx-text-fill: #2ecc71; }
 #window-normal .slider .track { -fx-background-color: #14331d; }
@@ -441,7 +443,7 @@
 #window-normal .text-field:focused { -fx-border-color: #2ecc71; }
 
 /* --- 4. ADVANTAGE (Azul) --- */
-#window-advantage.main-container { -mood-accent: #3498db; -fx-background-color: #0f1318; -fx-background-radius: 0px !important; -fx-border-radius: 0px !important; }
+#window-advantage.main-container { -mood-accent: #3498db; -mood-selection: #1e354a; -fx-background-color: #0f1318; -fx-background-radius: 0px !important; -fx-border-radius: 0px !important; }
 #window-advantage .window-header { -fx-background-color: #16222f; }
 #window-advantage .window-title { -fx-text-fill: #3498db; }
 #window-advantage .slider .track { -fx-background-color: #112233; }
@@ -528,11 +530,11 @@
 
 /* Lista de tracks de playlist: highlighted item */
 .list-cell:filled:selected {
-    -fx-background-color: #3a3a48;
+    -fx-background-color: -mood-selection;
     -fx-text-fill: #ffffff;
 }
 .list-cell:filled:selected:focused {
-    -fx-background-color: #4a4a5a;
+    -fx-background-color: -mood-selection-focused;
 }
 
 /* Estado ON del toggle de boomerang */
