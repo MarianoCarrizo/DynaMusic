@@ -32,7 +32,7 @@ class NowPlayingModelTest {
         model.show(new NowPlaying(NowPlayingSource.MOOD, "RAGED", "Battle", "Album", true));
 
         assertEquals("RAGED", model.get().sourceName());
-        assertEquals("MOOD · RAGED", model.get().badge());
+        assertEquals("Mood · Raged", model.get().badge());
         assertTrue(model.get().playing());
     }
 
@@ -42,9 +42,9 @@ class NowPlayingModelTest {
         NowPlaying preview = new NowPlaying(NowPlayingSource.PREVIEW, "ignored", "Song", "", true);
 
         assertEquals("", onDemand.sourceName());
-        assertEquals("PLAYING NOW", onDemand.badge());
+        assertEquals("Playing now", onDemand.badge());
         assertEquals("", preview.sourceName());
-        assertEquals("PREVIEW", preview.badge());
+        assertEquals("Preview", preview.badge());
     }
 
     @Test
@@ -54,7 +54,7 @@ class NowPlayingModelTest {
         assertEquals("", snapshot.sourceName());
         assertEquals("", snapshot.title());
         assertEquals("", snapshot.detail());
-        assertEquals("PLAYLIST", snapshot.badge());
+        assertEquals("Playlist", snapshot.badge());
     }
 
     @Test

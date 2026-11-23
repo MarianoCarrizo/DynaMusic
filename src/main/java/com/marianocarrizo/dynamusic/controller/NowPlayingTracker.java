@@ -39,6 +39,6 @@ final class NowPlayingTracker {
 
     private static NowPlaying of(NowPlayingSource source, String sourceName, SoundingTrack track) {
         if (!track.isPresent()) return NowPlaying.NONE;
-        return new NowPlaying(source, sourceName, track.title(), track.detail(), track.playing());
+        return new NowPlaying(source, sourceName, track.title(), track.detail(), track.file(), track.playing());
     }
 }

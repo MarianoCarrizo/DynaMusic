@@ -49,7 +49,7 @@ class NowPlayingTrackerTest {
 
         assertEquals(NowPlayingSource.MOOD, result.source());
         assertEquals("RAGED", result.sourceName());
-        assertEquals("MOOD · RAGED", result.badge());
+        assertEquals("Mood · Raged", result.badge());
         assertFalse(result.playing());
     }
 
@@ -63,7 +63,7 @@ class NowPlayingTrackerTest {
         PlaybackState state = state(PlaybackMode.MOOD, false, null, SoundingTrack.ABSENT, PAUSED_TRACK,
                 SoundingTrack.ABSENT, SoundingTrack.ABSENT);
 
-        assertEquals("MOOD", NowPlayingTracker.decide(state, null).badge());
+        assertEquals("Mood", NowPlayingTracker.decide(state, null).badge());
     }
 
     @Test
@@ -73,7 +73,7 @@ class NowPlayingTrackerTest {
 
         NowPlaying result = NowPlayingTracker.decide(state, "megaman");
 
-        assertEquals("PLAYLIST · megaman", result.badge());
+        assertEquals("Playlist · megaman", result.badge());
         assertEquals("04 Opening Stage", result.title());
         assertTrue(result.isSounding(NowPlayingSource.PLAYLIST));
     }
@@ -93,7 +93,7 @@ class NowPlayingTrackerTest {
 
         NowPlaying result = NowPlayingTracker.decide(state, "ignored");
 
-        assertEquals("PLAYING NOW", result.badge());
+        assertEquals("Playing now", result.badge());
         assertEquals("", result.sourceName());
     }
 

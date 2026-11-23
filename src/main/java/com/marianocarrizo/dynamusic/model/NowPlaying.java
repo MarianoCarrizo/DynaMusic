@@ -1,6 +1,9 @@
 package com.marianocarrizo.dynamusic.model;
 
-public record NowPlaying(NowPlayingSource source, String sourceName, String title, String detail, boolean playing) {
+import java.io.File;
+
+public record NowPlaying(NowPlayingSource source, String sourceName, String title, String detail, File file,
+                         boolean playing) {
 
     public static final NowPlaying NONE = new NowPlaying(NowPlayingSource.NONE, "", "Nothing playing", "", false);
 
@@ -9,6 +12,10 @@ public record NowPlaying(NowPlayingSource source, String sourceName, String titl
         title = title == null ? "" : title;
         detail = detail == null ? "" : detail;
         playing = source != NowPlayingSource.NONE && playing;
+    }
+
+    public NowPlaying(NowPlayingSource source, String sourceName, String title, String detail, boolean playing) {
+        this(source, sourceName, title, detail, null, playing);
     }
 
     public String badge() {
