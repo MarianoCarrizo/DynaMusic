@@ -40,8 +40,8 @@ public final class PreviewPanelController {
     }
 
     void start(File file) {
+        if (!host.musicService().previewTrack(file)) return;
         lblPreviewTrack.setText(TrackNames.title(file.getName()));
-        host.musicService().previewTrack(file);
         show(true);
         syncPlayPauseIcon();
     }
