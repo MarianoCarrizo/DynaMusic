@@ -56,6 +56,8 @@ public class SessionConfig {
 
     private boolean libraryCollapsed;
 
+    private double libraryDividerPosition = 0.3;
+
     // Sensibilidad por mood: TrackType.name() -> Double; null en sesiones antiguas (defecto 2.0)
     private Map<String, Double> moodSensitivities;
 
@@ -278,6 +280,9 @@ public class SessionConfig {
     }
 
     // --- Active playlist name ---
+
+    public double getLibraryDividerPosition() { return libraryDividerPosition; }
+    public void setLibraryDividerPosition(double position) { this.libraryDividerPosition = position; }
 
     public boolean isLibraryCollapsed() { return libraryCollapsed; }
     public void setLibraryCollapsed(boolean collapsed) { this.libraryCollapsed = collapsed; }

@@ -97,7 +97,8 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
 
     @FXML
     public void initialize() {
-        libraryVisibility = new LibraryVisibility(mainSplit, leftPanel, btnToggleLibrary);
+        libraryVisibility = new LibraryVisibility(mainSplit, leftPanel, btnToggleLibrary,
+                this::onLibraryDividerMoved);
         musicService.setOnPlaybackChanged(nowPlayingTracker::sync);
         youTubeBarController.attach(this);
         updateBarController.attach(this);
@@ -262,6 +263,11 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
 
     public void setHostServices(HostServices hostServices) {
         this.hostServices = hostServices;
+    }
+
+    private void onLibraryDividerMoved(double position) {
+        sessionConfig.setLibraryDividerPosition(position);
+        saveDebounce.playFromStart();
     }
 
     @FXML
@@ -454,6 +460,8 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
 
         libraryPanelController.restoreFolder(cfg.getLastFolderPath());
         sessionConfig.setLibraryCollapsed(cfg.isLibraryCollapsed());
+        sessionConfig.setLibraryDividerPosition(cfg.getLibraryDividerPosition());
+        libraryVisibility.setDividerPosition(cfg.getLibraryDividerPosition());
         libraryVisibility.set(!cfg.isLibraryCollapsed());
 
         playlistManager.setPlaylists(cfg.getPlaylists());
