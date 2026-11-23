@@ -6,6 +6,7 @@ import com.marianocarrizo.dynamusic.config.SessionConfigManager;
 import com.marianocarrizo.dynamusic.model.AuraSlot;
 import com.marianocarrizo.dynamusic.model.NowPlayingModel;
 import com.marianocarrizo.dynamusic.model.NowPlayingSource;
+import com.marianocarrizo.dynamusic.model.Playlist;
 import com.marianocarrizo.dynamusic.model.PlaylistItem;
 import com.marianocarrizo.dynamusic.model.Scene;
 import com.marianocarrizo.dynamusic.service.MusicService;
@@ -27,10 +28,13 @@ import javafx.stage.Window;
 import javafx.util.Duration;
 
 import java.io.File;
+import java.util.List;
 import java.util.Optional;
 
-public class PlayerController implements SceneHost, PlayerHost, MoodPanelController.Host,
-        PreviewPanelController.Host, OnDemandPanelController.Host, PlaylistTransportController.Host,
+public class PlayerController implements SceneHost, UpdateBarController.Host, SceneBarController.Host,
+        AmbianceToolbarController.Host, VolumeController.Host, LiveAuraController.Host, MoodPanelController.Host,
+        LibraryPanelController.Host, PreviewPanelController.Host, OnDemandPanelController.Host,
+        PlaylistPanelController.Host, PlaylistTransportController.Host, YouTubeBarController.Host,
         NowPlayingBarController.Host {
 
     private static final String CAFECITO_URL = "https://cafecito.app/duhonha";
@@ -398,6 +402,11 @@ public class PlayerController implements SceneHost, PlayerHost, MoodPanelControl
     @Override
     public PlaylistManager playlistManager() {
         return playlistManager;
+    }
+
+    @Override
+    public List<String> playlistNames() {
+        return playlistManager.getPlaylists().stream().map(Playlist::getName).toList();
     }
 
     @Override

@@ -1,5 +1,6 @@
 package com.marianocarrizo.dynamusic.controller;
 
+import com.marianocarrizo.dynamusic.config.SessionConfig;
 import com.marianocarrizo.dynamusic.model.AuraConfig;
 import com.marianocarrizo.dynamusic.model.AuraPreset;
 import com.marianocarrizo.dynamusic.model.AuraSlot;
@@ -17,6 +18,15 @@ import java.util.function.Consumer;
 
 public final class LiveAuraController {
 
+    interface Host {
+        SessionConfig session();
+
+        AuraSlot liveSlot();
+
+        void liveAuraEdited(AuraSlot slot);
+    }
+
+
     @FXML private Label lblLiveAura;
     @FXML private HBox livePresetBox;
     @FXML private Slider sldLiveIntensity;
@@ -26,10 +36,10 @@ public final class LiveAuraController {
 
     private final Map<AuraPreset, ToggleButton> presetButtons = new EnumMap<>(AuraPreset.class);
     private final ToggleGroup presetGroup = new ToggleGroup();
-    private PlayerHost host;
+    private Host host;
     private boolean updating = false;
 
-    void attach(PlayerHost host) {
+    void attach(Host host) {
         this.host = host;
         for (AuraPreset preset : AuraPreset.values()) {
             ToggleButton button = new ToggleButton(DisplayNames.capitalize(preset.name()));

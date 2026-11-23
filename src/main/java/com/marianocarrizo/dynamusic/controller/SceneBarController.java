@@ -1,16 +1,27 @@
 package com.marianocarrizo.dynamusic.controller;
 
+import com.marianocarrizo.dynamusic.config.SessionConfig;
 import com.marianocarrizo.dynamusic.model.Scene;
 import javafx.fxml.FXML;
 import javafx.scene.control.ComboBox;
-import javafx.scene.control.TextInputDialog;
 import javafx.util.StringConverter;
 
 public final class SceneBarController {
 
+    interface Host {
+        SessionConfig session();
+
+        void saveSession();
+
+        void applyActiveScene();
+
+        void openSceneEditor();
+    }
+
+
     @FXML private ComboBox<Scene> cmbScene;
 
-    private PlayerHost host;
+    private Host host;
     private boolean refreshing = false;
 
     @FXML
@@ -21,7 +32,7 @@ public final class SceneBarController {
         });
     }
 
-    void attach(PlayerHost host) {
+    void attach(Host host) {
         this.host = host;
         cmbScene.setOnAction(e -> {
             if (refreshing) return;
@@ -52,22 +63,14 @@ public final class SceneBarController {
 
     @FXML
     private void onNewScene() {
-        TextInputDialog d = new TextInputDialog("New scene");
-        d.setTitle("New scene");
-        d.setHeaderText(null);
-        d.setContentText("Name:");
-        d.showAndWait().map(String::trim).filter(n -> !n.isEmpty()).ifPresent(name ->
+        NamePrompt.ask("New scene", "Name:", "New scene").ifPresent(name ->
             switchScene(host.session().addScene(name)));
     }
 
     @FXML
     private void onSaveSceneAs() {
         Scene active = host.session().getActiveScene();
-        TextInputDialog d = new TextInputDialog(active.getName() + " copy");
-        d.setTitle("Save as new scene");
-        d.setHeaderText(null);
-        d.setContentText("Name:");
-        d.showAndWait().map(String::trim).filter(n -> !n.isEmpty()).ifPresent(name -> {
+        NamePrompt.ask("Save as new scene", "Name:", active.getName() + " copy").ifPresent(name -> {
             Scene copy = host.session().duplicateScene(active.getId(), name);
             if (copy != null) switchScene(copy);
         });

@@ -1,7 +1,6 @@
 package com.marianocarrizo.dynamusic.controller;
 
 import com.marianocarrizo.dynamusic.enums.TrackType;
-import com.marianocarrizo.dynamusic.model.Playlist;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuItem;
@@ -13,16 +12,31 @@ import javafx.scene.input.TransferMode;
 
 import java.io.File;
 import java.util.List;
+import java.util.Optional;
 
 final class LibraryCell extends TreeCell<File> {
 
-    private final PlayerHost host;
+    interface Host {
+        void playNow(File file, String title);
+
+        void assignTrack(TrackType type, File file);
+
+        List<String> playlistNames();
+
+        void addToPlaylist(String playlistName, File source);
+
+        void createPlaylistFromFolder(File folder);
+
+        Optional<String> promptNewPlaylistName();
+    }
+
+    private final Host host;
     private final ContextMenu fileMenu = new ContextMenu();
     private final ContextMenu folderMenu = new ContextMenu();
     private final Menu filePlaylistMenu = new Menu("Add to playlist");
     private final Menu folderPlaylistMenu = new Menu("Add to playlist");
 
-    LibraryCell(PlayerHost host) {
+    LibraryCell(Host host) {
         this.host = host;
         Menu assign = new Menu("Assign to");
         assign.getItems().addAll(
@@ -56,9 +70,9 @@ final class LibraryCell extends TreeCell<File> {
 
     private void fillPlaylistMenu(Menu target) {
         target.getItems().clear();
-        for (Playlist playlist : host.playlistManager().getPlaylists()) {
-            MenuItem entry = new MenuItem(playlist.getName());
-            entry.setOnAction(e -> host.addToPlaylist(playlist.getName(), getItem()));
+        for (String playlistName : host.playlistNames()) {
+            MenuItem entry = new MenuItem(playlistName);
+            entry.setOnAction(e -> host.addToPlaylist(playlistName, getItem()));
             target.getItems().add(entry);
         }
         if (!target.getItems().isEmpty()) target.getItems().add(new SeparatorMenuItem());

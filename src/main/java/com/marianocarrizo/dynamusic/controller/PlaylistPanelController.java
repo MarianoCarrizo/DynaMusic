@@ -1,5 +1,7 @@
 package com.marianocarrizo.dynamusic.controller;
 
+import com.marianocarrizo.dynamusic.model.NowPlayingModel;
+import com.marianocarrizo.dynamusic.config.SessionConfig;
 import com.marianocarrizo.dynamusic.model.NowPlayingSource;
 import com.marianocarrizo.dynamusic.model.PlaylistItem;
 import com.marianocarrizo.dynamusic.service.AudioFileCollector;
@@ -11,7 +13,6 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
-import javafx.scene.control.TextInputDialog;
 import javafx.scene.input.KeyCode;
 
 import java.io.File;
@@ -25,6 +26,23 @@ import java.util.function.Supplier;
 
 public final class PlaylistPanelController {
 
+    interface Host {
+        SessionConfig session();
+
+        void saveSession();
+
+        PlaylistManager playlistManager();
+
+        NowPlayingModel nowPlaying();
+
+        Optional<File> selectedLibraryItem();
+
+        void playPlaylistTrack(File file);
+
+        void persistPlaylists();
+    }
+
+
     private static final String DEFAULT_PLAYLIST_NAME = "New playlist";
     private static final String NAME_REJECTED_MESSAGE = "Name already exists or is blank.";
 
@@ -37,11 +55,11 @@ public final class PlaylistPanelController {
         t.setDaemon(true);
         return t;
     });
-    private PlayerHost host;
+    private Host host;
     private PlaylistManager playlistManager;
     private boolean refreshing = false;
 
-    void attach(PlayerHost host) {
+    void attach(Host host) {
         this.host = host;
         this.playlistManager = host.playlistManager();
         PlaylistTrackCell.Host trackHost = trackHost();
@@ -126,11 +144,7 @@ public final class PlaylistPanelController {
     }
 
     Optional<String> promptNewName() {
-        TextInputDialog d = new TextInputDialog();
-        d.setTitle("New Playlist");
-        d.setHeaderText(null);
-        d.setContentText("Name:");
-        Optional<String> created = d.showAndWait().map(String::trim).filter(n -> !n.isEmpty()).flatMap(name -> {
+        Optional<String> created = NamePrompt.ask("New Playlist", "Name:", "").flatMap(name -> {
             if (playlistManager.createPlaylist(name) == null) {
                 new Alert(Alert.AlertType.WARNING, NAME_REJECTED_MESSAGE).showAndWait();
                 return Optional.empty();
@@ -178,11 +192,7 @@ public final class PlaylistPanelController {
     private void onRenamePlaylist() {
         String current = cmbPlaylist.getValue();
         if (current == null) return;
-        TextInputDialog d = new TextInputDialog(current);
-        d.setTitle("Rename");
-        d.setHeaderText(null);
-        d.setContentText("New name:");
-        d.showAndWait().map(String::trim).filter(n -> !n.isEmpty()).ifPresent(name -> {
+        NamePrompt.ask("Rename", "New name:", current).ifPresent(name -> {
             if (!playlistManager.renamePlaylist(current, name)) {
                 new Alert(Alert.AlertType.WARNING, NAME_REJECTED_MESSAGE).showAndWait();
                 return;

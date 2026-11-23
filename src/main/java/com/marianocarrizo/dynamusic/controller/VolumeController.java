@@ -1,17 +1,28 @@
 package com.marianocarrizo.dynamusic.controller;
 
+import com.marianocarrizo.dynamusic.service.MusicService;
+import com.marianocarrizo.dynamusic.config.SessionConfig;
 import javafx.fxml.FXML;
 import javafx.scene.control.Label;
 import javafx.scene.control.Slider;
 
 public final class VolumeController {
 
+    interface Host {
+        SessionConfig session();
+
+        MusicService musicService();
+
+        void saveSession();
+    }
+
+
     @FXML private Slider sldMasterVolume;
     @FXML private Label lblMasterVolume;
 
-    private PlayerHost host;
+    private Host host;
 
-    void attach(PlayerHost host) {
+    void attach(Host host) {
         this.host = host;
         showPercent(host.session().getMasterVolume());
         sldMasterVolume.setValue(host.session().getMasterVolume());

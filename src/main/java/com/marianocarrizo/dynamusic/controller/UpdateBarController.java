@@ -11,15 +11,20 @@ import java.util.concurrent.CompletableFuture;
 
 public final class UpdateBarController {
 
+    interface Host {
+        void shutdownApp();
+    }
+
+
     @FXML private HBox updateBar;
     @FXML private Label lblUpdate;
     @FXML private Button btnUpdateNow;
     @FXML private Button btnUpdateOnClose;
 
-    private PlayerHost host;
+    private Host host;
     private UpdateManager.ReadyUpdate readyUpdate;
 
-    void attach(PlayerHost host) {
+    void attach(Host host) {
         this.host = host;
         UpdateManager.get().checkAsync(update -> Platform.runLater(() -> showUpdateNotice(update)));
     }
