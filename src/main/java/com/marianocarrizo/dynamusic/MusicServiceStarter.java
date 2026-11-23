@@ -32,16 +32,21 @@ public class MusicServiceStarter extends Application {
 
     private double xOffset = 0;
     private double yOffset = 0;
-    private final SingleInstance singleInstance = SingleInstance.inAppDataFolder();
+    private final SingleInstance singleInstance = SingleInstance.forCurrentUser();
     private List<File> launchFiles = List.of();
 
     @Override
     public void init() {
-        DataFolderMigration.migrateIfNeeded();
         OpenRequest launch = OpenRequest.fromPaths(getParameters().getRaw());
         launchFiles = launch.files();
         boolean runningElsewhere = singleInstance.claim() == SingleInstance.Role.SECONDARY;
         if (runningElsewhere && singleInstance.forward(launch)) System.exit(0);
+        if (!runningElsewhere) DataFolderMigration.migrateIfNeeded();
+    }
+
+    @Override
+    public void stop() {
+        singleInstance.close();
     }
 
     @Override

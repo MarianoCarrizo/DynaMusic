@@ -2,15 +2,21 @@ package com.marianocarrizo.dynamusic.controller;
 
 import java.io.File;
 import java.nio.file.Path;
+import java.util.Optional;
 
 final class LibraryRoot {
 
     private LibraryRoot() {
     }
 
-    static File rootFor(File currentRoot, File file) {
-        if (currentRoot != null && contains(currentRoot, file)) return currentRoot;
-        return file.getAbsoluteFile().getParentFile();
+    static Optional<File> rootFor(File currentRoot, File file) {
+        if (currentRoot != null && contains(currentRoot, file)) return Optional.of(currentRoot);
+        File folder = file.getAbsoluteFile().getParentFile();
+        return folder == null || isFilesystemRoot(folder) ? Optional.empty() : Optional.of(folder);
+    }
+
+    static boolean isFilesystemRoot(File folder) {
+        return normalized(folder).getParent() == null;
     }
 
     static boolean contains(File root, File file) {

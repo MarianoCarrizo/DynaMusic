@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OpenRequestTest {
@@ -118,5 +119,27 @@ class OpenRequestTest {
 
         assertEquals(List.of(song.getAbsoluteFile()),
                 OpenRequest.fromPaths(List.of(song.getAbsolutePath())).files());
+    }
+
+    @Test
+    void rejectsNetworkAndDevicePathsBeforeTouchingTheFilesystem() {
+        List<String> remote = List.of("\\\\server\\share\\song.mp3", "//server/share/song.mp3",
+                "\\\\?\\C:\\song.mp3", "\\\\.\\PhysicalDrive0\\song.mp3", "\\/server/share/song.mp3",
+                "/\\server\\share\\song.mp3");
+
+        for (String path : remote) {
+            assertTrue(OpenRequest.isNetworkOrDevicePath(path), path);
+            assertTrue(OpenRequest.decode(message(OpenRequest.HEADER, path)).orElseThrow().files().isEmpty(), path);
+            assertTrue(OpenRequest.fromPaths(List.of(path)).files().isEmpty(), path);
+        }
+    }
+
+    @Test
+    void localPathsAreNotTreatedAsNetworkPaths() throws IOException {
+        File song = audio("song.mp3");
+
+        assertFalse(OpenRequest.isNetworkOrDevicePath(song.getAbsolutePath()));
+        assertFalse(OpenRequest.isNetworkOrDevicePath("a"));
+        assertFalse(OpenRequest.isNetworkOrDevicePath("/home/user/song.mp3"));
     }
 }

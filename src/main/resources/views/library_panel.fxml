@@ -9,6 +9,7 @@
     <TextField fx:id="txtSearch" promptText="Search track by name..."/>
     <StackPane VBox.vgrow="ALWAYS">
         <TreeView fx:id="treeFiles" showRoot="false"/>
+        <Label fx:id="loadingLabel" text="Loading library..." styleClass="empty-state-hint"/>
         <VBox fx:id="emptyState" alignment="CENTER" spacing="12" styleClass="library-empty">
             <Label text="Nothing to play yet" styleClass="empty-state-title"/>
             <Button text="Open folder" onAction="#onOpenFolder" styleClass="btn-secondary"/>

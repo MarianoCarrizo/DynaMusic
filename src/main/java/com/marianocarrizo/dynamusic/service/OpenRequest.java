@@ -51,7 +51,8 @@ public record OpenRequest(List<File> files) {
     }
 
     private static Optional<File> playableFile(String raw, boolean requireAbsolute) {
-        if (raw == null || raw.isBlank() || raw.length() > MAX_PATH_LENGTH || hasControlCharacter(raw)) {
+        if (raw == null || raw.isBlank() || raw.length() > MAX_PATH_LENGTH || hasControlCharacter(raw)
+                || isNetworkOrDevicePath(raw)) {
             return Optional.empty();
         }
         Path path;
@@ -64,6 +65,14 @@ public record OpenRequest(List<File> files) {
         File file = path.toAbsolutePath().normalize().toFile();
         boolean playable = file.isFile() && AudioFileCollector.isAudioFile(file);
         return playable ? Optional.of(file) : Optional.empty();
+    }
+
+    static boolean isNetworkOrDevicePath(String raw) {
+        return raw.length() >= 2 && isSeparator(raw.charAt(0)) && isSeparator(raw.charAt(1));
+    }
+
+    private static boolean isSeparator(char character) {
+        return character == '\\' || character == '/';
     }
 
     private static boolean hasControlCharacter(String text) {

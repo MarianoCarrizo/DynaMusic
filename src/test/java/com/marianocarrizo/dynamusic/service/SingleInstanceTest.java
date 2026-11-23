@@ -11,6 +11,7 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -178,6 +179,56 @@ class SingleInstanceTest {
         first.close();
 
         assertFalse(Files.exists(dir.resolve(SingleInstance.PORT_FILE)));
+    }
+
+    @Test
+    void slowClientIsCutOffAtTheConnectionDeadlineWhileOthersStillGetServed() throws Exception {
+        File track = song("hello.mp3");
+        first = new SingleInstance(dir, 2, 20, 400);
+        first.claim();
+        first.listen(received::add);
+        int port = Integer.parseInt(Files.readString(dir.resolve(SingleInstance.PORT_FILE)).trim());
+
+        try (Socket trickler = new Socket(InetAddress.getByAddress(new byte[] {127, 0, 0, 1}), port)) {
+            trickler.setSoTimeout(3000);
+            trickler.getOutputStream().write('D');
+            second = instance();
+
+            assertTrue(second.forward(new OpenRequest(List.of(track))));
+            assertEquals(List.of(track), received.poll(WAIT_SECONDS, TimeUnit.SECONDS).files());
+            assertEquals(-1, trickler.getInputStream().read());
+        }
+    }
+
+    @Test
+    void connectionsBeyondTheWorkerLimitAreClosed() throws Exception {
+        first = new SingleInstance(dir, 2, 20, 1500);
+        first.claim();
+        first.listen(received::add);
+        int port = Integer.parseInt(Files.readString(dir.resolve(SingleInstance.PORT_FILE)).trim());
+        List<Socket> holders = new ArrayList<>();
+
+        try {
+            for (int i = 0; i < 2; i++) {
+                Socket holder = new Socket(InetAddress.getByAddress(new byte[] {127, 0, 0, 1}), port);
+                holder.getOutputStream().write('D');
+                holders.add(holder);
+            }
+            Thread.sleep(200);
+            try (Socket extra = new Socket(InetAddress.getByAddress(new byte[] {127, 0, 0, 1}), port)) {
+                extra.setSoTimeout(1000);
+                assertEquals(-1, extra.getInputStream().read());
+            }
+        } finally {
+            for (Socket holder : holders) holder.close();
+        }
+    }
+
+    @Test
+    void lockFolderIsPerUserAndOutsideTheDataFolder() {
+        Path folder = SingleInstance.lockFolder(dir.toString(), "ana maria\\x");
+
+        assertEquals(dir.resolve("DynaMusic-ana_maria_x"), folder);
     }
 
     private String sendRaw(String text) throws IOException {

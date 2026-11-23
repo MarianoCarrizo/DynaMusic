@@ -13,6 +13,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 public final class SingleInstance implements AutoCloseable {
@@ -25,6 +30,9 @@ public final class SingleInstance implements AutoCloseable {
     private static final int DEFAULT_ATTEMPTS = 15;
     private static final long DEFAULT_RETRY_DELAY_MS = 200;
     private static final int SOCKET_TIMEOUT_MS = 2000;
+    private static final long DEFAULT_CONNECTION_DEADLINE_MS = 2000;
+    private static final int WORKER_THREADS = 2;
+    private static final String LOCK_FOLDER_PREFIX = "DynaMusic-";
     private static final int BACKLOG = 4;
     private static final int MAX_PORT = 65535;
     private static final byte[] LOOPBACK = {127, 0, 0, 1};
@@ -32,22 +40,34 @@ public final class SingleInstance implements AutoCloseable {
     private final Path folder;
     private final int attempts;
     private final long retryDelayMs;
+    private final long connectionDeadlineMs;
+    private ExecutorService workers;
     private FileChannel lockChannel;
     private FileLock lock;
     private ServerSocket server;
 
     public SingleInstance(Path folder) {
-        this(folder, DEFAULT_ATTEMPTS, DEFAULT_RETRY_DELAY_MS);
+        this(folder, DEFAULT_ATTEMPTS, DEFAULT_RETRY_DELAY_MS, DEFAULT_CONNECTION_DEADLINE_MS);
     }
 
     SingleInstance(Path folder, int attempts, long retryDelayMs) {
+        this(folder, attempts, retryDelayMs, DEFAULT_CONNECTION_DEADLINE_MS);
+    }
+
+    SingleInstance(Path folder, int attempts, long retryDelayMs, long connectionDeadlineMs) {
         this.folder = folder;
         this.attempts = attempts;
         this.retryDelayMs = retryDelayMs;
+        this.connectionDeadlineMs = connectionDeadlineMs;
     }
 
-    public static SingleInstance inAppDataFolder() {
-        return new SingleInstance(YouTubeDownloader.appDir());
+    public static SingleInstance forCurrentUser() {
+        return new SingleInstance(lockFolder(System.getProperty("java.io.tmpdir"), System.getProperty("user.name")));
+    }
+
+    static Path lockFolder(String tempDirectory, String userName) {
+        String safeUser = userName == null ? "" : userName.replaceAll("[^A-Za-z0-9_.-]", "_");
+        return Path.of(tempDirectory, LOCK_FOLDER_PREFIX + safeUser);
     }
 
     public Role claim() {
@@ -93,7 +113,9 @@ public final class SingleInstance implements AutoCloseable {
             return;
         }
         ServerSocket accepting = server;
-        Thread thread = new Thread(() -> acceptLoop(accepting, onRequest), "single-instance-listener");
+        workers = newWorkers();
+        ExecutorService pool = workers;
+        Thread thread = new Thread(() -> acceptLoop(accepting, pool, onRequest), "single-instance-listener");
         thread.setDaemon(true);
         thread.start();
     }
@@ -102,6 +124,10 @@ public final class SingleInstance implements AutoCloseable {
     public void close() {
         closeQuietly(server);
         server = null;
+        if (workers != null) {
+            workers.shutdownNow();
+            workers = null;
+        }
         if (lock != null) {
             deletePortFile();
             try {
@@ -114,20 +140,44 @@ public final class SingleInstance implements AutoCloseable {
         lockChannel = null;
     }
 
-    private void acceptLoop(ServerSocket accepting, Consumer<OpenRequest> onRequest) {
+    private static ExecutorService newWorkers() {
+        return new ThreadPoolExecutor(WORKER_THREADS, WORKER_THREADS, 0, TimeUnit.MILLISECONDS,
+                new SynchronousQueue<>(), runnable -> {
+                    Thread worker = new Thread(runnable, "single-instance-worker");
+                    worker.setDaemon(true);
+                    return worker;
+                });
+    }
+
+    private void acceptLoop(ServerSocket accepting, ExecutorService pool, Consumer<OpenRequest> onRequest) {
         while (!accepting.isClosed()) {
-            try (Socket client = accepting.accept()) {
-                serve(client, onRequest);
+            try {
+                Socket client = accepting.accept();
+                submit(pool, client, onRequest);
             } catch (IOException e) {
                 if (accepting.isClosed()) return;
             }
         }
     }
 
+    private void submit(ExecutorService pool, Socket client, Consumer<OpenRequest> onRequest) {
+        try {
+            pool.execute(() -> handle(client, onRequest));
+        } catch (RejectedExecutionException e) {
+            closeQuietly(client);
+        }
+    }
+
+    private void handle(Socket client, Consumer<OpenRequest> onRequest) {
+        try (client) {
+            serve(client, onRequest);
+        } catch (IOException ignored) {
+        }
+    }
+
     private void serve(Socket client, Consumer<OpenRequest> onRequest) throws IOException {
         if (!client.getInetAddress().isLoopbackAddress()) return;
-        client.setSoTimeout(SOCKET_TIMEOUT_MS);
-        byte[] message = client.getInputStream().readNBytes(OpenRequest.MAX_BYTES + 1);
+        byte[] message = DeadlineReader.read(client, OpenRequest.MAX_BYTES + 1, connectionDeadlineMs);
         OpenRequest.decode(message).ifPresent(request -> {
             if (acknowledge(client)) onRequest.accept(request);
         });
