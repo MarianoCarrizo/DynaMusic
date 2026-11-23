@@ -1,5 +1,6 @@
 package com.marianocarrizo.dynamusic.service;
 
+import com.marianocarrizo.dynamusic.audio.AudioFormat;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -10,6 +11,7 @@ import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -30,6 +32,17 @@ class AudioFileCollectorTest {
         List<String> names = namesOf(AudioFileCollector.collect(root.toFile()));
 
         assertEquals(List.of("one.mp3", "three.wav", "two.FLAC"), names);
+    }
+
+    @Test
+    void collectsEveryRegistryFormatInAnyCase() throws IOException {
+        for (String extension : AudioFormat.allExtensions()) {
+            touch("lower/song." + extension);
+            touch("upper/SONG." + extension.toUpperCase(Locale.ROOT));
+        }
+        touch("lower/notes.txt");
+
+        assertEquals(AudioFormat.allExtensions().size() * 2, AudioFileCollector.collect(root.toFile()).size());
     }
 
     @Test

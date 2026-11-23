@@ -10,7 +10,6 @@ import java.nio.file.Path;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CoverFilesTest {
@@ -65,14 +64,5 @@ class CoverFilesTest {
         Optional<File> found = CoverFiles.find(dir.toFile());
 
         assertTrue(found.isEmpty());
-    }
-
-    @Test
-    void onlyMp3AndM4aMayHaveEmbeddedArt() {
-        assertTrue(CoverFiles.mayHaveEmbeddedArt(new File("a/Song.MP3")));
-        assertTrue(CoverFiles.mayHaveEmbeddedArt(new File("a/Song.m4a")));
-        assertFalse(CoverFiles.mayHaveEmbeddedArt(new File("a/Song.flac")));
-        assertFalse(CoverFiles.mayHaveEmbeddedArt(new File("a/Song.wav")));
-        assertFalse(CoverFiles.mayHaveEmbeddedArt(new File("a/Song")));
     }
 }

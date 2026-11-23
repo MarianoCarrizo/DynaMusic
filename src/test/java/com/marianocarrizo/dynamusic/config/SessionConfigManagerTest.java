@@ -2,6 +2,7 @@ package com.marianocarrizo.dynamusic.config;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.marianocarrizo.dynamusic.audio.cache.CacheLimit;
 import com.marianocarrizo.dynamusic.enums.TrackType;
 import com.marianocarrizo.dynamusic.model.AuraSlot;
 import com.marianocarrizo.dynamusic.model.BackgroundConfig;
@@ -18,6 +19,23 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SessionConfigManagerTest {
+
+    @Test
+    void savedCacheLimitIsReadWithoutTouchingTheRest(@TempDir Path dir) throws IOException {
+        Path file = dir.resolve("session.json");
+        Files.writeString(file, "{\"audioCacheLimit\":\"GB_10\"}");
+
+        assertEquals(CacheLimit.GB_10, new SessionConfigManager(file).readSavedCacheLimit());
+    }
+
+    @Test
+    void savedCacheLimitFallsBackToTheDefaultWhenMissingOrBroken(@TempDir Path dir) throws IOException {
+        assertEquals(CacheLimit.DEFAULT, new SessionConfigManager(dir.resolve("none.json")).readSavedCacheLimit());
+        Path broken = Files.writeString(dir.resolve("broken.json"), "{{{");
+        assertEquals(CacheLimit.DEFAULT, new SessionConfigManager(broken).readSavedCacheLimit());
+        Path old = Files.writeString(dir.resolve("old.json"), "{\"masterVolume\":0.5}");
+        assertEquals(CacheLimit.DEFAULT, new SessionConfigManager(old).readSavedCacheLimit());
+    }
 
     @Test
     void missingFileYieldsFreshConfigWithOneScene(@TempDir Path dir) {

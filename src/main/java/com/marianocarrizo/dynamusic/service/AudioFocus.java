@@ -24,6 +24,11 @@ final class AudioFocus {
         if (previewLoaded.getAsBoolean()) pausePreview.run();
     }
 
+    void claimForRequest() {
+        claimForMode();
+        pauseModePlayers.run();
+    }
+
     void claimForPreview() {
         previewSoundedLast = true;
         pauseModePlayers.run();

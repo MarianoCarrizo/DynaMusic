@@ -67,6 +67,7 @@ final class PlaylistTrackCell extends ListCell<PlaylistRow> {
     protected void updateItem(PlaylistRow item, boolean empty) {
         super.updateItem(item, empty);
         getStyleClass().remove(NOW_PLAYING_STYLE);
+        UnplayableStyle.apply(this, empty || item == null ? null : host.trackAt(getIndex()));
         if (empty || item == null) {
             setGraphic(null);
             setContextMenu(null);

@@ -23,6 +23,7 @@
             </padding>
             <Label text="DynaMusic" styleClass="window-title"/>
             <Region HBox.hgrow="ALWAYS" />
+            <fx:include fx:id="cacheSettings" source="cache_settings_button.fxml"/>
             <Button text="—" onAction="#onMinimizeWindow" styleClass="btn-window-control"/>
             <Button fx:id="btnMaximize" text="▢" onAction="#onMaximizeRestoreWindow" styleClass="btn-window-control"/>
             <Button text="✕" onAction="#onCloseWindow" styleClass="btn-window-control, btn-window-close"/>

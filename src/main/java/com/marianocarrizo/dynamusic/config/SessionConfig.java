@@ -1,5 +1,6 @@
 package com.marianocarrizo.dynamusic.config;
 
+import com.marianocarrizo.dynamusic.audio.cache.CacheLimit;
 import com.marianocarrizo.dynamusic.enums.TrackType;
 import com.marianocarrizo.dynamusic.model.BackgroundConfig;
 import com.marianocarrizo.dynamusic.model.NowPlayingSource;
@@ -70,6 +71,8 @@ public class SessionConfig {
 
     private Boolean ambianceIntroduced;
 
+    private String audioCacheLimit;
+
     public SessionConfig() {}
 
     public static SessionConfig firstRun() {
@@ -88,6 +91,18 @@ public class SessionConfig {
 
     public void adoptAmbianceIntroductionFrom(SessionConfig other) {
         ambianceIntroduced = other.ambianceIntroduced;
+    }
+
+    public CacheLimit getAudioCacheLimit() {
+        return CacheLimit.fromName(audioCacheLimit);
+    }
+
+    public void setAudioCacheLimit(CacheLimit limit) {
+        audioCacheLimit = limit == null ? null : limit.name();
+    }
+
+    public void adoptAudioCacheLimitFrom(SessionConfig other) {
+        audioCacheLimit = other.audioCacheLimit;
     }
 
     public List<Scene> getScenes() {

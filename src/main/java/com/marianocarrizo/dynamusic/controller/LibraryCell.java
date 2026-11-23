@@ -42,6 +42,7 @@ final class LibraryCell extends TreeCell<File> {
     @Override
     protected void updateItem(File item, boolean empty) {
         super.updateItem(item, empty);
+        UnplayableStyle.apply(this, empty ? null : item);
         if (empty || item == null) {
             setText(null);
             setContextMenu(null);

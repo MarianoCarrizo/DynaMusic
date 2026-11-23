@@ -5,7 +5,6 @@ import java.io.UncheckedIOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -19,16 +18,11 @@ public final class DataFolderMigration {
     }
 
     public static void migrateIfNeeded() {
-        String osName = System.getProperty("os.name", "");
-        String appdata = System.getenv("APPDATA");
-        String home = System.getProperty("user.home");
-        migrate(legacyDir(osName, appdata, home), YouTubeDownloader.appDir(osName, appdata, home));
+        migrate(AppDataFolder.parent().resolve(LEGACY_FOLDER_NAME), AppDataFolder.root());
     }
 
     static Path legacyDir(String osName, String appdata, String home) {
-        return (YtDlpManager.isWindows(osName) && appdata != null && !appdata.isBlank())
-                ? Paths.get(appdata, LEGACY_FOLDER_NAME)
-                : Paths.get(home, LEGACY_FOLDER_NAME);
+        return AppDataFolder.parent(osName, appdata, home).resolve(LEGACY_FOLDER_NAME);
     }
 
     static boolean migrate(Path oldDir, Path newDir) {

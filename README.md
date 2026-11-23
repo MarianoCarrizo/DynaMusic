@@ -41,7 +41,15 @@ Opcional: **Node.js** o **Deno** mejoran la descarga desde YouTube.
 
 ## Formatos de audio
 
-**Soportados:** MP3, WAV y FLAC. **No soportados:** OGG, Opus, M4A/AAC, WMA, AIFF y otros (no aparecen en la biblioteca). Lo que se baja de YouTube se guarda como MP3.
+**Soportados:** MP3, WAV, FLAC, AIFF, M4A, AAC, OGG, Opus, WMA y APE. Aparecen en la biblioteca, se pueden arrastrar y abrir con DynaMusic desde el Explorador.
+
+**Necesitan ffmpeg:** OGG, Opus, AAC, WMA, APE, los M4A con ALAC y los WAV, AIFF o FLAC de más de 96 kHz (se remuestrean a 96 kHz). El instalador incluye ffmpeg. Sin ffmpeg esos archivos siguen en la lista, atenuados, y al reproducirlos se explica el motivo; MP3, WAV, AIFF, M4A (AAC) y FLAC funcionan igual.
+
+**Calidad:** los 24 bits se conservan, sin dither ni recorte a 16 bits. Bajo el título se ve el formato, la profundidad, la frecuencia y el bitrate del archivo original, y se resalta cuando es alta resolución (más de 16 bits o más de 48 kHz).
+
+**Caché:** los FLAC y los formatos que pasan por ffmpeg se convierten una sola vez a WAV en `%APPDATA%\DynaMusic\cache\audio`. La segunda reproducción es inmediata y la pista siguiente de una playlist se prepara por adelantado. El tamaño máximo va de 512 MB a 20 GB (2 GB por defecto) y se cambia con el engranaje de la cabecera de la ventana, que también muestra el espacio usado y permite vaciar la caché. Cuando se llena se borra primero lo que hace más tiempo que no se usa.
+
+**Tags:** el título, el artista, el álbum y la carátula embebida se leen de FLAC, MP3, OGG, Opus y M4A. Lo que se baja de YouTube se guarda como MP3.
 
 Tus escenas y descargas se guardan en `%APPDATA%\DynaMusic` y no se borran al actualizar ni desinstalar.
 

@@ -1,10 +1,12 @@
 package com.marianocarrizo.dynamusic.service;
 
+import com.marianocarrizo.dynamusic.audio.AudioFormat;
+import com.marianocarrizo.dynamusic.tags.CoverReader;
+import com.marianocarrizo.dynamusic.tags.TagFormat;
 import javafx.application.Platform;
-import javafx.collections.MapChangeListener;
 import javafx.scene.image.Image;
-import javafx.scene.media.Media;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -17,7 +19,6 @@ public final class CoverArtLoader {
 
     private static final int DECODE_PIXELS = 112;
     private static final int CACHE_SIZE = 32;
-    private static final String EMBEDDED_IMAGE_KEY = "image";
 
     private final ExecutorService io = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "cover-art");
@@ -31,7 +32,6 @@ public final class CoverArtLoader {
             return size() > CACHE_SIZE;
         }
     };
-    private Media parsingMedia;
 
     public void load(File track, Consumer<Optional<Image>> onResult) {
         final int request = requests.begin();
@@ -41,7 +41,8 @@ public final class CoverArtLoader {
         }
         final boolean[] embeddedShown = {false};
         showFolderCover(track.getAbsoluteFile().getParentFile(), request, embeddedShown, onResult);
-        if (CoverFiles.mayHaveEmbeddedArt(track)) readEmbeddedArt(track, request, embeddedShown, onResult);
+        TagFormat format = AudioFormat.tagFormatOf(track);
+        if (format != TagFormat.NONE) readEmbeddedArt(track, format, request, embeddedShown, onResult);
     }
 
     private void showFolderCover(File folder, int request, boolean[] embeddedShown,
@@ -62,24 +63,21 @@ public final class CoverArtLoader {
         });
     }
 
-    private void readEmbeddedArt(File track, int request, boolean[] embeddedShown,
+    private void readEmbeddedArt(File track, TagFormat format, int request, boolean[] embeddedShown,
                                  Consumer<Optional<Image>> onResult) {
-        try {
-            Media media = new Media(track.toURI().toString());
-            parsingMedia = media;
-            Consumer<Object> deliver = value -> {
-                if (!(value instanceof Image image) || !requests.isCurrent(request)) return;
+        io.submit(() -> {
+            Optional<Image> image = CoverReader.read(track, format).map(CoverArtLoader::decode)
+                    .filter(decoded -> !decoded.isError());
+            if (image.isEmpty()) return;
+            Platform.runLater(() -> {
+                if (!requests.isCurrent(request)) return;
                 embeddedShown[0] = true;
-                onResult.accept(Optional.of(image));
-            };
-            media.getMetadata().addListener((MapChangeListener<String, Object>) change -> {
-                if (change.wasAdded() && EMBEDDED_IMAGE_KEY.equals(change.getKey())) {
-                    deliver.accept(change.getValueAdded());
-                }
+                onResult.accept(image);
             });
-            deliver.accept(media.getMetadata().get(EMBEDDED_IMAGE_KEY));
-        } catch (RuntimeException e) {
-            parsingMedia = null;
-        }
+        });
+    }
+
+    private static Image decode(byte[] bytes) {
+        return new Image(new ByteArrayInputStream(bytes), DECODE_PIXELS, DECODE_PIXELS, true, true);
     }
 }

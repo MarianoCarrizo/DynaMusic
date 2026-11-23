@@ -1,11 +1,14 @@
 package com.marianocarrizo.dynamusic.controller;
 
+import com.marianocarrizo.dynamusic.audio.AudioFormat;
 import com.marianocarrizo.dynamusic.model.NowPlaying;
 import com.marianocarrizo.dynamusic.model.NowPlayingModel;
 import com.marianocarrizo.dynamusic.config.SessionConfig;
 import com.marianocarrizo.dynamusic.model.NowPlayingSource;
 import com.marianocarrizo.dynamusic.model.PlaylistItem;
 import com.marianocarrizo.dynamusic.service.AudioFileCollector;
+import com.marianocarrizo.dynamusic.service.FfmpegLocator;
+import com.marianocarrizo.dynamusic.service.MusicService;
 import com.marianocarrizo.dynamusic.service.PlaylistManager;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -33,6 +36,8 @@ public final class PlaylistPanelController {
         void saveSession();
 
         PlaylistManager playlistManager();
+
+        MusicService musicService();
 
         NowPlayingModel nowPlaying();
 
@@ -75,6 +80,8 @@ public final class PlaylistPanelController {
             refresh();
         });
         host.nowPlaying().snapshotProperty().addListener((obs, oldValue, newValue) -> refreshPlayingState());
+        host.musicService().tags().onLoaded(this::refreshRowLabels);
+        FfmpegLocator.onResolved(() -> Platform.runLater(lstPlaylistTracks::refresh));
         lstPlaylistTracks.setPlaceholder(emptyListHint());
         lstPlaylistTracks.setOnDragEntered(e -> dragActivity.begin());
         lstPlaylistTracks.setOnDragExited(e -> dragActivity.end());
@@ -112,6 +119,24 @@ public final class PlaylistPanelController {
 
     void showPendingEntry(String text) {
         lstPlaylistTracks.getItems().add(PlaylistRow.pending(text));
+    }
+
+    private PlaylistRow rowFor(PlaylistItem item) {
+        return PlaylistRow.of(item, host.musicService().tags().peek(new File(item.getPath())));
+    }
+
+    private void requestTags() {
+        host.musicService().tags().request(playlistManager.getActiveItems().stream()
+                .map(item -> new File(item.getPath()))
+                .toList());
+    }
+
+    private void refreshRowLabels() {
+        List<PlaylistItem> items = playlistManager.getActiveItems();
+        for (int i = 0; i < items.size() && i < lstPlaylistTracks.getItems().size(); i++) {
+            PlaylistRow row = rowFor(items.get(i));
+            if (!row.equals(lstPlaylistTracks.getItems().get(i))) lstPlaylistTracks.getItems().set(i, row);
+        }
     }
 
     private void refreshPlayingState() {
@@ -161,9 +186,10 @@ public final class PlaylistPanelController {
             int selected = lstPlaylistTracks.getSelectionModel().getSelectedIndex();
             lstPlaylistTracks.getItems().setAll(
                 playlistManager.getActiveItems().stream()
-                    .map(PlaylistRow::of)
+                    .map(this::rowFor)
                     .toList()
             );
+            requestTags();
             selectTrackRow(selected);
             lstPlaylistTracks.refresh();
 
@@ -269,7 +295,7 @@ public final class PlaylistPanelController {
                 NowPlaying current = host.nowPlaying().get();
                 boolean currentRow = current.source() == NowPlayingSource.PLAYLIST
                         && index == playlistManager.currentDisplayIndex();
-                return RowPlayback.of(currentRow, current.playing());
+                return RowPlayback.of(currentRow, current.playing(), current.isLoading());
             }
             @Override public File trackAt(int index) {
                 List<PlaylistItem> items = playlistManager.getActiveItems();
@@ -311,7 +337,7 @@ public final class PlaylistPanelController {
     }
 
     private void showNoAudioFilesMessage() {
-        new Alert(Alert.AlertType.INFORMATION, "No audio files (mp3, wav, flac) found in that folder.").showAndWait();
+        new Alert(Alert.AlertType.INFORMATION, "No audio files (" + AudioFormat.displayList() + ") found in that folder.").showAndWait();
     }
 
     private static String playlistNameFor(File folder) {

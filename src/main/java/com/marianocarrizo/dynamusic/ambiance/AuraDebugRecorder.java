@@ -1,11 +1,12 @@
 package com.marianocarrizo.dynamusic.ambiance;
 
+import com.marianocarrizo.dynamusic.service.AppDataFolder;
+
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Locale;
 
 final class AuraDebugRecorder {
@@ -68,11 +69,7 @@ final class AuraDebugRecorder {
     }
 
     static Path file() {
-        String appdata = System.getenv("APPDATA");
-        Path dir = (appdata != null && !appdata.isBlank())
-                ? Paths.get(appdata, "DynaMusic")
-                : Paths.get(System.getProperty("user.home"), "DynaMusic");
-        return dir.resolve("audio-debug.csv");
+        return AppDataFolder.child("audio-debug.csv");
     }
 
     private static String fmt(double v) {

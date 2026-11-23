@@ -1,11 +1,13 @@
 package com.marianocarrizo.dynamusic.controller;
 
+import com.marianocarrizo.dynamusic.audio.AudioQuality;
 import com.marianocarrizo.dynamusic.component.CoverView;
 import com.marianocarrizo.dynamusic.component.IconButton;
 import com.marianocarrizo.dynamusic.component.IconToggleButton;
 import com.marianocarrizo.dynamusic.component.Icons;
 import com.marianocarrizo.dynamusic.component.PlayPauseButton;
 import com.marianocarrizo.dynamusic.component.SeekBar;
+import com.marianocarrizo.dynamusic.model.LoadState;
 import com.marianocarrizo.dynamusic.model.NowPlaying;
 import com.marianocarrizo.dynamusic.model.NowPlayingModel;
 import com.marianocarrizo.dynamusic.model.NowPlayingSource;
@@ -13,17 +15,21 @@ import com.marianocarrizo.dynamusic.model.RepeatMode;
 import com.marianocarrizo.dynamusic.service.CoverArtLoader;
 import javafx.fxml.FXML;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressIndicator;
 import javafx.scene.image.Image;
 import javafx.scene.input.ContextMenuEvent;
 import javafx.scene.layout.HBox;
 
 import java.io.File;
 import java.util.Objects;
+import java.util.Optional;
 
 public final class NowPlayingBarController {
 
     private static final String PLACEHOLDER_RESOURCE = "/images/cover-placeholder.png";
     private static final int PLACEHOLDER_PIXELS = 112;
+    private static final String FAILED_DETAIL_STYLE = "now-playing-failed";
+    private static final String HI_RES_STYLE = "now-playing-quality-hires";
 
     interface Host extends VolumeController.Host, TrackActionsMenu.Host {
         NowPlayingModel nowPlaying();
@@ -48,8 +54,10 @@ public final class NowPlayingBarController {
     @FXML private HBox trackInfo;
     @FXML private CoverView cover;
     @FXML private Label lblTitle;
+    @FXML private ProgressIndicator loadingIndicator;
     @FXML private Label lblDetail;
     @FXML private Label lblSource;
+    @FXML private Label lblQuality;
     @FXML private IconToggleButton btnShuffle;
     @FXML private IconButton btnPrevious;
     @FXML private PlayPauseButton btnPlayPause;
@@ -87,6 +95,7 @@ public final class NowPlayingBarController {
         host.musicService().setActiveProgressListener(seekBar::showPlayback);
         volumeController.attach(host);
         host.nowPlaying().snapshotProperty().addListener((obs, oldValue, newValue) -> render(newValue));
+        host.musicService().quality().onLoaded(() -> showQuality(shown.file()));
         render(host.nowPlaying().get());
     }
 
@@ -137,18 +146,31 @@ public final class NowPlayingBarController {
         showText(lblDetail, current.detail());
         showText(lblSource, current.badge());
         btnPlayPause.showPlaying(current.playing());
-        TransportAvailability available = TransportAvailability.of(current.source());
-        btnShuffle.setDisable(!available.shuffle());
-        btnPrevious.setDisable(!available.previous());
-        btnNext.setDisable(!available.next());
-        btnRepeat.setDisable(!available.repeat());
-        btnShuffle.setSelected(available.shuffle() && host.isShuffleOn());
-        showRepeat(available.repeat() ? host.repeatMode(current.source()) : RepeatMode.OFF);
+        btnPlayPause.setDisable(current.isBusy());
+        loadingIndicator.setVisible(current.isLoading());
+        loadingIndicator.setManaged(current.isLoading());
+        lblDetail.getStyleClass().remove(FAILED_DETAIL_STYLE);
+        if (current.state() == LoadState.FAILED) lblDetail.getStyleClass().add(FAILED_DETAIL_STYLE);
+        TransportAvailability supported = TransportAvailability.of(current.source());
+        btnShuffle.setDisable(!supported.shuffle());
+        btnPrevious.setDisable(!supported.previous());
+        btnNext.setDisable(!supported.next());
+        btnRepeat.setDisable(!supported.repeat());
+        btnShuffle.setSelected(supported.shuffle() && host.isShuffleOn());
+        showRepeat(supported.repeat() ? host.repeatMode(current.source()) : RepeatMode.OFF);
         boolean idle = current.source() == NowPlayingSource.NONE;
-        seekBar.setSeekEnabled(!idle);
+        seekBar.setSeekEnabled(!idle && !current.isBusy());
         showProgress(current, idle);
         showCover(current.file());
+        showQuality(current.file());
         shown = current;
+    }
+
+    private void showQuality(File file) {
+        Optional<AudioQuality> quality = file == null ? Optional.empty() : host.musicService().quality().peek(file);
+        showText(lblQuality, quality.map(AudioQuality::label).orElse(""));
+        lblQuality.getStyleClass().remove(HI_RES_STYLE);
+        if (quality.map(AudioQuality::isHiRes).orElse(false)) lblQuality.getStyleClass().add(HI_RES_STYLE);
     }
 
     private void showText(Label label, String text) {
@@ -159,8 +181,8 @@ public final class NowPlayingBarController {
 
     private void showProgress(NowPlaying current, boolean idle) {
         boolean sameTrack = current.source() == shown.source() && current.title().equals(shown.title());
-        if (idle || !sameTrack) seekBar.showNoTrack();
-        if (!idle) host.musicService().reportActiveProgress();
+        if (idle || current.isBusy() || !sameTrack) seekBar.showNoTrack();
+        if (!idle && !current.isBusy()) host.musicService().reportActiveProgress();
     }
 
     private void showCover(File file) {

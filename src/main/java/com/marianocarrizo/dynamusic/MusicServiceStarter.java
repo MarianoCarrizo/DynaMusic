@@ -6,6 +6,7 @@ import com.marianocarrizo.dynamusic.enums.TrackType;
 import com.marianocarrizo.dynamusic.config.SessionConfig;
 import com.marianocarrizo.dynamusic.config.SessionConfigManager;
 import com.marianocarrizo.dynamusic.service.DataFolderMigration;
+import com.marianocarrizo.dynamusic.service.FfmpegLocator;
 import com.marianocarrizo.dynamusic.service.OpenRequest;
 import com.marianocarrizo.dynamusic.service.SingleInstance;
 import javafx.application.Application;
@@ -122,6 +123,8 @@ public class MusicServiceStarter extends Application {
         // Sondeo de ffmpeg: se inyecta ANTES de applySession para que la restauración
         // del boomerang sepa si ffmpeg está disponible antes de intentar un re-bake
         controller.setFfmpegAvailable(BoomerangBaker.isFfmpegAvailable());
+        FfmpegLocator.onResolved(() -> Platform.runLater(
+                () -> controller.setFfmpegAvailable(BoomerangBaker.isFfmpegAvailable())));
 
         // Auto-carga de sesión guardada (G3): se aplica ANTES de stage.show()
         // para que la UI refleje el estado anterior desde el primer render

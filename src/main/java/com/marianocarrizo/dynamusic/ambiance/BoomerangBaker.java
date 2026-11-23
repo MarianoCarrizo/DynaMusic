@@ -1,5 +1,6 @@
 package com.marianocarrizo.dynamusic.ambiance;
 
+import com.marianocarrizo.dynamusic.service.AppDataFolder;
 import com.marianocarrizo.dynamusic.service.FfmpegLocator;
 
 import java.io.IOException;
@@ -34,48 +35,14 @@ public final class BoomerangBaker {
 
     // --- Sondeo estático de ffmpeg ---
 
-    /**
-     * Sondeo de un solo disparo con timeout de 3 segundos.
-     */
     public static boolean isFfmpegAvailable() {
-        try {
-            Optional<String> ffmpeg = FfmpegLocator.executable();
-            if (ffmpeg.isEmpty()) return false;
-            Process p = new ProcessBuilder(ffmpeg.get(), "-version")
-                    .redirectErrorStream(true)
-                    .start();
-            // Drenar salida para evitar bloqueo en el buffer del proceso
-            p.getInputStream().transferTo(java.io.OutputStream.nullOutputStream());
-            boolean done = p.waitFor(3, TimeUnit.SECONDS);
-            if (!done) {
-                p.destroyForcibly();
-                return false;
-            }
-            return p.exitValue() == 0;
-        } catch (IOException e) {
-            return false;
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return false;
-        }
+        return FfmpegLocator.isAvailable();
     }
 
     // --- Directorio de caché ---
 
-    /**
-     * Resuelve y crea (si no existe) el directorio de caché de boomerang.
-     * Usa %APPDATA%/DynaMusic/boomerang-cache/ con fallback a user.home.
-     */
     private Path cacheDir() throws IOException {
-        String appdata = System.getenv("APPDATA");
-        Path dir;
-        if (appdata != null && !appdata.isBlank()) {
-            dir = Paths.get(appdata, "DynaMusic", "boomerang-cache");
-        } else {
-            dir = Paths.get(System.getProperty("user.home"), "DynaMusic", "boomerang-cache");
-        }
-        Files.createDirectories(dir);
-        return dir;
+        return Files.createDirectories(AppDataFolder.child("boomerang-cache"));
     }
 
     // --- Clave de caché ---

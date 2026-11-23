@@ -125,6 +125,10 @@ jobs:
           Get-ChildItem "$src/bin" | Where-Object { $_.Name -ne 'ffplay.exe' } | Copy-Item -Destination $bundle
           Copy-Item "$src/LICENSE.txt" $bundle
           & "$bundle/ffmpeg.exe" -version | Select-Object -First 1
+          $decoders = & "$bundle/ffmpeg.exe" -hide_banner -decoders | Out-String
+          foreach ($decoder in 'flac', 'vorbis', 'opus', 'aac', 'alac', 'wmav2', 'ape') {
+            if ($decoders -notmatch "\b$decoder\b") { throw "Bundled ffmpeg lacks the $decoder decoder" }
+          }
 
       - name: Ensure Inno Setup 6.3 or newer
         shell: pwsh

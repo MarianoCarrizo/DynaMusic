@@ -6,15 +6,16 @@
       fx:controller="com.marianocarrizo.dynamusic.controller.PlaylistPanelController"
       spacing="10" VBox.vgrow="ALWAYS">
     <HBox spacing="8" alignment="CENTER_LEFT">
-        <ComboBox fx:id="cmbPlaylist" HBox.hgrow="ALWAYS" maxWidth="Infinity" promptText="Select playlist"/>
-        <Label fx:id="lblTrackCounter" text="— / —" minWidth="56" alignment="CENTER" styleClass="playlist-counter"/>
-        <Button fx:id="btnNewPlaylist" text="+" onAction="#onNewPlaylist" styleClass="btn-secondary">
+        <ComboBox fx:id="cmbPlaylist" HBox.hgrow="ALWAYS" minWidth="60" prefWidth="160" maxWidth="Infinity"
+                  promptText="Select playlist"/>
+        <Label fx:id="lblTrackCounter" text="— / —" minWidth="-Infinity" alignment="CENTER" styleClass="playlist-counter"/>
+        <Button fx:id="btnNewPlaylist" text="+" minWidth="-Infinity" onAction="#onNewPlaylist" styleClass="btn-secondary">
             <tooltip>
                 <Tooltip text="Create a new playlist"/>
             </tooltip>
         </Button>
-        <Button fx:id="btnRenamePlaylist" text="Rename" onAction="#onRenamePlaylist" styleClass="btn-secondary"/>
-        <Button fx:id="btnDeletePlaylist" text="Delete" onAction="#onDeletePlaylist" styleClass="btn-secondary"/>
+        <Button fx:id="btnRenamePlaylist" text="Rename" minWidth="-Infinity" onAction="#onRenamePlaylist" styleClass="btn-secondary"/>
+        <Button fx:id="btnDeletePlaylist" text="Delete" minWidth="-Infinity" onAction="#onDeletePlaylist" styleClass="btn-secondary"/>
     </HBox>
 
     <ListView fx:id="lstPlaylistTracks" VBox.vgrow="ALWAYS" prefHeight="150"/>

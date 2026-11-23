@@ -2,6 +2,8 @@ package com.marianocarrizo.dynamusic.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.marianocarrizo.dynamusic.audio.cache.CacheLimit;
+import com.marianocarrizo.dynamusic.service.AppDataFolder;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -9,7 +11,6 @@ import java.io.Writer;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 
 /**
@@ -40,11 +41,16 @@ public class SessionConfigManager {
      */
     private Path configPath() {
         if (pathOverride != null) return pathOverride;
-        String appdata = System.getenv("APPDATA");
-        if (appdata == null || appdata.isEmpty()) {
-            appdata = System.getProperty("user.home") + "/AppData/Roaming";
+        return AppDataFolder.child("session.json");
+    }
+
+    public CacheLimit readSavedCacheLimit() {
+        try (Reader reader = Files.newBufferedReader(configPath())) {
+            SessionConfig cfg = gson.fromJson(reader, SessionConfig.class);
+            return cfg == null ? CacheLimit.DEFAULT : cfg.getAudioCacheLimit();
+        } catch (Exception unreadable) {
+            return CacheLimit.DEFAULT;
         }
-        return Paths.get(appdata, "DynaMusic", "session.json");
     }
 
     /**

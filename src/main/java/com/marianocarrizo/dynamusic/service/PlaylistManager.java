@@ -489,6 +489,25 @@ public class PlaylistManager {
         return next();
     }
 
+    public Optional<File> peekNext() {
+        if (activePlaylist == null || order.length == 0) return Optional.empty();
+        if (repeat == RepeatMode.ONE && !currentTrackRemoved) return getCurrentTrack();
+        int cursor = position;
+        if (currentTrackRemoved) {
+            if (cursor < order.length) return fileAtNaturalIndex(order[cursor]);
+            cursor = order.length - 1;
+        }
+        if (cursor < order.length - 1) return fileAtNaturalIndex(order[cursor + 1]);
+        if (repeat == RepeatMode.ALL && !shuffle) return fileAtNaturalIndex(0);
+        return Optional.empty();
+    }
+
+    private Optional<File> fileAtNaturalIndex(int index) {
+        List<String> paths = activePlaylist.getPaths();
+        if (index < 0 || index >= paths.size()) return Optional.empty();
+        return Optional.of(new File(paths.get(index)));
+    }
+
     public boolean isShuffle() { return shuffle; }
 
     /** Cantidad de pistas de la playlist activa; 0 si no hay ninguna seleccionada. */

@@ -3,6 +3,7 @@ package com.marianocarrizo.dynamusic.controller;
 import com.marianocarrizo.dynamusic.model.NowPlaying;
 import com.marianocarrizo.dynamusic.model.NowPlayingModel;
 import com.marianocarrizo.dynamusic.model.NowPlayingSource;
+import com.marianocarrizo.dynamusic.service.PendingLoad;
 import com.marianocarrizo.dynamusic.service.PlaybackState;
 import com.marianocarrizo.dynamusic.service.SoundingTrack;
 
@@ -26,6 +27,7 @@ final class NowPlayingTracker {
     }
 
     static NowPlaying decide(PlaybackState state, String playlistName) {
+        if (state.pending().isPresent()) return pendingOf(state.pending().get(), playlistName);
         if (state.previewSoundedLast()) {
             return of(NowPlayingSource.PREVIEW, "", state.preview());
         }
@@ -35,6 +37,17 @@ final class NowPlayingTracker {
             case PLAYLIST -> of(NowPlayingSource.PLAYLIST, playlistName, state.playlist());
             case ON_DEMAND -> of(NowPlayingSource.ON_DEMAND, "", state.onDemand());
         };
+    }
+
+    private static NowPlaying pendingOf(PendingLoad load, String playlistName) {
+        String sourceName = switch (load.source()) {
+            case MOOD -> load.moodType() == null ? "" : load.moodType().name();
+            case PLAYLIST -> playlistName;
+            default -> "";
+        };
+        SoundingTrack track = load.track();
+        return new NowPlaying(load.source(), sourceName, track.title(), track.detail(), track.file(), false,
+                track.state());
     }
 
     private static NowPlaying of(NowPlayingSource source, String sourceName, SoundingTrack track) {

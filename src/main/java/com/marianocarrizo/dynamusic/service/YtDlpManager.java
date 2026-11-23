@@ -34,7 +34,7 @@ public final class YtDlpManager {
     private static final long PROBE_TIMEOUT_SEC  = 10;
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(15);
 
-    private static final YtDlpManager INSTANCE = new YtDlpManager(YouTubeDownloader::appDir,
+    private static final YtDlpManager INSTANCE = new YtDlpManager(AppDataFolder::root,
             System.getProperty("os.name", ""), System.getProperty("os.arch", ""));
 
     public static YtDlpManager get() { return INSTANCE; }

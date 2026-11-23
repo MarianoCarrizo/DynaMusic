@@ -1,5 +1,6 @@
 package com.marianocarrizo.dynamusic.controller;
 
+import com.marianocarrizo.dynamusic.audio.AudioFormat;
 import com.marianocarrizo.dynamusic.component.FilledSlider;
 import com.marianocarrizo.dynamusic.enums.TrackType;
 import com.marianocarrizo.dynamusic.model.AuraConfig;
@@ -210,7 +211,8 @@ final class MoodTabContent extends VBox {
         FileChooser chooser = new FileChooser();
         chooser.setTitle("Select track for " + capitalize(slot.name()));
         chooser.getExtensionFilters().add(
-                new FileChooser.ExtensionFilter("Audio (mp3, wav, flac)", "*.mp3", "*.wav", "*.flac"));
+                new FileChooser.ExtensionFilter("Audio (" + AudioFormat.displayList() + ")",
+                        AudioFormat.chooserPatterns()));
         String current = host.session().getActiveScene().getAssignments().get(trackType);
         File dir = null;
         if (current != null) dir = new File(current).getParentFile();
