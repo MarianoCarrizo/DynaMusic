@@ -3,6 +3,7 @@ package com.marianocarrizo.dynamusic.service;
 import com.marianocarrizo.dynamusic.audio.AudioFormat;
 import com.marianocarrizo.dynamusic.enums.TrackType;
 import com.marianocarrizo.dynamusic.model.NowPlayingSource;
+import com.marianocarrizo.dynamusic.tags.TrackTagStore;
 import com.marianocarrizo.dynamusic.utils.ConversorUtils;
 import javafx.application.Platform;
 import javafx.scene.media.Media;
@@ -86,6 +87,7 @@ public class MusicService {
      * Executor de un único hilo para la preparación de audio.
      * Se usa para conversión FLAC + cálculo RMS fuera del hilo FX.
      */
+    private final TrackTagStore tags = new TrackTagStore(AudioFormat::tagFormatOf, Platform::runLater);
     private final ExecutorService audioPrep = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "audio-prep");
         t.setDaemon(true);
@@ -133,6 +135,11 @@ public class MusicService {
         this.loopEnabled = false;
         this.previewLoopEnabled = false;
         this.previewPlayer = null;
+        tags.onLoaded(this::notifyPlaybackChanged);
+    }
+
+    public TrackTagStore tags() {
+        return tags;
     }
 
     // =========================================================================
@@ -200,21 +207,22 @@ public class MusicService {
 
     private SoundingTrack previewSounding() {
         if (previewPlayer == null || previewFile == null) return SoundingTrack.ABSENT;
-        return SoundingTrack.of(previewFile, isPreviewPlaying());
+        return SoundingTrack.of(previewFile, tags.peek(previewFile), isPreviewPlaying());
     }
 
     private SoundingTrack moodSounding() {
         File file = currentTrack == null || !players.containsKey(currentTrack) ? null : trackFiles.get(currentTrack);
-        return file == null ? SoundingTrack.ABSENT : SoundingTrack.of(file, isPlaying());
+        return file == null ? SoundingTrack.ABSENT : SoundingTrack.of(file, tags.peek(file), isPlaying());
     }
 
     private SoundingTrack playlistSounding() {
-        return playlistFile == null ? SoundingTrack.ABSENT : SoundingTrack.of(playlistFile, isPlaylistPlaying());
+        return playlistFile == null ? SoundingTrack.ABSENT : SoundingTrack.of(playlistFile, tags.peek(playlistFile), isPlaylistPlaying());
     }
 
     private SoundingTrack onDemandSounding() {
         if (onDemandFile == null) return SoundingTrack.ABSENT;
-        return SoundingTrack.of(onDemandTitle, onDemandFile, isOnDemandPlaying());
+        if (onDemandTitle == null) return SoundingTrack.of(onDemandFile, tags.peek(onDemandFile), isOnDemandPlaying());
+        return SoundingTrack.of(onDemandTitle, onDemandFile, tags.peek(onDemandFile), isOnDemandPlaying());
     }
 
     private void notifyPlaybackChanged() {
@@ -356,6 +364,7 @@ public class MusicService {
 
         final int seq = loadSeq.merge(type, 1, Integer::sum);
 
+        tags.request(file);
         audioPrep.submit(() -> {
             try {
                 final File finalFile;
@@ -538,6 +547,7 @@ public class MusicService {
         }
 
         // (3) Preparación en background (conversión FLAC + RMS)
+        tags.request(file);
         audioPrep.submit(() -> {
             try {
                 final File finalFile;
@@ -775,6 +785,7 @@ public class MusicService {
         cancelActiveFade();
         final int seq = playlistLoads.begin();
 
+        tags.request(file);
         audioPrep.submit(() -> {
             try {
                 final File playable = AudioFormat.FLAC.matches(file)
@@ -947,6 +958,7 @@ public class MusicService {
         audioFocus.claimForMode();
         final int seq = ++onDemandSeq;
 
+        tags.request(file);
         audioPrep.submit(() -> {
             try {
                 final File finalFile = AudioFormat.FLAC.matches(file)
@@ -997,7 +1009,7 @@ public class MusicService {
                         attachSpectrumListener(player);
                         onDemandPlayer = player;
                         onDemandFile = file;
-                        onDemandTitle = title != null && !title.isBlank() ? title : TrackNames.title(file.getName());
+                        onDemandTitle = title != null && !title.isBlank() ? title : null;
                         player.play();
                         if (onStarted != null) onStarted.run();
                         notifyPlaybackChanged();

@@ -7,6 +7,7 @@ import com.marianocarrizo.dynamusic.config.SessionConfig;
 import com.marianocarrizo.dynamusic.model.NowPlayingSource;
 import com.marianocarrizo.dynamusic.model.PlaylistItem;
 import com.marianocarrizo.dynamusic.service.AudioFileCollector;
+import com.marianocarrizo.dynamusic.service.MusicService;
 import com.marianocarrizo.dynamusic.service.PlaylistManager;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -34,6 +35,8 @@ public final class PlaylistPanelController {
         void saveSession();
 
         PlaylistManager playlistManager();
+
+        MusicService musicService();
 
         NowPlayingModel nowPlaying();
 
@@ -76,6 +79,7 @@ public final class PlaylistPanelController {
             refresh();
         });
         host.nowPlaying().snapshotProperty().addListener((obs, oldValue, newValue) -> refreshPlayingState());
+        host.musicService().tags().onLoaded(this::refreshRowLabels);
         lstPlaylistTracks.setPlaceholder(emptyListHint());
         lstPlaylistTracks.setOnDragEntered(e -> dragActivity.begin());
         lstPlaylistTracks.setOnDragExited(e -> dragActivity.end());
@@ -113,6 +117,24 @@ public final class PlaylistPanelController {
 
     void showPendingEntry(String text) {
         lstPlaylistTracks.getItems().add(PlaylistRow.pending(text));
+    }
+
+    private PlaylistRow rowFor(PlaylistItem item) {
+        return PlaylistRow.of(item, host.musicService().tags().peek(new File(item.getPath())));
+    }
+
+    private void requestTags() {
+        host.musicService().tags().request(playlistManager.getActiveItems().stream()
+                .map(item -> new File(item.getPath()))
+                .toList());
+    }
+
+    private void refreshRowLabels() {
+        List<PlaylistItem> items = playlistManager.getActiveItems();
+        for (int i = 0; i < items.size() && i < lstPlaylistTracks.getItems().size(); i++) {
+            PlaylistRow row = rowFor(items.get(i));
+            if (!row.equals(lstPlaylistTracks.getItems().get(i))) lstPlaylistTracks.getItems().set(i, row);
+        }
     }
 
     private void refreshPlayingState() {
@@ -162,9 +184,10 @@ public final class PlaylistPanelController {
             int selected = lstPlaylistTracks.getSelectionModel().getSelectedIndex();
             lstPlaylistTracks.getItems().setAll(
                 playlistManager.getActiveItems().stream()
-                    .map(PlaylistRow::of)
+                    .map(this::rowFor)
                     .toList()
             );
+            requestTags();
             selectTrackRow(selected);
             lstPlaylistTracks.refresh();
 

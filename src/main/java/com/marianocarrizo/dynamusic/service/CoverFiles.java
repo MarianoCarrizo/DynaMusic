@@ -1,9 +1,5 @@
 package com.marianocarrizo.dynamusic.service;
 
-import com.marianocarrizo.dynamusic.audio.AudioFormat;
-import com.marianocarrizo.dynamusic.audio.PlaybackRoute;
-import com.marianocarrizo.dynamusic.tags.TagFormat;
-
 import java.io.File;
 import java.util.HashMap;
 import java.util.List;
@@ -31,11 +27,5 @@ public final class CoverFiles {
             }
         }
         return Optional.empty();
-    }
-
-    public static boolean mayHaveEmbeddedArt(File track) {
-        return AudioFormat.fromFile(track)
-                .filter(format -> format.route() == PlaybackRoute.NATIVE && format.tagFormat() != TagFormat.NONE)
-                .isPresent();
     }
 }
