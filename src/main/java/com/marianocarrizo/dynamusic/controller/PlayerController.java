@@ -5,11 +5,7 @@ import com.marianocarrizo.dynamusic.ambiance.YoutubePicker;
 import com.marianocarrizo.dynamusic.component.SeekBar;
 import com.marianocarrizo.dynamusic.config.SessionConfig;
 import com.marianocarrizo.dynamusic.config.SessionConfigManager;
-import com.marianocarrizo.dynamusic.model.AuraConfig;
-import com.marianocarrizo.dynamusic.model.AuraPreset;
 import com.marianocarrizo.dynamusic.model.AuraSlot;
-import com.marianocarrizo.dynamusic.model.BackgroundConfig;
-import com.marianocarrizo.dynamusic.model.BackgroundTarget;
 import com.marianocarrizo.dynamusic.model.Playlist;
 import com.marianocarrizo.dynamusic.model.PlaylistItem;
 import com.marianocarrizo.dynamusic.model.Scene;
@@ -24,29 +20,24 @@ import javafx.animation.Animation;
 import javafx.animation.PauseTransition;
 import javafx.application.HostServices;
 import javafx.application.Platform;
-import javafx.css.PseudoClass;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
-import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
-import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SeparatorMenuItem;
-import javafx.scene.control.Slider;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.ToggleButton;
-import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.TreeCell;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
@@ -54,12 +45,8 @@ import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.Dragboard;
 import javafx.scene.input.TransferMode;
-import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
-import javafx.scene.shape.Circle;
 import javafx.stage.DirectoryChooser;
-import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 import javafx.util.Duration;
@@ -91,15 +78,8 @@ public class PlayerController implements SceneHost, PlayerHost {
     @FXML private AmbianceToolbarController ambianceToolbarController;
     @FXML private VolumeController volumeController;
 
-    @FXML private Button btnPaused;
-    @FXML private Button btnNormal;
-    @FXML private Button btnRaged;
-    @FXML private Button btnAdvantage;
-
-    // Panel de mood
-    @FXML private ToggleButton btnLoopIcon;
-    @FXML private Button btnPlayPause;
-    @FXML private SeekBar moodSeekBar;
+    @FXML private MoodPanelController moodPanelController;
+    @FXML private LiveAuraController liveAuraController;
 
     @FXML private VBox previewPanel;
     @FXML private ToggleButton btnPreviewLoop;
@@ -112,9 +92,6 @@ public class PlayerController implements SceneHost, PlayerHost {
     @FXML private ToggleButton btnOnDemandLoop;
     @FXML private Button btnOnDemandPlayPause;
     @FXML private SeekBar onDemandSeekBar;
-
-    @FXML private Label lblNowPlayingMood;
-    @FXML private Label lblNowPlaying;
 
     // T-10: TabPane de modos
     @FXML private TabPane modeTabPane;
@@ -147,8 +124,6 @@ public class PlayerController implements SceneHost, PlayerHost {
     @FXML private Button btnBrowseYoutube;
     @FXML private Label lblYoutubeError;
 
-    private static final PseudoClass DROP_TARGET = PseudoClass.getPseudoClass("drop-target");
-
     private File rootFolder;
 
     private final MusicService musicService = new MusicService();
@@ -161,17 +136,6 @@ public class PlayerController implements SceneHost, PlayerHost {
 
     private boolean applyingSession = false;
     private boolean refreshingUI = false;
-    private TrackType currentActiveType = TrackType.NORMAL;
-
-    @FXML private Label  lblLiveAura;
-    @FXML private HBox   livePresetBox;
-    @FXML private Slider sldLiveIntensity;
-    @FXML private Slider sldLiveReactivity;
-    @FXML private Label  lblLiveIntensity;
-    @FXML private Label  lblLiveReactivity;
-    private final Map<AuraPreset, ToggleButton> livePresetButtons = new EnumMap<>(AuraPreset.class);
-    private final ToggleGroup livePresetGroup = new ToggleGroup();
-    private boolean updatingLiveAura = false;
 
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "track-io");
@@ -182,15 +146,6 @@ public class PlayerController implements SceneHost, PlayerHost {
     private final PauseTransition saveDebounce = new PauseTransition(Duration.millis(400));
 
     private final Map<TrackType, String> loadedPaths = new EnumMap<>(TrackType.class);
-
-    private final Map<TrackType, Button> moodButtons = new EnumMap<>(TrackType.class);
-    private final Map<TrackType, MoodCard> moodCards = new EnumMap<>(TrackType.class);
-
-    private static final class MoodCard {
-        final Label track = new Label();
-        final Circle dot = new Circle(5);
-        final Label preset = new Label();
-    }
 
     private static final String DEFAULT_PLAYLIST_NAME = "New playlist";
 
@@ -203,11 +158,9 @@ public class PlayerController implements SceneHost, PlayerHost {
         sceneBarController.attach(this);
         ambianceToolbarController.attach(this);
         volumeController.attach(this);
-        buildMoodCards();
-        buildLiveAura();
-        refreshCards();
-        updateButtons();
-        updateNowPlayingCaption();
+        liveAuraController.attach(this);
+        moodPanelController.attach(this);
+        liveAuraController.refresh();
 
         saveDebounce.setOnFinished(e -> manager.save(sessionConfig));
 
@@ -237,19 +190,6 @@ public class PlayerController implements SceneHost, PlayerHost {
             });
         }
 
-        if (btnLoopIcon != null) {
-            btnLoopIcon.selectedProperty().addListener((obs, oldVal, newVal) ->
-                musicService.setLoop(newVal));
-        }
-
-        // Listener del reproductor de mood
-        musicService.setProgressListener((current, total) ->
-            Platform.runLater(() -> {
-                moodSeekBar.showPlayback(current, total);
-                updateButtons();
-                updatePlayPauseButton();
-            }));
-
         // Listener del reproductor de preescucha
         musicService.setPreviewProgressListener((current, total) ->
             Platform.runLater(() -> {
@@ -270,21 +210,16 @@ public class PlayerController implements SceneHost, PlayerHost {
         });
         showOnDemandPanel(false);
 
-        moodSeekBar.setOnSeekToFraction(musicService::seekCurrentTrack);
         previewSeekBar.setOnSeekToFraction(musicService::seekPreview);
 
         musicService.setOnPreviewPausedByMode(() -> setPreviewButtonIcon("▶"));
         musicService.setOnModePausedByPreview(() -> {
-            setMoodButtonIcon("▶");
+            moodPanelController.showPlaying(false);
             if (btnOnDemandPlayPause != null) btnOnDemandPlayPause.setText("▶");
             if (btnPlaylistPlayPause != null) btnPlaylistPlayPause.setText("▶");
         });
         onDemandSeekBar.setOnSeekToFraction(musicService::seekOnDemand);
         playlistSeekBar.setOnSeekToFraction(musicService::seekPlaylist);
-
-        if (lblNowPlaying != null) {
-            lblNowPlaying.textProperty().bind(musicService.nowPlayingProperty());
-        }
 
         updatePreviewPanel(false);
         ambiance.setAudioSource(musicService::getAudioFeatures);
@@ -351,191 +286,23 @@ public class PlayerController implements SceneHost, PlayerHost {
         });
     }
 
-    private void buildMoodCards() {
-        bindCard(TrackType.PAUSED,    btnPaused,    1);
-        bindCard(TrackType.NORMAL,    btnNormal,    2);
-        bindCard(TrackType.RAGED,     btnRaged,     3);
-        bindCard(TrackType.ADVANTAGE, btnAdvantage, 4);
-    }
-
-    private void bindCard(TrackType type, Button button, int number) {
-        if (button == null) return;
-        MoodCard card = new MoodCard();
-
-        Label title = new Label("[" + number + "] " + type.name());
-        title.getStyleClass().add("card-title");
-        card.track.getStyleClass().add("card-track");
-        card.track.setMaxWidth(190);
-        card.track.setAlignment(Pos.CENTER);
-        card.preset.getStyleClass().add("card-aura");
-        HBox auraRow = new HBox(5, card.dot, card.preset);
-        auraRow.setAlignment(Pos.CENTER);
-
-        VBox box = new VBox(4, title, card.track, auraRow);
-        box.setAlignment(Pos.CENTER);
-        button.setText(null);
-        button.setGraphic(box);
-        button.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
-        button.setMinWidth(0);
-
-        button.setOnDragOver(e -> {
-            if (audioFileIn(e.getDragboard()) != null) e.acceptTransferModes(TransferMode.COPY);
-            e.consume();
-        });
-        button.setOnDragEntered(e -> {
-            if (audioFileIn(e.getDragboard()) != null) button.pseudoClassStateChanged(DROP_TARGET, true);
-        });
-        button.setOnDragExited(e -> button.pseudoClassStateChanged(DROP_TARGET, false));
-        button.setOnDragDropped(e -> {
-            File f = audioFileIn(e.getDragboard());
-            if (f != null) assignTrack(type, f);
-            e.setDropCompleted(f != null);
-            e.consume();
-        });
-
-        button.setContextMenu(backgroundMenu(AuraSlot.of(type)));
-
-        moodButtons.put(type, button);
-        moodCards.put(type, card);
-    }
-
-    private ContextMenu backgroundMenu(AuraSlot slot) {
-        MenuItem choose = new MenuItem("Choose...");
-        choose.setOnAction(e -> chooseBackgroundFor(slot));
-        MenuItem useScene = new MenuItem("Use scene background");
-        useScene.setOnAction(e -> useSceneBackgroundFor(slot));
-        ContextMenu menu = new ContextMenu(new Menu("Background", null, choose, useScene));
-        menu.setOnShowing(e -> useScene.setDisable(!sessionConfig.getActiveScene().hasOwnBackground(slot)));
-        return menu;
-    }
-
-    private void chooseBackgroundFor(AuraSlot slot) {
-        FileChooser chooser = BackgroundEditorController.newBackgroundChooser(sessionConfig.getLastImageFolderPath());
-        File file = chooser.showOpenDialog(mainRoot.getScene().getWindow());
-        if (file == null) return;
-        BackgroundConfig cfg = BackgroundTarget.of(slot).getOrCreateIn(sessionConfig.getActiveScene());
-        cfg.setPath(file.getAbsolutePath());
-        cfg.setSegmentStartMs(null);
-        cfg.setSegmentEndMs(null);
-        cfg.setPlaybackRate(1.0);
-        cfg.setBoomerangEnabled(false);
-        sessionConfig.setLastImageFolderPath(file.getParent());
-        onSlotBackgroundEdited();
-    }
-
-    private void useSceneBackgroundFor(AuraSlot slot) {
-        sessionConfig.getActiveScene().clearBackground(slot);
-        onSlotBackgroundEdited();
-    }
-
-    private void onSlotBackgroundEdited() {
+    @Override
+    public void slotBackgroundEdited() {
         manager.save(sessionConfig);
         ambiance.applyBackgroundIfChanged(liveSlot());
-        if (sceneEditor != null) sceneEditor.refreshBackground();
-    }
-
-    private File audioFileIn(Dragboard db) {
-        if (db == null || !db.hasFiles()) return null;
-        for (File f : db.getFiles()) {
-            if (f.isFile() && isAudioFile(f)) return f;
-        }
-        return null;
+        refreshSceneEditorBackground();
     }
 
     private void refreshCards() {
-        Scene scene = sessionConfig.getActiveScene();
-        Map<TrackType, String> assignments = scene.getAssignments();
-        for (TrackType type : TrackType.values()) {
-            MoodCard card = moodCards.get(type);
-            if (card == null) continue;
-            String path = assignments.get(type);
-            card.track.getStyleClass().remove("card-track-empty");
-            if (path == null || path.isEmpty()) {
-                card.track.setText("Drop a track here");
-                card.track.getStyleClass().add("card-track-empty");
-            } else {
-                File f = new File(path);
-                card.track.setText(stripExtension(f.getName()) + (f.isFile() ? "" : " (missing)"));
-            }
-            AuraConfig aura = scene.getAura(AuraSlot.of(type));
-            card.dot.setFill(Color.web(aura.getPrimaryColor()));
-            card.preset.setText(capitalize(aura.getPreset().name()));
-        }
-        refreshLiveAura();
+        moodPanelController.refreshCards();
+        liveAuraController.refresh();
     }
 
-    private void buildLiveAura() {
-        if (livePresetBox == null) return;
-        for (AuraPreset p : AuraPreset.values()) {
-            ToggleButton tb = new ToggleButton(capitalize(p.name()));
-            tb.getStyleClass().addAll("btn-secondary", "btn-preset");
-            tb.setToggleGroup(livePresetGroup);
-            tb.setOnAction(e -> {
-                if (!tb.isSelected()) tb.setSelected(true);
-                if (!updatingLiveAura) pickLivePreset(p);
-            });
-            livePresetButtons.put(p, tb);
-            livePresetBox.getChildren().add(tb);
-        }
-        sldLiveIntensity.valueProperty().addListener((obs, o, nv) -> {
-            lblLiveIntensity.setText(Math.round(nv.doubleValue() * 100) + "%");
-            if (!updatingLiveAura) editLiveAura(a -> a.setIntensity(nv.doubleValue()));
-        });
-        sldLiveReactivity.valueProperty().addListener((obs, o, nv) -> {
-            lblLiveReactivity.setText(Math.round(nv.doubleValue() * 100) + "%");
-            if (!updatingLiveAura) editLiveAura(a -> a.setReactivity(nv.doubleValue()));
-        });
-    }
-
-    private void refreshLiveAura() {
-        if (livePresetBox == null) return;
-        AuraConfig aura = sessionConfig.getActiveScene().getAura(liveSlot());
-        updatingLiveAura = true;
-        try {
-            lblLiveAura.setText("LIVE AURA · " + (usesOnDemandAura() ? "ON DEMAND" : currentActiveType.name()));
-            ToggleButton tb = livePresetButtons.get(aura.getPreset());
-            if (tb != null) tb.setSelected(true);
-            sldLiveIntensity.setValue(aura.getIntensity());
-            sldLiveReactivity.setValue(aura.getReactivity());
-        } finally {
-            updatingLiveAura = false;
-        }
-    }
-
-    private void pickLivePreset(AuraPreset preset) {
-        AuraSlot slot = liveSlot();
-        Scene scene = sessionConfig.getActiveScene();
-        AuraConfig old = scene.getAura(slot);
-        if (old.getPreset() == preset) return;
-        AuraConfig fresh = preset.defaults();
-        fresh.setIntensity(old.getIntensity());
-        fresh.setReactivity(old.getReactivity());
-        scene.setAura(slot, fresh);
-        onLiveAuraEdited(slot);
-    }
-
-    private void editLiveAura(java.util.function.Consumer<AuraConfig> change) {
-        AuraSlot slot = liveSlot();
-        change.accept(sessionConfig.getActiveScene().getAura(slot));
-        onLiveAuraEdited(slot);
-    }
-
-    private void onLiveAuraEdited(AuraSlot slot) {
+    @Override
+    public void liveAuraEdited(AuraSlot slot) {
         onAuraEdited(slot);
         if (sceneEditor != null) sceneEditor.refreshAuras();
     }
-
-    private void updateNowPlayingCaption() {
-        if (lblNowPlayingMood != null)
-            lblNowPlayingMood.setText("NOW PLAYING · " + currentActiveType.name());
-    }
-
-    // --- Controles de mood ---
-
-    @FXML private void onSwitchToPaused()   { switchTrack(TrackType.PAUSED); }
-    @FXML private void onSwitchToNormal()   { switchTrack(TrackType.NORMAL); }
-    @FXML private void onSwitchToRaged()    { switchTrack(TrackType.RAGED); }
-    @FXML private void onSwitchToAdvantage(){ switchTrack(TrackType.ADVANTAGE); }
 
     public void toggleLastUsedPlayer() {
         if (musicService.previewSoundedLast()) {
@@ -543,55 +310,27 @@ public class PlayerController implements SceneHost, PlayerHost {
             return;
         }
         switch (musicService.getPlaybackMode()) {
-            case MOOD -> onTogglePlayPause();
+            case MOOD -> moodPanelController.togglePlayPause();
             case PLAYLIST -> onPlaylistPlayPause();
             case ON_DEMAND -> onToggleOnDemandPlayPause();
         }
     }
 
+    @Override
     public void switchTrack(TrackType type) {
         if (type == null || !musicService.isLoaded(type)) return;
         boolean fromOtherSource = musicService.getPlaybackMode() != MusicService.PlaybackMode.MOOD;
-        if (!fromOtherSource && type == currentActiveType && musicService.getCurrentTrack() == type) return;
+        if (!fromOtherSource && type == moodPanelController.activeMood() && musicService.getCurrentTrack() == type) return;
         enterMode(MusicService.PlaybackMode.MOOD);
         musicService.switchTrack(type);
-        this.currentActiveType = type;
+        moodPanelController.setActiveMood(type);
         updateWindowMood(type);
-        updateNowPlayingCaption();
         ambiance.activateSlot(AuraSlot.of(type));
-        refreshLiveAura();
-        updateButtons();
-        setMoodButtonIcon("⏸"); // siempre arranca reproduciendo
+        liveAuraController.refresh();
+        moodPanelController.refreshButtonStates();
+        moodPanelController.showPlaying(true);
         updatePreviewPanel(false);
         resetPreviewSlider();
-    }
-
-    @FXML
-    private void onTogglePlayPause() {
-        if (musicService.isPlaying()) {
-            setMoodButtonIcon("▶"); // feedback inmediato — el audio baja en 1s
-            musicService.fadeOutAndPause(null);
-        } else {
-            setMoodButtonIcon("⏸");
-            enterMode(MusicService.PlaybackMode.MOOD);
-            musicService.fadeInAndPlay();
-        }
-    }
-
-    @FXML
-    private void onStop() {
-        musicService.stop(); // cancela fade interno y para inmediatamente
-        setMoodButtonIcon("▶");
-    }
-
-    private void setMoodButtonIcon(String icon) {
-        if (btnPlayPause != null) btnPlayPause.setText(icon);
-    }
-
-    // Llamado desde el listener de progreso para sync en casos edge (fin de pista, etc.)
-    private void updatePlayPauseButton() {
-        if (btnPlayPause != null)
-            btnPlayPause.setText(musicService.isPlaying() ? "⏸" : "▶");
     }
 
     private boolean usesOnDemandAura() {
@@ -599,11 +338,13 @@ public class PlayerController implements SceneHost, PlayerHost {
         return mode == MusicService.PlaybackMode.ON_DEMAND || mode == MusicService.PlaybackMode.PLAYLIST;
     }
 
-    private AuraSlot liveSlot() {
-        return usesOnDemandAura() ? AuraSlot.ON_DEMAND : AuraSlot.of(currentActiveType);
+    @Override
+    public AuraSlot liveSlot() {
+        return usesOnDemandAura() ? AuraSlot.ON_DEMAND : AuraSlot.of(moodPanelController.activeMood());
     }
 
-    private void enterMode(MusicService.PlaybackMode target) {
+    @Override
+    public void enterMode(MusicService.PlaybackMode target) {
         musicService.setPlaybackMode(target);
         syncSourceUi();
     }
@@ -616,20 +357,20 @@ public class PlayerController implements SceneHost, PlayerHost {
             if (lstPlaylistTracks != null) lstPlaylistTracks.refresh();
         }
         ambiance.activateSlot(liveSlot());
-        refreshLiveAura();
-        updatePlayPauseButton();
+        liveAuraController.refresh();
+        moodPanelController.syncPlayPauseIcon();
     }
 
     private void playNow(File file, String title) {
         if (file == null || !file.isFile()) return;
-        String label = title != null && !title.isBlank() ? title : stripExtension(file.getName());
+        String label = title != null && !title.isBlank() ? title : DisplayNames.stripExtension(file.getName());
         if (lblOnDemandTrack != null) lblOnDemandTrack.setText(label);
         onDemandSeekBar.showNoTrack();
         musicService.playOnDemand(file, label, () -> {
             showOnDemandPanel(true);
             ambiance.activateSlot(AuraSlot.ON_DEMAND);
-            refreshLiveAura();
-            setMoodButtonIcon("▶");
+            liveAuraController.refresh();
+            moodPanelController.showPlaying(false);
             if (btnPlaylistPlayPause != null) btnPlaylistPlayPause.setText("▶");
             if (lstPlaylistTracks != null) lstPlaylistTracks.refresh();
             updateOnDemandPlayPauseButton();
@@ -665,7 +406,7 @@ public class PlayerController implements SceneHost, PlayerHost {
     @FXML
     private void onOnDemandClose() {
         enterMode(MusicService.PlaybackMode.MOOD);
-        setMoodButtonIcon("▶");
+        moodPanelController.showPlaying(false);
     }
 
     @FXML
@@ -730,23 +471,6 @@ public class PlayerController implements SceneHost, PlayerHost {
         updatePreviewPlayPauseButton();
     }
 
-    // --- Estado de botones de mood ---
-
-    private void updateButtons() {
-        for (TrackType t : TrackType.values()) {
-            Button b = moodButtons.get(t);
-            if (b == null) continue;
-            b.getStyleClass().remove("btn-phase-empty");
-            b.getStyleClass().remove("btn-phase-active");
-            if (!musicService.isLoaded(t)) b.getStyleClass().add("btn-phase-empty");
-        }
-
-        if (currentActiveType != null && musicService.isLoaded(currentActiveType)) {
-            Button active = moodButtons.get(currentActiveType);
-            if (active != null) active.getStyleClass().add("btn-phase-active");
-        }
-    }
-
     private void updateWindowMood(TrackType type) {
         if (type == null || mainRoot == null) return;
         mainRoot.setId(switch (type) {
@@ -798,14 +522,9 @@ public class PlayerController implements SceneHost, PlayerHost {
         ambiance.applyScene(scene);
 
         refreshCards();
-        updateButtons();
-        updatePlayPauseButton();
-        resetMoodProgressIfEmpty();
-    }
-
-    private void resetMoodProgressIfEmpty() {
-        if (musicService.isLoaded(currentActiveType)) return;
-        moodSeekBar.showNoTrack();
+        moodPanelController.refreshButtonStates();
+        moodPanelController.syncPlayPauseIcon();
+        moodPanelController.resetProgressIfEmpty();
     }
 
     private void onTrackLoadFailed(TrackType type, String path) {
@@ -813,18 +532,18 @@ public class PlayerController implements SceneHost, PlayerHost {
         loadedPaths.remove(type);
         musicService.unloadTrack(type);
         refreshCards();
-        updateButtons();
-        updatePlayPauseButton();
+        moodPanelController.refreshButtonStates();
+        moodPanelController.syncPlayPauseIcon();
     }
 
     private void onTrackLoaded(TrackType type) {
-        if (type == currentActiveType && !musicService.isPlaying()
+        if (type == moodPanelController.activeMood() && !musicService.isPlaying()
                 && musicService.getCurrentTrack() != type) {
             musicService.selectTrack(type);
         }
         refreshCards();
-        updateButtons();
-        updatePlayPauseButton();
+        moodPanelController.refreshButtonStates();
+        moodPanelController.syncPlayPauseIcon();
     }
 
     @Override public SessionConfig session() { return sessionConfig; }
@@ -887,9 +606,9 @@ public class PlayerController implements SceneHost, PlayerHost {
         manager.save(sessionConfig);
         loadedPaths.remove(type);
         musicService.unloadTrack(type);
-        updateButtons();
-        updatePlayPauseButton();
-        resetMoodProgressIfEmpty();
+        moodPanelController.refreshButtonStates();
+        moodPanelController.syncPlayPauseIcon();
+        moodPanelController.resetProgressIfEmpty();
         refreshCards();
         if (sceneEditor != null) sceneEditor.refreshTracks();
     }
@@ -1507,11 +1226,6 @@ public class PlayerController implements SceneHost, PlayerHost {
     // --- Controles de ventana ---
 
     @FXML
-    private void onToggleLoop() {
-        if (btnLoopIcon != null) musicService.setLoop(btnLoopIcon.isSelected());
-    }
-
-    @FXML
     private void onTogglePreviewLoop() {
         if (btnPreviewLoop != null) musicService.setPreviewLoop(btnPreviewLoop.isSelected());
     }
@@ -1544,18 +1258,6 @@ public class PlayerController implements SceneHost, PlayerHost {
     private void onMinimizeWindow(ActionEvent event) {
         Stage stage = (Stage) ((Node) event.getSource()).getScene().getWindow();
         stage.setIconified(true);
-    }
-
-    // --- Utils ---
-
-    private static String stripExtension(String name) {
-        int dot = name.lastIndexOf('.');
-        return dot > 0 ? name.substring(0, dot) : name;
-    }
-
-    private static String capitalize(String enumName) {
-        String s = enumName.replace('_', ' ').toLowerCase();
-        return Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
 }

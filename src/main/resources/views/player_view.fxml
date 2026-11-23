@@ -107,53 +107,7 @@
 
                     <Tab fx:id="moodsTab" text="Moods">
                         <content>
-                            <VBox spacing="14" alignment="CENTER">
-                                <padding>
-                                    <Insets top="10" right="4" bottom="4" left="4"/>
-                                </padding>
-
-                                <VBox spacing="4" alignment="CENTER" styleClass="track-info-container">
-                                    <Label fx:id="lblNowPlayingMood" text="NOW PLAYING" styleClass="lbl-session-title"/>
-                                    <Label fx:id="lblNowPlaying" text="—" styleClass="lbl-track-active"/>
-                                </VBox>
-
-                                <GridPane hgap="10" vgap="10" alignment="CENTER" VBox.vgrow="ALWAYS">
-                                    <columnConstraints>
-                                        <ColumnConstraints hgrow="ALWAYS" minWidth="100" percentWidth="50"/>
-                                        <ColumnConstraints hgrow="ALWAYS" minWidth="100" percentWidth="50"/>
-                                    </columnConstraints>
-                                    <rowConstraints>
-                                        <RowConstraints vgrow="ALWAYS" minHeight="80"/>
-                                        <RowConstraints vgrow="ALWAYS" minHeight="80"/>
-                                    </rowConstraints>
-                                    <children>
-                                        <Button fx:id="btnPaused" onAction="#onSwitchToPaused"
-                                                maxWidth="Infinity" maxHeight="Infinity" styleClass="btn-phase"
-                                                GridPane.columnIndex="0" GridPane.rowIndex="0"/>
-                                        <Button fx:id="btnNormal" onAction="#onSwitchToNormal"
-                                                maxWidth="Infinity" maxHeight="Infinity" styleClass="btn-phase"
-                                                GridPane.columnIndex="1" GridPane.rowIndex="0"/>
-                                        <Button fx:id="btnRaged" onAction="#onSwitchToRaged"
-                                                maxWidth="Infinity" maxHeight="Infinity" styleClass="btn-phase"
-                                                GridPane.columnIndex="0" GridPane.rowIndex="1"/>
-                                        <Button fx:id="btnAdvantage" onAction="#onSwitchToAdvantage"
-                                                maxWidth="Infinity" maxHeight="Infinity" styleClass="btn-phase"
-                                                GridPane.columnIndex="1" GridPane.rowIndex="1"/>
-                                    </children>
-                                </GridPane>
-
-                                <!-- Reproductor de mood -->
-                                <VBox spacing="8" alignment="CENTER" styleClass="playback-panel">
-                                    <Label text="MOOD" styleClass="lbl-panel-title"/>
-                                    <HBox spacing="20" alignment="CENTER">
-                                        <ToggleButton fx:id="btnLoopIcon" text="🔁" onAction="#onToggleLoop" styleClass="btn-spotify-flat, btn-loop"/>
-                                        <Button text="■" onAction="#onStop" styleClass="btn-spotify-flat, btn-stop"/>
-                                        <Button fx:id="btnPlayPause" text="▶" onAction="#onTogglePlayPause" styleClass="btn-spotify-circle"/>
-                                    </HBox>
-                                    <SeekBar fx:id="moodSeekBar"/>
-                                </VBox>
-
-                            </VBox>
+                            <fx:include fx:id="moodPanel" source="mood_panel.fxml"/>
                         </content>
                     </Tab>
 
@@ -206,20 +160,7 @@
 
                 </TabPane>
 
-                <VBox spacing="6" styleClass="playback-panel">
-                    <Label fx:id="lblLiveAura" text="LIVE AURA" styleClass="lbl-panel-title"/>
-                    <HBox fx:id="livePresetBox" spacing="6" alignment="CENTER"/>
-                    <HBox spacing="8" alignment="CENTER_LEFT">
-                        <Label text="Intensity" minWidth="70" styleClass="lbl-session-title"/>
-                        <Slider fx:id="sldLiveIntensity" min="0" max="1" HBox.hgrow="ALWAYS" styleClass="spotify-slider"/>
-                        <Label fx:id="lblLiveIntensity" text="50%" minWidth="40" styleClass="lbl-time"/>
-                    </HBox>
-                    <HBox spacing="8" alignment="CENTER_LEFT">
-                        <Label text="Reactivity" minWidth="70" styleClass="lbl-session-title"/>
-                        <Slider fx:id="sldLiveReactivity" min="0" max="1" HBox.hgrow="ALWAYS" styleClass="spotify-slider"/>
-                        <Label fx:id="lblLiveReactivity" text="50%" minWidth="40" styleClass="lbl-time"/>
-                    </HBox>
-                </VBox>
+                <fx:include fx:id="liveAura" source="live_aura.fxml"/>
 
             </VBox>
         </SplitPane>
