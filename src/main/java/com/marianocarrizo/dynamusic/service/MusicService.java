@@ -1,5 +1,6 @@
 package com.marianocarrizo.dynamusic.service;
 
+import com.marianocarrizo.dynamusic.audio.AudioFormat;
 import com.marianocarrizo.dynamusic.enums.TrackType;
 import com.marianocarrizo.dynamusic.model.NowPlayingSource;
 import com.marianocarrizo.dynamusic.utils.ConversorUtils;
@@ -358,7 +359,7 @@ public class MusicService {
         audioPrep.submit(() -> {
             try {
                 final File finalFile;
-                if (file.getName().toLowerCase().endsWith(".flac")) {
+                if (AudioFormat.FLAC.matches(file)) {
                     finalFile = ConversorUtils.convertFlacToWav(file);
                 } else {
                     finalFile = file;
@@ -540,7 +541,7 @@ public class MusicService {
         audioPrep.submit(() -> {
             try {
                 final File finalFile;
-                if (file.getName().toLowerCase().endsWith(".flac")) {
+                if (AudioFormat.FLAC.matches(file)) {
                     finalFile = ConversorUtils.convertFlacToWav(file);
                 } else {
                     finalFile = file;
@@ -776,7 +777,7 @@ public class MusicService {
 
         audioPrep.submit(() -> {
             try {
-                final File playable = file.getName().toLowerCase().endsWith(".flac")
+                final File playable = AudioFormat.FLAC.matches(file)
                         ? ConversorUtils.convertFlacToWav(file) : file;
                 final double gain = ConversorUtils.calculateGainForRMS(playable);
                 Platform.runLater(() -> openPlaylistPlayer(file, playable, gain, seq));
@@ -948,7 +949,7 @@ public class MusicService {
 
         audioPrep.submit(() -> {
             try {
-                final File finalFile = file.getName().toLowerCase().endsWith(".flac")
+                final File finalFile = AudioFormat.FLAC.matches(file)
                         ? ConversorUtils.convertFlacToWav(file) : file;
                 final double gain = ConversorUtils.calculateGainForRMS(finalFile);
 

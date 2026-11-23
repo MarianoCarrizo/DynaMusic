@@ -1,5 +1,7 @@
 package com.marianocarrizo.dynamusic.service;
 
+import com.marianocarrizo.dynamusic.audio.AudioFormat;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
@@ -14,13 +16,10 @@ import java.util.Locale;
 
 public final class AudioFileCollector {
 
-    private static final List<String> AUDIO_EXTENSIONS = List.of(".mp3", ".wav", ".flac");
-
     private AudioFileCollector() {}
 
     public static boolean isAudioFile(File file) {
-        String name = file.getName().toLowerCase(Locale.ROOT);
-        return AUDIO_EXTENSIONS.stream().anyMatch(name::endsWith);
+        return AudioFormat.isSupported(file);
     }
 
     public static List<File> collect(File fileOrFolder) {

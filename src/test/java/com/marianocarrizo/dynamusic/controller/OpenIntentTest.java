@@ -29,6 +29,13 @@ class OpenIntentTest {
     }
 
     @Test
+    void aFileOfAnyRegistryFormatPlays() throws IOException {
+        File opus = Files.createFile(dir.resolve("a.opus")).toFile();
+
+        assertEquals(opus, OpenIntent.of(List.of(opus)).track().orElseThrow());
+    }
+
+    @Test
     void onlyTheFirstAudioFileIsKept() throws IOException {
         File first = Files.createFile(dir.resolve("a.flac")).toFile();
         File second = Files.createFile(dir.resolve("b.wav")).toFile();

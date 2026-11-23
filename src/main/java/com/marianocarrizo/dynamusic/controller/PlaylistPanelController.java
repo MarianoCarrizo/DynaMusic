@@ -1,5 +1,6 @@
 package com.marianocarrizo.dynamusic.controller;
 
+import com.marianocarrizo.dynamusic.audio.AudioFormat;
 import com.marianocarrizo.dynamusic.model.NowPlaying;
 import com.marianocarrizo.dynamusic.model.NowPlayingModel;
 import com.marianocarrizo.dynamusic.config.SessionConfig;
@@ -311,7 +312,7 @@ public final class PlaylistPanelController {
     }
 
     private void showNoAudioFilesMessage() {
-        new Alert(Alert.AlertType.INFORMATION, "No audio files (mp3, wav, flac) found in that folder.").showAndWait();
+        new Alert(Alert.AlertType.INFORMATION, "No audio files (" + AudioFormat.displayList() + ") found in that folder.").showAndWait();
     }
 
     private static String playlistNameFor(File folder) {

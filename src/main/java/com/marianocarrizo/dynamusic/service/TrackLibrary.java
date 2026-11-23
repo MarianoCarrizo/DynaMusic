@@ -10,7 +10,7 @@ public final class TrackLibrary {
     private TrackLibrary() {}
 
     public static Path libraryDir() {
-        return YouTubeDownloader.appDir().resolve("library");
+        return AppDataFolder.child("library");
     }
 
     public static String pin(String path) {

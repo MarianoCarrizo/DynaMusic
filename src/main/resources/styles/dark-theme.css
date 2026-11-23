@@ -86,6 +86,9 @@
     -fx-text-fill: -mood-accent;
     -fx-font-weight: bold;
 }
+.track-unplayable {
+    -fx-opacity: 0.45;
+}
 .playlist-counter {
     -fx-text-fill: #b0b0b8;
     -fx-font-size: 12px;

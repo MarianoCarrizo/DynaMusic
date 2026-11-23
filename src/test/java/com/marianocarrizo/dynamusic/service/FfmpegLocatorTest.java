@@ -7,12 +7,24 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FfmpegLocatorTest {
 
     private static final Path ROOT = Path.of("app-root").toAbsolutePath();
+
+    @Test
+    void missingExecutableIsNotAvailable() {
+        assertFalse(FfmpegLocator.answersVersionQuery(Optional.empty()));
+        assertFalse(FfmpegLocator.answersVersionQuery(Optional.of(ROOT.resolve("no-such-ffmpeg").toString())));
+    }
+
+    @Test
+    void availabilityIsMemoized() {
+        assertEquals(FfmpegLocator.isAvailable(), FfmpegLocator.isAvailable());
+    }
 
     @Test
     void installRootFromLauncherPath() {

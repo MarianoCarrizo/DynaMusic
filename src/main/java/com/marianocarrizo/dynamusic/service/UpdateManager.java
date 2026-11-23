@@ -36,7 +36,7 @@ public final class UpdateManager {
 
     public record ReadyUpdate(Version version, Path installer) {}
 
-    private static final UpdateManager INSTANCE = new UpdateManager(YouTubeDownloader::appDir,
+    private static final UpdateManager INSTANCE = new UpdateManager(AppDataFolder::root,
             Version.parse(System.getProperty(VERSION_PROPERTY)), System.getProperty("os.name", ""),
             URI.create(UpdateChecker.LATEST_RELEASE_URL));
 

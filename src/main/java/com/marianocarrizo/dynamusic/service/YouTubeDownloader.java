@@ -2,13 +2,13 @@ package com.marianocarrizo.dynamusic.service;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.marianocarrizo.dynamusic.audio.AudioFormat;
 import com.marianocarrizo.dynamusic.model.PlaylistItem;
 import javafx.application.Platform;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -31,6 +31,8 @@ import java.util.stream.Stream;
 public final class YouTubeDownloader {
 
     private static final String WATCH_URL_PREFIX = "https://www.youtube.com/watch?v=";
+    private static final String DOWNLOAD_EXTENSION = AudioFormat.MP3.primaryExtension();
+    private static final String DOWNLOAD_SUFFIX = "." + DOWNLOAD_EXTENSION;
     private static final int  MAX_CACHE_ENTRIES        = 20;
     private static final long DOWNLOAD_TIMEOUT_SECONDS = 120;
     private static final long TITLE_TIMEOUT_SECONDS    = 15;
@@ -234,19 +236,8 @@ public final class YouTubeDownloader {
         });
     }
 
-    static Path appDir() {
-        return appDir(System.getProperty("os.name", ""), System.getenv("APPDATA"),
-                System.getProperty("user.home"));
-    }
-
-    static Path appDir(String osName, String appdata, String home) {
-        return (YtDlpManager.isWindows(osName) && appdata != null && !appdata.isBlank())
-                ? Paths.get(appdata, "DynaMusic")
-                : Paths.get(home, "DynaMusic");
-    }
-
     static Path cacheDirPath() {
-        return appDir().resolve("yt-cache");
+        return AppDataFolder.child("yt-cache");
     }
 
     private Path cacheDir() throws IOException {
@@ -260,7 +251,7 @@ public final class YouTubeDownloader {
                               Consumer<String> onFailure) {
         Path out;
         try {
-            out = cacheDir().resolve(videoId + ".mp3");
+            out = cacheDir().resolve(videoId + DOWNLOAD_SUFFIX);
         } catch (IOException e) {
             onFailure.accept("Cannot resolve cache directory: " + e.getMessage());
             return;
@@ -351,7 +342,7 @@ public final class YouTubeDownloader {
 
     static boolean isLeftover(String fileName, String videoId, boolean keepFinal) {
         if (!fileName.startsWith(videoId + ".")) return false;
-        return !(keepFinal && fileName.equals(videoId + ".mp3"));
+        return !(keepFinal && fileName.equals(videoId + DOWNLOAD_SUFFIX));
     }
 
     static List<String> downloadArgs(Path out, String url) {
@@ -361,7 +352,7 @@ public final class YouTubeDownloader {
     static List<String> downloadArgs(Path out, String url, Optional<Path> ffmpegDir) {
         List<String> args = new ArrayList<>(List.of(
                 "-x",
-                "--audio-format", "mp3",
+                "--audio-format", DOWNLOAD_EXTENSION,
                 "--no-playlist",
                 "-o", out.toString()));
         ffmpegDir.ifPresent(dir -> {
@@ -395,7 +386,7 @@ public final class YouTubeDownloader {
             List<Path> files;
             try (Stream<Path> stream = Files.list(dir)) {
                 files = stream
-                        .filter(p -> p.toString().endsWith(".mp3"))
+                        .filter(p -> p.toString().endsWith(DOWNLOAD_SUFFIX))
                         .collect(Collectors.toList());
             }
             if (files.size() <= MAX_CACHE_ENTRIES) return;

@@ -6,7 +6,6 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -112,17 +111,5 @@ class YtDlpManagerTest {
         YtDlpManager m = new YtDlpManager(() -> app, "Linux", "amd64");
         assertFalse(m.isSetupRunning());
         assertTrue(m.readiness().isDone());
-    }
-
-    @Test
-    void appDirUsesAppdataOnlyOnWindows() {
-        assertEquals(Paths.get("C:\\Users\\u\\AppData\\Roaming", "DynaMusic"),
-                YouTubeDownloader.appDir("Windows 11", "C:\\Users\\u\\AppData\\Roaming", "C:\\Users\\u"));
-        assertEquals(Paths.get("/home/u", "DynaMusic"),
-                YouTubeDownloader.appDir("Linux", "/stray/appdata", "/home/u"));
-        assertEquals(Paths.get("/home/u", "DynaMusic"),
-                YouTubeDownloader.appDir("Windows 11", " ", "/home/u"));
-        assertEquals(Paths.get("/Users/u", "DynaMusic"),
-                YouTubeDownloader.appDir("Mac OS X", null, "/Users/u"));
     }
 }

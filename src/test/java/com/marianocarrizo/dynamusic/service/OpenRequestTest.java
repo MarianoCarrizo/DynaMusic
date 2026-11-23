@@ -1,5 +1,6 @@
 package com.marianocarrizo.dynamusic.service;
 
+import com.marianocarrizo.dynamusic.audio.AudioFormat;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -36,6 +37,16 @@ class OpenRequestTest {
         Optional<OpenRequest> decoded = OpenRequest.decode(new OpenRequest(List.of(song, other)).encode());
 
         assertEquals(List.of(song.getAbsoluteFile(), other.getAbsoluteFile()), decoded.orElseThrow().files());
+    }
+
+    @Test
+    void acceptsEveryRegistryFormat() throws IOException {
+        List<File> files = new ArrayList<>();
+        for (String extension : AudioFormat.allExtensions()) files.add(audio("song." + extension));
+
+        OpenRequest decoded = OpenRequest.decode(new OpenRequest(files).encode()).orElseThrow();
+
+        assertEquals(Math.min(files.size(), OpenRequest.MAX_FILES), decoded.files().size());
     }
 
     @Test

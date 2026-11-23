@@ -2,6 +2,7 @@ package com.marianocarrizo.dynamusic.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.marianocarrizo.dynamusic.service.AppDataFolder;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -9,7 +10,6 @@ import java.io.Writer;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 
 /**
@@ -40,11 +40,7 @@ public class SessionConfigManager {
      */
     private Path configPath() {
         if (pathOverride != null) return pathOverride;
-        String appdata = System.getenv("APPDATA");
-        if (appdata == null || appdata.isEmpty()) {
-            appdata = System.getProperty("user.home") + "/AppData/Roaming";
-        }
-        return Paths.get(appdata, "DynaMusic", "session.json");
+        return AppDataFolder.child("session.json");
     }
 
     /**

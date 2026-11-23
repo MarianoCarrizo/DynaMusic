@@ -1,14 +1,18 @@
 package com.marianocarrizo.dynamusic.service;
 
+import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 
 public final class FfmpegLocator {
 
     static final String BUNDLED_DIR = "ffmpeg";
+    private static final long VERSION_QUERY_TIMEOUT_SECONDS = 3;
 
     private FfmpegLocator() {}
 
@@ -17,6 +21,28 @@ public final class FfmpegLocator {
     public static Optional<String> executable() {
         if (BUNDLED != null) return Optional.of(BUNDLED.resolve(binaryName(osName())).toString());
         return ExecutableResolver.find("ffmpeg").map(Path::toString);
+    }
+
+    public static boolean isAvailable() {
+        return AvailabilityProbe.RESULT;
+    }
+
+    static boolean answersVersionQuery(Optional<String> executable) {
+        if (executable.isEmpty()) return false;
+        try {
+            Process process = new ProcessBuilder(executable.get(), "-version").redirectErrorStream(true).start();
+            process.getInputStream().transferTo(OutputStream.nullOutputStream());
+            if (!process.waitFor(VERSION_QUERY_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                return false;
+            }
+            return process.exitValue() == 0;
+        } catch (IOException e) {
+            return false;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
     }
 
     public static Optional<Path> directory() {
@@ -53,5 +79,9 @@ public final class FfmpegLocator {
 
     static String binaryName(String osName) {
         return YtDlpManager.isWindows(osName) ? "ffmpeg.exe" : "ffmpeg";
+    }
+
+    private static final class AvailabilityProbe {
+        static final boolean RESULT = answersVersionQuery(executable());
     }
 }

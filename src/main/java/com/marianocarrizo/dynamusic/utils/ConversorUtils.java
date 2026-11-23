@@ -24,7 +24,8 @@ public final class ConversorUtils {
     private static final double TARGET_RMS = 0.1; // Nivel de referencia
 
     public static File convertFlacToWav(File flacFile) throws Exception {
-        File wavFile = File.createTempFile("track_", ".wav");
+        File wavFile = File.createTempFile("track_",
+                "." + com.marianocarrizo.dynamusic.audio.AudioFormat.WAV.primaryExtension());
         wavFile.deleteOnExit();
 
         AudioInputStream flacStream = AudioSystem.getAudioInputStream(flacFile);
@@ -70,7 +71,7 @@ public final class ConversorUtils {
 
     public static double calculateGainForRMS(File audioFile) throws IOException, UnsupportedAudioFileException {
         // MP3 is not decodable by javax.sound.sampled — return a safe default gain
-        if (audioFile.getName().toLowerCase().endsWith(".mp3")) {
+        if (com.marianocarrizo.dynamusic.audio.AudioFormat.MP3.matches(audioFile)) {
             return 0.8;
         }
         AudioInputStream ais = AudioSystem.getAudioInputStream(audioFile);
