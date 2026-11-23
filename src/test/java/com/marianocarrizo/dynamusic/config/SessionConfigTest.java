@@ -1,5 +1,6 @@
 package com.marianocarrizo.dynamusic.config;
 
+import com.marianocarrizo.dynamusic.audio.cache.CacheLimit;
 import com.marianocarrizo.dynamusic.enums.TrackType;
 import com.marianocarrizo.dynamusic.model.AuraPreset;
 import com.marianocarrizo.dynamusic.model.AuraSlot;
@@ -260,5 +261,60 @@ class SessionConfigTest {
 
         assertEquals(RepeatMode.ONE, reloaded.getRepeatMode(NowPlayingSource.PLAYLIST));
         assertEquals(RepeatMode.ONE, reloaded.getRepeatMode(NowPlayingSource.MOOD));
+    }
+
+    @Test
+    void audioCacheLimitDefaultsWhenTheSessionPredatesIt() {
+        SessionConfig loaded = new Gson().fromJson("{\"masterVolume\":0.5}", SessionConfig.class);
+
+        assertEquals(CacheLimit.GB_2, loaded.getAudioCacheLimit());
+    }
+
+    @Test
+    void audioCacheLimitSurvivesAJsonRoundTrip() {
+        SessionConfig cfg = new SessionConfig();
+        cfg.setAudioCacheLimit(CacheLimit.GB_5);
+
+        SessionConfig loaded = new Gson().fromJson(new Gson().toJson(cfg), SessionConfig.class);
+
+        assertEquals(CacheLimit.GB_5, loaded.getAudioCacheLimit());
+    }
+
+    @Test
+    void anUnknownPersistedLimitFallsBackToTheDefault() {
+        SessionConfig loaded = new Gson().fromJson("{\"audioCacheLimit\":\"GB_999\"}", SessionConfig.class);
+
+        assertEquals(CacheLimit.DEFAULT, loaded.getAudioCacheLimit());
+    }
+
+    @Test
+    void adoptingACopiesTheLoadedLimitIntoTheLiveConfig() {
+        SessionConfig loaded = new SessionConfig();
+        loaded.setAudioCacheLimit(CacheLimit.GB_10);
+        SessionConfig live = new SessionConfig();
+
+        live.adoptAudioCacheLimitFrom(loaded);
+
+        assertEquals(CacheLimit.GB_10, live.getAudioCacheLimit());
+    }
+
+    @Test
+    void savingOtherSettingsDoesNotResetTheLimit() {
+        SessionConfig cfg = new SessionConfig();
+        cfg.setAudioCacheLimit(CacheLimit.GB_1);
+
+        cfg.setAmbianceScreenIndex(2);
+
+        assertEquals(CacheLimit.GB_1, cfg.getAudioCacheLimit());
+    }
+
+    @Test
+    void settingNullRestoresTheDefault() {
+        SessionConfig cfg = new SessionConfig();
+        cfg.setAudioCacheLimit(CacheLimit.GB_20);
+
+        cfg.setAudioCacheLimit(null);
+
+        assertEquals(CacheLimit.DEFAULT, cfg.getAudioCacheLimit());
     }
 }
