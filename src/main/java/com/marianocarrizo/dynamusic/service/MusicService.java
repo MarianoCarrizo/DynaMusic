@@ -798,7 +798,7 @@ public class MusicService {
      */
     public void playPlaylistTrack(File file) {
         if (mode != PlaybackMode.PLAYLIST) return;
-        audioFocus.claimForMode();
+        audioFocus.claimForRequest();
         cancelActiveFade();
         final int seq = playlistLoads.begin();
         playlistPendingTicket = beginPending(NowPlayingSource.PLAYLIST, null, file, null);
@@ -998,7 +998,7 @@ public class MusicService {
 
     public void playOnDemand(File file, String title, Runnable onStarted) {
         if (file == null || !file.exists()) return;
-        audioFocus.claimForMode();
+        audioFocus.claimForRequest();
         final int seq = ++onDemandSeq;
         final int pendingTicket = beginPending(NowPlayingSource.ON_DEMAND, null, file, title);
 
