@@ -48,9 +48,7 @@
                 <padding>
                     <Insets top="10" right="8" bottom="10" left="10"/>
                 </padding>
-                <Button text="📂 Open Folder" onAction="#onOpenFolder" maxWidth="Infinity" styleClass="btn-secondary"/>
-                <TextField fx:id="txtSearch" promptText="Search track by name..."/>
-                <TreeView fx:id="treeFiles" VBox.vgrow="ALWAYS" showRoot="false"/>
+                <fx:include fx:id="libraryPanel" source="library_panel.fxml"/>
 
                 <VBox fx:id="previewPanel" spacing="6" alignment="CENTER"
                       styleClass="playback-panel, preview-panel, preview-strip"
@@ -83,18 +81,7 @@
                     <SeekBar fx:id="onDemandSeekBar"/>
                 </VBox>
 
-                <HBox spacing="8" alignment="CENTER_LEFT">
-                    <TextField fx:id="txtYoutubeUrl" HBox.hgrow="ALWAYS" maxWidth="Infinity"
-                               promptText="Paste YouTube URL..."/>
-                    <Button fx:id="btnPlayYoutube" text="Play" onAction="#onPlayYoutubeUrl"
-                            minWidth="60" styleClass="btn-secondary"/>
-                    <Button fx:id="btnAddYoutube" text="Add" onAction="#onAddYoutubeUrl"
-                            minWidth="60" styleClass="btn-secondary"/>
-                    <Button fx:id="btnBrowseYoutube" text="Browse" onAction="#onBrowseYouTube"
-                            minWidth="60" styleClass="btn-secondary"/>
-                </HBox>
-                <Label fx:id="lblYoutubeError" styleClass="error-label" text=""
-                       visible="false" managed="false" wrapText="true"/>
+                <fx:include fx:id="youTubeBar" source="youtube_bar.fxml"/>
             </VBox>
 
             <VBox fx:id="rightPanel" spacing="14" minWidth="420">

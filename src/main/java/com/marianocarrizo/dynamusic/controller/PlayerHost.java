@@ -3,10 +3,13 @@ package com.marianocarrizo.dynamusic.controller;
 import com.marianocarrizo.dynamusic.config.SessionConfig;
 import com.marianocarrizo.dynamusic.enums.TrackType;
 import com.marianocarrizo.dynamusic.model.AuraSlot;
+import com.marianocarrizo.dynamusic.model.PlaylistItem;
+import com.marianocarrizo.dynamusic.service.PlaylistManager;
 import com.marianocarrizo.dynamusic.service.MusicService;
 import javafx.stage.Window;
 
 import java.io.File;
+import java.util.Optional;
 
 public interface PlayerHost {
 
@@ -37,4 +40,24 @@ public interface PlayerHost {
     void enterMode(MusicService.PlaybackMode mode);
 
     void assignTrack(TrackType type, File file);
+
+    void playNow(File file, String title);
+
+    void startPreview(File file);
+
+    PlaylistManager playlistManager();
+
+    Optional<String> promptNewPlaylistName();
+
+    void addToPlaylist(String playlistName, File source);
+
+    void createPlaylistFromFolder(File folder);
+
+    String selectedPlaylistName();
+
+    void showPendingPlaylistEntry(String text);
+
+    void addPlaylistItem(String playlistName, PlaylistItem item);
+
+    void refreshPlaylistView();
 }
