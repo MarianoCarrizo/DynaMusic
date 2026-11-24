@@ -32,6 +32,7 @@
             <Label fx:id="lblDetail" maxWidth="Infinity" styleClass="now-playing-detail"/>
             <Label fx:id="lblSource" maxWidth="Infinity" styleClass="now-playing-source"/>
             <Label fx:id="lblQuality" maxWidth="Infinity" styleClass="now-playing-quality"/>
+            <Label fx:id="lblOutput" maxWidth="Infinity" styleClass="now-playing-output"/>
         </VBox>
     </HBox>
 

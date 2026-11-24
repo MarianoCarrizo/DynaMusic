@@ -4,6 +4,7 @@ import com.marianocarrizo.dynamusic.audio.AudioFormat;
 import com.marianocarrizo.dynamusic.audio.AudioPrep;
 import com.marianocarrizo.dynamusic.audio.PcmProbe;
 import com.marianocarrizo.dynamusic.audio.PreparedAudio;
+import com.marianocarrizo.dynamusic.audio.stream.OutputArbiter;
 import java.io.File;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -22,9 +23,11 @@ public final class PlaybackRouter {
     private final StreamOpener opener;
     private final Executor background;
     private final Executor fx;
+    private final OutputArbiter arbiter;
 
     public PlaybackRouter(BooleanSupplier streamingEnabled, Function<File, CompletableFuture<PreparedAudio>> prepare,
-            StreamOpener opener, Executor background, Executor fx) {
+            StreamOpener opener, Executor background, Executor fx, OutputArbiter arbiter) {
+        this.arbiter = arbiter;
         this.streamingEnabled = streamingEnabled;
         this.prepare = prepare;
         this.opener = opener;
@@ -32,13 +35,17 @@ public final class PlaybackRouter {
         this.fx = fx;
     }
 
-    public static PlaybackRouter standard(AudioPrep prep, BooleanSupplier streamingEnabled, Executor fx) {
+    public static PlaybackRouter standard(AudioPrep prep, BooleanSupplier streamingEnabled,
+            BooleanSupplier exclusiveEnabled, Executor fx) {
+        OutputArbiter arbiter = OutputArbiter.process();
         Executor background = Executors.newFixedThreadPool(OPEN_THREADS, runnable -> {
             Thread thread = new Thread(runnable, OPEN_THREAD_NAME);
             thread.setDaemon(true);
             return thread;
         });
-        return new PlaybackRouter(streamingEnabled, prep::prepare, LineStreamOpener.standard(), background, fx);
+        return new PlaybackRouter(streamingEnabled, prep::prepare,
+                LineStreamOpener.standard(exclusiveEnabled, arbiter),
+                background, fx, arbiter);
     }
 
     public boolean streams(File file) {
@@ -63,7 +70,7 @@ public final class PlaybackRouter {
         try {
             if (choose(enabled, use, file) != EngineChoice.STREAMING) return Optional.empty();
             return opener.open(file).map(stream -> new StreamingPlan(stream, fx));
-        } catch (RuntimeException unavailable) {
+        } catch (RuntimeException | LinkageError unavailable) {
             return Optional.empty();
         }
     }
@@ -78,6 +85,6 @@ public final class PlaybackRouter {
     }
 
     private CompletableFuture<PlaybackPlan> javaFx(File file) {
-        return prepare.apply(file).<PlaybackPlan>thenApply(JavaFxPlan::new);
+        return prepare.apply(file).<PlaybackPlan>thenApply(prepared -> new JavaFxPlan(prepared, arbiter));
     }
 }

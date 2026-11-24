@@ -370,4 +370,57 @@ class SessionConfigTest {
 
         assertTrue(cfg.isStreamingEngineEnabled());
     }
+
+    @Test
+    void exclusiveOutputIsOffForAFreshConfig() {
+        assertFalse(new SessionConfig().isExclusiveOutputEnabled());
+    }
+
+    @Test
+    void exclusiveOutputIsOffWhenTheSessionPredatesIt() {
+        SessionConfig loaded = new Gson().fromJson("{\"streamingEngine\":true}", SessionConfig.class);
+
+        assertFalse(loaded.isExclusiveOutputEnabled());
+        assertTrue(loaded.isStreamingEngineEnabled());
+    }
+
+    @Test
+    void exclusiveOutputSurvivesAJsonRoundTrip() {
+        SessionConfig cfg = new SessionConfig();
+        cfg.setExclusiveOutputEnabled(true);
+
+        SessionConfig loaded = new Gson().fromJson(new Gson().toJson(cfg), SessionConfig.class);
+
+        assertTrue(loaded.isExclusiveOutputEnabled());
+    }
+
+    @Test
+    void exclusiveOutputCanBeTurnedBackOff() {
+        SessionConfig cfg = new SessionConfig();
+        cfg.setExclusiveOutputEnabled(true);
+
+        cfg.setExclusiveOutputEnabled(false);
+
+        assertFalse(new Gson().fromJson(new Gson().toJson(cfg), SessionConfig.class).isExclusiveOutputEnabled());
+    }
+
+    @Test
+    void adoptingTheStreamingEngineAlsoCopiesExclusiveOutput() {
+        SessionConfig loaded = new SessionConfig();
+        loaded.setExclusiveOutputEnabled(true);
+        SessionConfig live = new SessionConfig();
+
+        live.adoptStreamingEngineFrom(loaded);
+
+        assertTrue(live.isExclusiveOutputEnabled());
+    }
+
+    @Test
+    void exclusiveOutputIsIndependentFromTheStreamingEngine() {
+        SessionConfig cfg = new SessionConfig();
+        cfg.setExclusiveOutputEnabled(true);
+
+        assertFalse(cfg.isStreamingEngineEnabled());
+        assertTrue(cfg.isExclusiveOutputEnabled());
+    }
 }

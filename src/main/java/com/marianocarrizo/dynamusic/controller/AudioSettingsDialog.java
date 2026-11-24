@@ -5,6 +5,7 @@ import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Dialog;
@@ -21,6 +22,7 @@ final class AudioSettingsDialog {
     private static final String TITLE = "Audio settings";
     private static final String LIMIT_LABEL = "Maximum cache size";
     private static final String CLEAR_LABEL = "Clear cache";
+    private static final String CLOSE_LABEL = "Close";
     private static final double CONTENT_SPACING = 10;
     private static final double CONTENT_PADDING = 16;
 
@@ -44,8 +46,9 @@ final class AudioSettingsDialog {
         VBox content = new VBox(CONTENT_SPACING, new Label(LIMIT_LABEL), choice, usage, clear, streamingSection);
         content.setPadding(new Insets(CONTENT_PADDING));
         dialog.getDialogPane().setContent(content);
-        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
-        ThemedDialog.theme(dialog, owner);
+        ButtonType close = new ButtonType(CLOSE_LABEL, ButtonBar.ButtonData.CANCEL_CLOSE);
+        dialog.getDialogPane().getButtonTypes().add(close);
+        ThemedDialog.theme(dialog, owner, close);
         dialog.showAndWait();
     }
 }

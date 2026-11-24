@@ -1,5 +1,6 @@
 package com.marianocarrizo.dynamusic.service.playback;
 
+import com.marianocarrizo.dynamusic.audio.stream.OutputStatus;
 import com.marianocarrizo.dynamusic.service.AudioAnalyzer;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.ReadOnlyObjectProperty;
@@ -26,6 +27,8 @@ public interface Playback {
     ReadOnlyObjectProperty<PlaybackStatus> statusProperty();
 
     PlaybackStatus getStatus();
+
+    ReadOnlyObjectProperty<OutputStatus> outputProperty();
 
     DoubleProperty volumeProperty();
 

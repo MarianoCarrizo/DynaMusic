@@ -75,6 +75,8 @@ public class SessionConfig {
 
     private Boolean streamingEngine;
 
+    private Boolean exclusiveOutput;
+
     public SessionConfig() {}
 
     public static SessionConfig firstRun() {
@@ -115,8 +117,17 @@ public class SessionConfig {
         streamingEngine = enabled;
     }
 
+    public boolean isExclusiveOutputEnabled() {
+        return Boolean.TRUE.equals(exclusiveOutput);
+    }
+
+    public void setExclusiveOutputEnabled(boolean enabled) {
+        exclusiveOutput = enabled;
+    }
+
     public void adoptStreamingEngineFrom(SessionConfig other) {
         streamingEngine = other.streamingEngine;
+        exclusiveOutput = other.exclusiveOutput;
     }
 
     public List<Scene> getScenes() {

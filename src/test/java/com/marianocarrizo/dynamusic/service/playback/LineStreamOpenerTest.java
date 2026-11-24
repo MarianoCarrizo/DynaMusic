@@ -1,5 +1,13 @@
 package com.marianocarrizo.dynamusic.service.playback;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import java.util.concurrent.atomic.AtomicInteger;
+import com.marianocarrizo.dynamusic.audio.wasapi.SharedStream;
+import com.marianocarrizo.dynamusic.audio.wasapi.WasapiApi;
+import com.marianocarrizo.dynamusic.audio.wasapi.WasapiSharedApi;
+import com.marianocarrizo.dynamusic.audio.wasapi.ExclusiveSupport;
+import com.marianocarrizo.dynamusic.audio.wasapi.ExclusiveStream;
+import com.marianocarrizo.dynamusic.audio.stream.OutputArbiter;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -32,6 +40,10 @@ class LineStreamOpenerTest {
     private FakePcmSource source = sourceOf(CD);
     private FakePcmSource resampled;
     private FakePcmSink sink;
+    private FakePcmSink exclusiveSink;
+    private FakePcmSink wasapiSharedSink;
+    private final List<AudioFormat> wasapiSharedRequests = new ArrayList<>();
+    private final List<AudioFormat> exclusiveRequests = new ArrayList<>();
     private boolean sinkFails;
     private boolean sourceFails;
 
@@ -131,5 +143,191 @@ class LineStreamOpenerTest {
 
         assertTrue(opener(format -> format.getSampleRate() <= 48000, true).open(FILE).isEmpty());
         assertEquals(1, resampled.closes());
+    }
+
+    private LineStreamOpener exclusiveOpener(Predicate<AudioFormat> exclusive) {
+        return new LineStreamOpener(file -> source, format -> {
+            sinkRequests.add(format);
+            sink = new FakePcmSink(format);
+            return sink;
+        }, format -> {
+            exclusiveRequests.add(format);
+            exclusiveSink = new FakePcmSink(format);
+            return exclusiveSink;
+        }, (file, target, frames) -> sourceOf(target),
+                new OutputNegotiator(exclusive, format -> true, () -> false));
+    }
+
+    private static WasapiApi probing(ExclusiveSupport support, AtomicInteger probes) {
+        return new WasapiApi() {
+            @Override
+            public ExclusiveSupport probe(AudioFormat format) {
+                probes.incrementAndGet();
+                if (support == null) throw new IllegalStateException("no native layer");
+                return support;
+            }
+
+            @Override
+            public ExclusiveStream open(AudioFormat format, long periodHns) {
+                throw new UnsupportedOperationException();
+            }
+        };
+    }
+
+    @Test
+    void aNativeBindingErrorDeclinesExclusiveInsteadOfEscaping() {
+        WasapiApi unlinked = new WasapiApi() {
+            @Override
+            public ExclusiveSupport probe(AudioFormat format) {
+                throw new ExceptionInInitializerError("avrt is missing");
+            }
+
+            @Override
+            public ExclusiveStream open(AudioFormat format, long periodHns) {
+                throw new NoClassDefFoundError("ProAudioTask");
+            }
+        };
+        Predicate<AudioFormat> offer = LineStreamOpener.exclusiveOffer(() -> true, new OutputArbiter(), unlinked);
+
+        assertFalse(offer.test(HI_RES));
+    }
+
+    @Test
+    void aLinkageErrorWhileOpeningTheSinkYieldsNoStream() {
+        source = sourceOf(HI_RES);
+        LineStreamOpener unlinked = new LineStreamOpener(file -> source, format -> new FakePcmSink(format),
+                format -> {
+                    throw new NoClassDefFoundError("Win32Library");
+                }, (file, target, frames) -> sourceOf(target),
+                new OutputNegotiator(format -> true, format -> true, () -> false));
+
+        assertTrue(unlinked.open(FILE).isEmpty());
+        assertEquals(1, source.closes());
+    }
+
+    private LineStreamOpener sharedOpener(Predicate<AudioFormat> wasapiShared) {
+        return new LineStreamOpener(file -> source, format -> {
+            sinkRequests.add(format);
+            sink = new FakePcmSink(format);
+            return sink;
+        }, format -> {
+            exclusiveRequests.add(format);
+            exclusiveSink = new FakePcmSink(format);
+            return exclusiveSink;
+        }, format -> {
+            wasapiSharedRequests.add(format);
+            wasapiSharedSink = new FakePcmSink(format);
+            return wasapiSharedSink;
+        }, (file, target, frames) -> sourceOf(target),
+                new OutputNegotiator(format -> false, wasapiShared, format -> true, () -> false));
+    }
+
+    private static WasapiSharedApi sharedProbing(Boolean supported) {
+        return new WasapiSharedApi() {
+            @Override
+            public boolean supportsShared(AudioFormat format) {
+                if (supported == null) throw new ExceptionInInitializerError("avrt is missing");
+                return supported;
+            }
+
+            @Override
+            public SharedStream openShared(AudioFormat format) {
+                throw new UnsupportedOperationException();
+            }
+        };
+    }
+
+    @Test
+    void aWasapiSharedPlanOpensTheWasapiSharedSinkInTheSourceFormat() {
+        source = sourceOf(HI_RES);
+
+        Optional<PcmStream> stream = sharedOpener(format -> true).open(FILE);
+
+        assertSame(wasapiSharedSink, stream.orElseThrow().sink());
+        assertEquals(List.of(HI_RES), wasapiSharedRequests);
+        assertTrue(sinkRequests.isEmpty());
+        assertTrue(exclusiveRequests.isEmpty());
+    }
+
+    @Test
+    void aRejectedWasapiSharedProbeOpensTheJavaSoundSink() {
+        source = sourceOf(HI_RES);
+
+        Optional<PcmStream> stream = sharedOpener(format -> false).open(FILE);
+
+        assertSame(sink, stream.orElseThrow().sink());
+        assertTrue(wasapiSharedRequests.isEmpty());
+    }
+
+    @Test
+    void theSharedOfferFollowsTheNativeAnswer() {
+        assertTrue(LineStreamOpener.sharedOffer(sharedProbing(true)).test(HI_RES));
+        assertFalse(LineStreamOpener.sharedOffer(sharedProbing(false)).test(HI_RES));
+    }
+
+    @Test
+    void aNativeBindingErrorDeclinesWasapiSharedInsteadOfEscaping() {
+        assertFalse(LineStreamOpener.sharedOffer(sharedProbing(null)).test(HI_RES));
+    }
+
+    @Test
+    void anExclusivePlanOpensTheExclusiveSinkInTheSourceFormat() {
+        source = sourceOf(HI_RES);
+
+        Optional<PcmStream> stream = exclusiveOpener(format -> true).open(FILE);
+
+        assertSame(exclusiveSink, stream.orElseThrow().sink());
+        assertEquals(List.of(HI_RES), exclusiveRequests);
+        assertTrue(sinkRequests.isEmpty());
+    }
+
+    @Test
+    void aRejectedExclusiveProbeOpensTheSharedSink() {
+        source = sourceOf(HI_RES);
+
+        Optional<PcmStream> stream = exclusiveOpener(format -> false).open(FILE);
+
+        assertSame(sink, stream.orElseThrow().sink());
+        assertTrue(exclusiveRequests.isEmpty());
+    }
+
+    @Test
+    void theSettingOffNeverProbesTheDevice() {
+        AtomicInteger probes = new AtomicInteger();
+        Predicate<AudioFormat> offer = LineStreamOpener.exclusiveOffer(() -> false, new OutputArbiter(),
+                probing(ExclusiveSupport.SUPPORTED, probes));
+
+        assertFalse(offer.test(HI_RES));
+        assertEquals(0, probes.get());
+    }
+
+    @Test
+    void sharedPlaybackInProgressSkipsTheExclusiveOffer() {
+        AtomicInteger probes = new AtomicInteger();
+        OutputArbiter arbiter = new OutputArbiter();
+        arbiter.sharedStarting(new Object(), 1);
+        Predicate<AudioFormat> offer = LineStreamOpener.exclusiveOffer(() -> true, arbiter,
+                probing(ExclusiveSupport.SUPPORTED, probes));
+
+        assertFalse(offer.test(HI_RES));
+        assertEquals(0, probes.get());
+    }
+
+    @Test
+    void onlyASupportedProbeOffersExclusive() {
+        for (ExclusiveSupport support : ExclusiveSupport.values()) {
+            Predicate<AudioFormat> offer = LineStreamOpener.exclusiveOffer(() -> true, new OutputArbiter(),
+                    probing(support, new AtomicInteger()));
+
+            assertEquals(support == ExclusiveSupport.SUPPORTED, offer.test(HI_RES), support.name());
+        }
+    }
+
+    @Test
+    void aFailingNativeLayerDeclinesExclusiveInsteadOfThrowing() {
+        Predicate<AudioFormat> offer = LineStreamOpener.exclusiveOffer(() -> true, new OutputArbiter(),
+                probing(null, new AtomicInteger()));
+
+        assertFalse(offer.test(HI_RES));
     }
 }

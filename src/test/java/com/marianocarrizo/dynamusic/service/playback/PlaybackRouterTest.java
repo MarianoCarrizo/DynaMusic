@@ -1,5 +1,6 @@
 package com.marianocarrizo.dynamusic.service.playback;
 
+import com.marianocarrizo.dynamusic.audio.stream.OutputArbiter;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -29,6 +30,7 @@ class PlaybackRouterTest {
 
     @TempDir Path dir;
 
+    private final OutputArbiter arbiter = new OutputArbiter();
     private final AtomicBoolean enabled = new AtomicBoolean(true);
     private final AtomicInteger prepares = new AtomicInteger();
     private final AtomicInteger opens = new AtomicInteger();
@@ -43,7 +45,7 @@ class PlaybackRouterTest {
         return new PlaybackRouter(enabled::get, file -> {
             prepares.incrementAndGet();
             return CompletableFuture.completedFuture(new PreparedAudio(file, PREPARED_GAIN));
-        }, file -> opener.open(file), Runnable::run, Runnable::run);
+        }, file -> opener.open(file), Runnable::run, Runnable::run, arbiter);
     }
 
     private static File flacFixture() {
@@ -123,6 +125,17 @@ class PlaybackRouterTest {
     }
 
     @Test
+    void anOpenerFailingToLinkTheNativeLayerFallsBackToJavaFx() {
+        opener = file -> {
+            throw new ExceptionInInitializerError("avrt is missing");
+        };
+
+        PlaybackPlan plan = router().plan(flacFixture(), PlaybackUse.LISTEN).join();
+
+        assertInstanceOf(JavaFxPlan.class, plan);
+    }
+
+    @Test
     void togglingTheSettingAffectsOnlyPlansRequestedAfterwards() {
         PlaybackRouter router = router();
         enabled.set(false);
@@ -157,5 +170,15 @@ class PlaybackRouterTest {
         assertTrue(router().streamsAsync(flacFixture()).join());
         enabled.set(false);
         assertEquals(false, router().streamsAsync(flacFixture()).join());
+    }
+
+    @Test
+    void javaFxPlansCarryTheRoutersArbiter() {
+        enabled.set(false);
+
+        JavaFxPlan javaFx = assertInstanceOf(JavaFxPlan.class,
+                router().plan(flacFixture(), PlaybackUse.MOOD).join());
+
+        assertSame(arbiter, javaFx.arbiter());
     }
 }

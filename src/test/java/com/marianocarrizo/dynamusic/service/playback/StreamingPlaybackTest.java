@@ -1,5 +1,6 @@
 package com.marianocarrizo.dynamusic.service.playback;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -171,6 +172,17 @@ class StreamingPlaybackTest {
         assertEquals(1, ends.get());
         assertEquals(1, sink.drains());
         assertEquals(PlaybackStatus.PLAYING, playback.getStatus());
+    }
+
+    @Test
+    void theNaturalEndReleasesTheDeviceWithoutWaitingForAnotherWrite() throws Exception {
+        open(patternPcm(TOTAL_FRAMES / 2));
+
+        playback.play();
+        await(() -> ends.get() == 1);
+
+        await(() -> sink.suspends() == 1);
+        assertEquals(0, errors.get());
     }
 
     @Test
@@ -365,5 +377,126 @@ class StreamingPlaybackTest {
         playback.volumeProperty().set(0.3);
 
         assertEquals(0.3, playback.getVolume(), 0.0);
+    }
+
+    @Test
+    void pauseReleasesTheDeviceAndResumeReacquiresIt() throws Exception {
+        open(constantPcm(TOTAL_FRAMES * 4, CONSTANT_SAMPLE));
+        playback.play();
+        await(() -> sink.starts() == 1);
+
+        playback.pause();
+        await(() -> sink.suspends() == 1);
+        playback.play();
+
+        await(() -> sink.starts() == 2);
+        assertEquals(0, errors.get());
+    }
+
+    @Test
+    void stopReleasesTheDevice() throws Exception {
+        open(constantPcm(TOTAL_FRAMES * 4, CONSTANT_SAMPLE));
+        playback.play();
+        await(() -> sink.starts() == 1);
+
+        playback.stop();
+
+        await(() -> sink.suspends() == 1);
+        assertEquals(0, errors.get());
+    }
+
+    @Test
+    void seeksQueuedWhileTheWorkerIsBusyExecuteOnlyTheLatest() throws Exception {
+        open(constantPcm(TOTAL_FRAMES * 4, CONSTANT_SAMPLE));
+        CountDownLatch gate = new CountDownLatch(1);
+        sink.blockWrites(gate);
+        playback.play();
+        await(() -> sink.writeAttempts() >= 1);
+
+        for (int second = 1; second <= 3; second++) {
+            playback.seek(Duration.seconds(second * 0.5));
+        }
+        playback.seek(Duration.seconds(3));
+        gate.countDown();
+
+        await(() -> source.seeks().size() >= 1);
+        settle();
+        assertEquals(1, source.seeks().size());
+        assertEquals(3L * TOTAL_FRAMES, source.seeks().get(0));
+        assertEquals(0, errors.get());
+    }
+
+    @Test
+    void seeksArrivingDuringASeekCollapseIntoTheLastOneWithoutAnExtraStart() throws Exception {
+        open(constantPcm(TOTAL_FRAMES * 4, CONSTANT_SAMPLE));
+        playback.play();
+        await(() -> sink.starts() == 1);
+        CountDownLatch gate = new CountDownLatch(1);
+        source.blockSeeks(gate);
+
+        playback.seek(Duration.seconds(1));
+        await(() -> source.seeks().size() == 1);
+        playback.seek(Duration.seconds(2));
+        playback.seek(Duration.seconds(3));
+        gate.countDown();
+
+        await(() -> source.seeks().size() == 2);
+        await(() -> sink.starts() == 2);
+        settle();
+        assertEquals(TOTAL_FRAMES, source.seeks().get(0));
+        assertEquals(3L * TOTAL_FRAMES, source.seeks().get(1));
+        assertEquals(2, sink.starts());
+    }
+
+    @Test
+    void seekingWhilePausedReleasesTheDevice() throws Exception {
+        open(constantPcm(TOTAL_FRAMES * 4, CONSTANT_SAMPLE));
+
+        playback.seek(Duration.seconds(1));
+
+        await(() -> sink.suspends() == 1);
+        assertEquals(0, sink.starts());
+    }
+
+    @Test
+    void seekingWhilePlayingKeepsPlayingWithoutAReleaseOfTheDevice() throws Exception {
+        open(constantPcm(TOTAL_FRAMES * 4, CONSTANT_SAMPLE));
+        playback.play();
+        await(() -> sink.starts() == 1);
+
+        playback.seek(Duration.seconds(1));
+
+        await(() -> sink.starts() == 2);
+        settle();
+        assertEquals(ends.get(), sink.suspends());
+    }
+
+    @Test
+    void theOutputStartsAsTheSinkReportsIt() {
+        open(constantPcm(100, 0));
+
+        assertEquals("16/44.1 shared", playback.outputProperty().get().label());
+    }
+
+    @Test
+    void aSharedOutputKeepsItsLabelWhenTheVolumeDrops() {
+        open(constantPcm(100, 0));
+
+        playback.setVolume(0.5);
+
+        assertEquals("16/44.1 shared", playback.outputProperty().get().label());
+        assertFalse(playback.outputProperty().get().bitPerfect());
+    }
+
+    @Test
+    void theOutputIsAttenuatedBelowFullVolumeAndRecoversAtFullVolume() {
+        open(constantPcm(100, 0));
+
+        playback.setVolume(0.5);
+        boolean attenuated = playback.outputProperty().get().attenuated();
+        playback.setVolume(1.0);
+
+        assertTrue(attenuated);
+        assertFalse(playback.outputProperty().get().attenuated());
     }
 }
