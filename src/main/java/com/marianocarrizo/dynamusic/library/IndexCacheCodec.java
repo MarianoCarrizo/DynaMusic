@@ -9,7 +9,7 @@ import java.util.Optional;
 
 final class IndexCacheCodec {
 
-    static final String HEADER = "dynamusic-library-index 1";
+    static final String HEADER = "dynamusic-library-index 2";
     private static final String FIELD_SEPARATOR = "\t";
     private static final String LINE_SEPARATOR = "\n";
     private static final int FIELD_COUNT = 9;
@@ -21,17 +21,16 @@ final class IndexCacheCodec {
     static String encode(Collection<TrackEntry> entries) {
         StringBuilder text = new StringBuilder(HEADER).append(LINE_SEPARATOR);
         for (TrackEntry entry : entries) {
-            if (!isEncodable(entry.path())) continue;
             TrackTags tags = entry.tags();
-            text.append(entry.path()).append(FIELD_SEPARATOR)
+            text.append(escape(entry.path())).append(FIELD_SEPARATOR)
                     .append(entry.size()).append(FIELD_SEPARATOR)
                     .append(entry.modified()).append(FIELD_SEPARATOR)
                     .append(tags.trackNumber()).append(FIELD_SEPARATOR)
                     .append(tags.hasCover() ? COVER : NO_COVER).append(FIELD_SEPARATOR)
-                    .append(tags.year()).append(FIELD_SEPARATOR)
-                    .append(tags.title()).append(FIELD_SEPARATOR)
-                    .append(tags.artist()).append(FIELD_SEPARATOR)
-                    .append(tags.album()).append(LINE_SEPARATOR);
+                    .append(escape(tags.year())).append(FIELD_SEPARATOR)
+                    .append(escape(tags.title())).append(FIELD_SEPARATOR)
+                    .append(escape(tags.artist())).append(FIELD_SEPARATOR)
+                    .append(escape(tags.album())).append(LINE_SEPARATOR);
         }
         return text.toString();
     }
@@ -50,8 +49,40 @@ final class IndexCacheCodec {
         return entries;
     }
 
-    private static boolean isEncodable(String path) {
-        return path.indexOf('\t') < 0 && path.indexOf('\n') < 0 && path.indexOf('\r') < 0;
+    private static String escape(String value) {
+        StringBuilder out = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            switch (c) {
+                case '\\' -> out.append("\\\\");
+                case '\t' -> out.append("\\t");
+                case '\n' -> out.append("\\n");
+                case '\r' -> out.append("\\r");
+                default -> out.append(c);
+            }
+        }
+        return out.toString();
+    }
+
+    private static String unescape(String value) {
+        if (value.indexOf('\\') < 0) return value;
+        StringBuilder out = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c != '\\' || i + 1 >= value.length()) {
+                out.append(c);
+                continue;
+            }
+            char next = value.charAt(++i);
+            switch (next) {
+                case 't' -> out.append('\t');
+                case 'n' -> out.append('\n');
+                case 'r' -> out.append('\r');
+                case '\\' -> out.append('\\');
+                default -> out.append(c).append(next);
+            }
+        }
+        return out.toString();
     }
 
     private static Optional<TrackEntry> parse(String line) {
@@ -64,8 +95,9 @@ final class IndexCacheCodec {
             long modified = Long.parseLong(fields[2]);
             int trackNumber = Integer.parseInt(fields[3]);
             if (size < 0 || trackNumber < 0) return Optional.empty();
-            TrackTags tags = new TrackTags(fields[6], fields[7], fields[8], trackNumber, fields[5], coverFlag);
-            return Optional.of(new TrackEntry(fields[0], size, modified, tags));
+            TrackTags tags = new TrackTags(unescape(fields[6]), unescape(fields[7]), unescape(fields[8]), trackNumber,
+                    unescape(fields[5]), coverFlag);
+            return Optional.of(new TrackEntry(unescape(fields[0]), size, modified, tags));
         } catch (NumberFormatException malformed) {
             return Optional.empty();
         }

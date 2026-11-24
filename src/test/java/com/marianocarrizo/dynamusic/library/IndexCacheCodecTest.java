@@ -40,11 +40,30 @@ class IndexCacheCodecTest {
     }
 
     @Test
-    void pathsWithSeparatorsAreSkippedWhenEncoding() {
-        List<TrackEntry> decoded = IndexCacheCodec.decode(
-                IndexCacheCodec.encode(List.of(entry("/m/bad\tname.flac"), entry("/m/bad\nname.flac"), entry("/m/ok.flac"))));
+    void separatorsAndBackslashesInEveryTextFieldRoundTrip() {
+        TrackEntry awkward = new TrackEntry("C:\\m\\bad\tname\n.flac", 5, 6,
+                new TrackTags("a\tb", "c\nd\re", "f\\tg\\", 2, "20\t01", false));
 
-        assertEquals(List.of(entry("/m/ok.flac")), decoded);
+        List<TrackEntry> decoded = IndexCacheCodec.decode(
+                IndexCacheCodec.encode(List.of(entry("/m/ok.flac"), awkward, entry("/m/after.flac"))));
+
+        assertEquals(List.of(entry("/m/ok.flac"), awkward, entry("/m/after.flac")), decoded);
+    }
+
+    @Test
+    void encodedEntriesStayOnOneLineEach() {
+        String text = IndexCacheCodec.encode(List.of(entry("/m/a\nb.flac"), entry("/m/c\rd.flac")));
+
+        assertEquals(3, text.split("\n").length);
+        assertTrue(!text.contains("\r"));
+    }
+
+    @Test
+    void anOldVersionOneCacheIsRejectedSoTheLibraryIsRescanned() {
+        String text = "dynamusic-library-index 1\n" + line("/m/a.flac", "1", "1", "1", "0", "", "t", "a", "b") + "\n";
+
+        assertTrue(!IndexCacheCodec.hasValidHeader(text));
+        assertTrue(IndexCacheCodec.decode(text).isEmpty());
     }
 
     @Test
