@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.io.SequenceInputStream;
+import java.util.Optional;
 import javax.sound.sampled.AudioFormat;
 import org.jflac.FLACDecoder;
 import org.jflac.frame.Frame;
@@ -18,6 +19,7 @@ public final class FlacPcmSource implements PcmSource {
 
     private static final int INPUT_BUFFER_BYTES = 64 * 1024;
     private static final int MAX_BYTES_PER_SAMPLE = 4;
+    private static final int MAX_RESYNCS = 4;
 
     private final File file;
     private final RandomAccessFile random;
@@ -32,6 +34,11 @@ public final class FlacPcmSource implements PcmSource {
     private long discardBytes;
     private FLACDecoder decoder;
     private InputStream decoderInput;
+    private long seekTarget;
+    private long seekOffset;
+    private long expectedSample;
+    private int resyncs;
+    private boolean awaitingFirstFrame;
 
     private FlacPcmSource(File file, RandomAccessFile random, FlacMetadata metadata) throws IOException {
         this.file = file;
@@ -45,7 +52,7 @@ public final class FlacPcmSource implements PcmSource {
         this.frameBytes = format.getFrameSize();
         this.totalFrames = info.getTotalSamples();
         this.bisect = new FlacFrameBisect(random, metadata.firstFrameOffset(), info.getMinBlockSize(),
-                FlacFrameBisect.DEFAULT_SPAN_BYTES);
+                info.getMaxBlockSize(), FlacFrameBisect.DEFAULT_SPAN_BYTES);
         this.decoded = new ByteData(info.getMaxBlockSize() * info.getChannels() * MAX_BYTES_PER_SAMPLE);
         openDecoderAt(metadata.firstFrameOffset());
     }
@@ -85,6 +92,11 @@ public final class FlacPcmSource implements PcmSource {
         FlacSeekIndex index = metadata.seekIndex();
         FlacSeekPoint point = index.hasPoints() ? index.locate(target) : bisect.locate(target);
         openDecoderAt(point.offset());
+        seekTarget = target;
+        seekOffset = point.offset();
+        expectedSample = point.sample();
+        resyncs = 0;
+        awaitingFirstFrame = true;
         discardBytes = (target - point.sample()) * frameBytes;
         decodedOffset = 0;
         decodedLength = 0;
@@ -102,15 +114,49 @@ public final class FlacPcmSource implements PcmSource {
 
     private boolean ensureDecoded() throws IOException {
         while (decodedOffset >= decodedLength) {
-            Frame frame = decoder.readNextFrame();
-            if (frame == null) return false;
-            decoded = decoder.decodeFrame(frame, decoded);
+            if (!decodeNextFrame()) return false;
+            awaitingFirstFrame = false;
             decodedLength = decoded.getLen();
             int skipped = (int) Math.min(discardBytes, decodedLength);
             decodedOffset = skipped;
             discardBytes -= skipped;
         }
         return true;
+    }
+
+    private boolean decodeNextFrame() throws IOException {
+        while (true) {
+            try {
+                Frame frame = decoder.readNextFrame();
+                if (frame != null && (!awaitingFirstFrame || frame.header.sampleNumber == expectedSample)) {
+                    decoded = decoder.decodeFrame(frame, decoded);
+                    return true;
+                }
+                if (!awaitingFirstFrame || !resyncAfterBadSeek()) {
+                    if (frame != null) throw new IOException("Seek landed on a misaligned FLAC frame");
+                    return false;
+                }
+            } catch (IOException | RuntimeException failure) {
+                if (!awaitingFirstFrame || !resyncAfterBadSeek()) throw failure;
+            }
+        }
+    }
+
+    private boolean resyncAfterBadSeek() throws IOException {
+        if (resyncs >= MAX_RESYNCS) return false;
+        resyncs++;
+        Optional<FlacSeekPoint> next = nextCandidate();
+        if (next.isEmpty()) return false;
+        seekOffset = next.get().offset();
+        expectedSample = next.get().sample();
+        openDecoderAt(seekOffset);
+        discardBytes = Math.max(0, seekTarget - expectedSample) * frameBytes;
+        return true;
+    }
+
+    private Optional<FlacSeekPoint> nextCandidate() throws IOException {
+        FlacSeekPoint located = bisect.locate(seekTarget);
+        return located.offset() != seekOffset ? Optional.of(located) : bisect.nextAfter(seekOffset);
     }
 
     private void openDecoderAt(long offset) throws IOException {

@@ -122,4 +122,32 @@ class FlacPcmSourceTest {
 
         assertThrows(IOException.class, () -> FlacPcmSource.open(bogus.toFile()));
     }
+
+    private File withSeekPointMovedInsideAFrame(int pointIndex, int shift) throws IOException {
+        byte[] data = Files.readAllBytes(FlacFixtures.file(16, true).toPath());
+        int position = 4;
+        while ((data[position] & 0x7F) != 3) {
+            position += 4 + ((data[position + 1] & 0xFF) << 16 | (data[position + 2] & 0xFF) << 8 | (data[position + 3] & 0xFF));
+        }
+        int offsetField = position + 4 + pointIndex * 18 + 8 + 7;
+        data[offsetField] = (byte) (data[offsetField] + shift);
+        Path damaged = dir.resolve("moved-seek-point.flac");
+        Files.write(damaged, data);
+        return damaged.toFile();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"3,7", "5,40", "8,200"})
+    void aSeekPointLandingInsideAFrameResyncsInsteadOfFailing(int pointIndex, int shift) throws Exception {
+        byte[] expected = linear(FlacFixtures.file(16, true));
+        int frameBytes = 4;
+        try (FlacPcmSource source = FlacPcmSource.open(withSeekPointMovedInsideAFrame(pointIndex, shift))) {
+            long target = (long) pointIndex * FlacFixtures.BLOCK_SIZE;
+            source.seekToFrame(target);
+            byte[] actual = FlacFixtures.readAll(source);
+            byte[] tail = Arrays.copyOfRange(expected, (int) (target * frameBytes), expected.length);
+
+            assertArrayEquals(tail, actual, "tail after seek to " + target);
+        }
+    }
 }
