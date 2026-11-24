@@ -38,7 +38,7 @@ import java.util.Optional;
 public class PlayerController implements SceneHost, UpdateBarController.Host, SceneBarController.Host,
         AmbianceToolbarController.Host, LiveAuraController.Host, MoodPanelController.Host,
         LibraryPanelController.Host, PlaylistPanelController.Host, YouTubeBarController.Host,
-        NowPlayingBarController.Host, AudioSettingsController.Host {
+        NowPlayingBarController.Host, AudioSettingsController.Host, BrowsePanelController.Host {
 
     private static final String CAFECITO_URL = "https://cafecito.app/duhonha";
     private HostServices hostServices;
@@ -59,6 +59,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
     @FXML private MoodPanelController moodPanelController;
     @FXML private LiveAuraController liveAuraController;
     @FXML private QueuePanelController queuePanelController;
+    @FXML private BrowsePanelController browsePanelController;
 
     @FXML private NowPlayingBarController nowPlayingBarController;
 
@@ -95,8 +96,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
             musicService::playbackState, playlistManager::getActivePlaylistName, nowPlaying);
     private final PlaylistPlayback playlistPlayback = new PlaylistPlayback(
             musicService, playlistManager, this::enterMode, this::refreshPlaylistView);
-    private final ActiveTransport transport = new ActiveTransport(
-            musicService, playlistPlayback::startCurrent, () -> !modeShell.isListen());
+    private final ActiveTransport transport = new ActiveTransport(musicService, playlistPlayback::startCurrent, () -> !modeShell.isListen());
     private final RepeatSettings repeatSettings = new RepeatSettings(
             mode -> musicService.setLoop(mode.repeatsTrack()), playlistManager::setRepeat,
             mode -> musicService.setOnDemandLoop(mode.repeatsTrack()),
@@ -122,6 +122,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
         playlistPanelController.attach(this);
         nowPlayingBarController.attach(this);
         queuePanelController.attach(playlistPlayback);
+        browsePanelController.attach(this, libraryPanelController.rootFolderProperty(), modeShell.modeProperty());
         nowPlayingTracker.sync();
         liveAuraController.refresh();
         modeShell.install(mainRoot, modeTabPane, modeSwitchController, () -> updateWindowMood(moodPanelController.activeMood()));
@@ -351,6 +352,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
     @Override public ObservableBooleanValue moodActionsVisible() { return modeShell.sessionActiveProperty(); }
 
     @Override public void enqueue(List<File> files, QueuePlacement placement) { playlistPlayback.enqueue(files, placement); }
+    @Override public void playContext(String label, List<File> tracks, int start) { playlistPlayback.playContext(label, tracks, start); }
     @Override public MusicService musicService() { return musicService; }
 
     @Override public AmbianceCoordinator ambiance() { return ambiance; }

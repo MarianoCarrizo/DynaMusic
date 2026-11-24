@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+
+<VBox xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.marianocarrizo.dynamusic.controller.BrowsePanelController"
+      spacing="8" VBox.vgrow="ALWAYS">
+    <padding>
+        <Insets top="10" right="4" bottom="4" left="4"/>
+    </padding>
+    <HBox spacing="8" alignment="CENTER_LEFT">
+        <fx:define>
+            <ToggleGroup fx:id="sectionGroup"/>
+        </fx:define>
+        <Button fx:id="btnBack" text="Back" onAction="#onBack" styleClass="btn-secondary"/>
+        <HBox spacing="0" alignment="CENTER_LEFT">
+            <ToggleButton fx:id="btnAlbums" text="Albums" toggleGroup="$sectionGroup" selected="true"
+                          styleClass="mode-switch-button, mode-switch-first"/>
+            <ToggleButton fx:id="btnArtists" text="Artists" toggleGroup="$sectionGroup"
+                          styleClass="mode-switch-button, mode-switch-last"/>
+        </HBox>
+        <Label fx:id="lblContext" styleClass="lbl-panel-title" minWidth="0" HBox.hgrow="ALWAYS" maxWidth="Infinity"/>
+        <ProgressIndicator fx:id="indexingIndicator" styleClass="now-playing-loading" prefWidth="14" prefHeight="14"
+                           minWidth="14" minHeight="14" maxWidth="14" maxHeight="14"/>
+        <Label fx:id="lblStatus" styleClass="playlist-counter"/>
+    </HBox>
+    <StackPane fx:id="stage" VBox.vgrow="ALWAYS">
+        <Label fx:id="lblPlaceholder" styleClass="empty-state-hint" wrapText="true"/>
+    </StackPane>
+</VBox>
