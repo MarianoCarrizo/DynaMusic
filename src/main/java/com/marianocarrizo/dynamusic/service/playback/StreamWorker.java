@@ -1,5 +1,6 @@
 package com.marianocarrizo.dynamusic.service.playback;
 
+import com.marianocarrizo.dynamusic.audio.stream.OutputStatus;
 import com.marianocarrizo.dynamusic.audio.stream.PcmOutput;
 import com.marianocarrizo.dynamusic.audio.stream.PcmSource;
 import java.io.IOException;
@@ -25,6 +26,7 @@ final class StreamWorker implements Runnable {
     private long resumeFrame = NO_SEEK;
     private int generation;
     private double postedSeconds;
+    private OutputStatus postedOutput;
 
     StreamWorker(PcmSource source, PcmOutput output, StreamListener listener) {
         this.source = source;
@@ -81,6 +83,7 @@ final class StreamWorker implements Runnable {
     public void run() {
         try {
             output.seek(0);
+            postOutput();
             loop();
         } catch (IOException | RuntimeException failure) {
             if (!isClosing()) listener.failed(failure);
@@ -132,6 +135,7 @@ final class StreamWorker implements Runnable {
         if (play) {
             resumeFromPausedFrame();
             output.start();
+            postOutput();
         } else {
             long playedFrame = output.pause();
             if (!ended) resumeFrame = playedFrame;
@@ -154,6 +158,7 @@ final class StreamWorker implements Runnable {
         }
         if (count <= 0) return;
         output.write(buffer, count);
+        postOutput();
         if (Math.abs(output.seconds() - postedSeconds) >= POSITION_STEP_SECONDS) postPosition();
     }
 
@@ -167,6 +172,13 @@ final class StreamWorker implements Runnable {
     private void postPosition() {
         postedSeconds = output.seconds();
         listener.positionChanged(postedSeconds, generation);
+    }
+
+    private void postOutput() {
+        OutputStatus current = output.status();
+        if (current.equals(postedOutput)) return;
+        postedOutput = current;
+        listener.outputChanged(current);
     }
 
     private boolean isClosing() {

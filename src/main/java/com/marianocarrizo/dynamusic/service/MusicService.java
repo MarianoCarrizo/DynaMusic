@@ -4,6 +4,7 @@ import com.marianocarrizo.dynamusic.audio.AudioFormat;
 import com.marianocarrizo.dynamusic.audio.AudioServices;
 import com.marianocarrizo.dynamusic.audio.TrackQualityStore;
 import com.marianocarrizo.dynamusic.audio.UnplayableAudioException;
+import com.marianocarrizo.dynamusic.audio.stream.OutputStatus;
 import com.marianocarrizo.dynamusic.config.SessionConfigManager;
 import com.marianocarrizo.dynamusic.enums.TrackType;
 import com.marianocarrizo.dynamusic.model.NowPlayingSource;
@@ -77,6 +78,7 @@ public class MusicService {
     private boolean previewLoopEnabled;
     private BiConsumer<Duration, Duration> activeProgressListener = (current, total) -> { };
     private Runnable onPlaybackChanged = () -> { };
+    private Runnable onOutputChanged = () -> { };
     private Playback fadingOutPlayer;
     private File previewFile;
     private File playlistFile;
@@ -216,6 +218,15 @@ public class MusicService {
         onPlaybackChanged = listener == null ? () -> { } : listener;
     }
 
+    public void setOnOutputChanged(Runnable listener) {
+        onOutputChanged = listener == null ? () -> { } : listener;
+    }
+
+    public OutputStatus activeOutput() {
+        Playback active = activePlayer();
+        return active == null ? OutputStatus.NONE : active.outputProperty().get();
+    }
+
     public void setActiveProgressListener(BiConsumer<Duration, Duration> listener) {
         activeProgressListener = listener == null ? (current, total) -> { } : listener;
     }
@@ -309,6 +320,7 @@ public class MusicService {
     }
 
     private void observeStatus(Playback player) {
+        player.outputProperty().addListener((obs, oldOutput, newOutput) -> onOutputChanged.run());
         player.statusProperty().addListener((obs, oldStatus, newStatus) -> {
             if (newStatus != PlaybackStatus.PLAYING && player == fadingOutPlayer) fadingOutPlayer = null;
             notifyPlaybackChanged();

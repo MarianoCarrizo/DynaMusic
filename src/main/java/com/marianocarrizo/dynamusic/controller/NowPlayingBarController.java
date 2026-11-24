@@ -1,6 +1,7 @@
 package com.marianocarrizo.dynamusic.controller;
 
 import com.marianocarrizo.dynamusic.audio.AudioQuality;
+import com.marianocarrizo.dynamusic.audio.stream.OutputStatus;
 import com.marianocarrizo.dynamusic.component.CoverView;
 import com.marianocarrizo.dynamusic.component.IconButton;
 import com.marianocarrizo.dynamusic.component.IconToggleButton;
@@ -30,6 +31,7 @@ public final class NowPlayingBarController {
     private static final int PLACEHOLDER_PIXELS = 112;
     private static final String FAILED_DETAIL_STYLE = "now-playing-failed";
     private static final String HI_RES_STYLE = "now-playing-quality-hires";
+    private static final String BIT_PERFECT_STYLE = "now-playing-output-bitperfect";
 
     interface Host extends VolumeController.Host, TrackActionsMenu.Host {
         NowPlayingModel nowPlaying();
@@ -58,6 +60,7 @@ public final class NowPlayingBarController {
     @FXML private Label lblDetail;
     @FXML private Label lblSource;
     @FXML private Label lblQuality;
+    @FXML private Label lblOutput;
     @FXML private IconToggleButton btnShuffle;
     @FXML private IconButton btnPrevious;
     @FXML private PlayPauseButton btnPlayPause;
@@ -96,6 +99,7 @@ public final class NowPlayingBarController {
         volumeController.attach(host);
         host.nowPlaying().snapshotProperty().addListener((obs, oldValue, newValue) -> render(newValue));
         host.musicService().quality().onLoaded(() -> showQuality(shown.file()));
+        host.musicService().setOnOutputChanged(this::showOutput);
         render(host.nowPlaying().get());
     }
 
@@ -163,6 +167,7 @@ public final class NowPlayingBarController {
         showProgress(current, idle);
         showCover(current.file());
         showQuality(current.file());
+        showOutput();
         shown = current;
     }
 
@@ -171,6 +176,13 @@ public final class NowPlayingBarController {
         showText(lblQuality, quality.map(AudioQuality::label).orElse(""));
         lblQuality.getStyleClass().remove(HI_RES_STYLE);
         if (quality.map(AudioQuality::isHiRes).orElse(false)) lblQuality.getStyleClass().add(HI_RES_STYLE);
+    }
+
+    private void showOutput() {
+        OutputStatus output = host.musicService().activeOutput();
+        showText(lblOutput, output.label());
+        lblOutput.getStyleClass().remove(BIT_PERFECT_STYLE);
+        if (output.bitPerfect()) lblOutput.getStyleClass().add(BIT_PERFECT_STYLE);
     }
 
     private void showText(Label label, String text) {

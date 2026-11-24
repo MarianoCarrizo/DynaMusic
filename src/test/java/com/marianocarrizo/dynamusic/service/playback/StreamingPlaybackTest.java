@@ -1,5 +1,6 @@
 package com.marianocarrizo.dynamusic.service.playback;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -413,5 +414,34 @@ class StreamingPlaybackTest {
 
         await(() -> sink.starts() == 2);
         assertEquals(0, sink.suspends());
+    }
+
+    @Test
+    void theOutputStartsAsTheSinkReportsIt() {
+        open(constantPcm(100, 0));
+
+        assertEquals("16/44.1 shared", playback.outputProperty().get().label());
+    }
+
+    @Test
+    void aSharedOutputKeepsItsLabelWhenTheVolumeDrops() {
+        open(constantPcm(100, 0));
+
+        playback.setVolume(0.5);
+
+        assertEquals("16/44.1 shared", playback.outputProperty().get().label());
+        assertFalse(playback.outputProperty().get().bitPerfect());
+    }
+
+    @Test
+    void theOutputIsAttenuatedBelowFullVolumeAndRecoversAtFullVolume() {
+        open(constantPcm(100, 0));
+
+        playback.setVolume(0.5);
+        boolean attenuated = playback.outputProperty().get().attenuated();
+        playback.setVolume(1.0);
+
+        assertTrue(attenuated);
+        assertFalse(playback.outputProperty().get().attenuated());
     }
 }

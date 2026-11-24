@@ -1,5 +1,6 @@
 package com.marianocarrizo.dynamusic.service.playback;
 
+import com.marianocarrizo.dynamusic.audio.stream.OutputStatus;
 import com.marianocarrizo.dynamusic.service.AudioAnalyzer;
 import java.util.concurrent.Executor;
 import javafx.beans.property.DoubleProperty;
@@ -14,6 +15,7 @@ final class FakePlayback implements Playback {
     private final ReadOnlyObjectWrapper<PlaybackStatus> status = new ReadOnlyObjectWrapper<>(PlaybackStatus.UNKNOWN);
     private final ReadOnlyObjectWrapper<Duration> currentTime = new ReadOnlyObjectWrapper<>(Duration.ZERO);
     private final DoubleProperty volume = new SimpleDoubleProperty(1.0);
+    private final ReadOnlyObjectWrapper<OutputStatus> output = new ReadOnlyObjectWrapper<>(OutputStatus.NONE);
     private Runnable onReady;
     private Runnable onEnd;
     private Runnable onError;
@@ -99,6 +101,15 @@ final class FakePlayback implements Playback {
     @Override
     public PlaybackStatus getStatus() {
         return status.get();
+    }
+
+    void showOutput(OutputStatus status) {
+        output.set(status);
+    }
+
+    @Override
+    public ReadOnlyObjectProperty<OutputStatus> outputProperty() {
+        return output.getReadOnlyProperty();
     }
 
     @Override

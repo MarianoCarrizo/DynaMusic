@@ -65,6 +65,7 @@ class ExclusiveHandoffTest {
         assertEquals(PlaybackStatus.PLAYING, playback.getStatus());
         assertEquals(0, errors.get());
         assertEquals(1, exclusive.suspends());
+        await(() -> playback.outputProperty().get().label().equals("16/44.1 shared"));
     }
 
     @Test
@@ -82,5 +83,29 @@ class ExclusiveHandoffTest {
 
         assertEquals(1, lines.opened().size());
         assertFalse(arbiter.holdsExclusive());
+        assertEquals("16/44.1 shared", playback.outputProperty().get().label());
+    }
+
+    @Test
+    void theBadgeReadsExclusiveWhilePlayingExclusive() throws Exception {
+        openPlayback();
+
+        playback.play();
+        await(() -> exclusive.writes() > 0);
+
+        assertEquals("16/44.1 exclusive", playback.outputProperty().get().label());
+    }
+
+    @Test
+    void anAttenuatedExclusiveStreamIsNotBitPerfectAndRecoversAtFullVolume() throws Exception {
+        openPlayback();
+        playback.play();
+        await(() -> exclusive.writes() > 0);
+
+        playback.setVolume(0.5);
+        assertEquals("16/44.1 exclusive · not bit-perfect", playback.outputProperty().get().label());
+
+        playback.setVolume(1.0);
+        assertEquals("16/44.1 exclusive", playback.outputProperty().get().label());
     }
 }

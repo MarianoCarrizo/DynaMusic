@@ -1,6 +1,7 @@
 package com.marianocarrizo.dynamusic.service.playback;
 
 import com.marianocarrizo.dynamusic.audio.stream.OutputArbiter;
+import com.marianocarrizo.dynamusic.audio.stream.OutputStatus;
 import com.marianocarrizo.dynamusic.service.AudioAnalyzer;
 import java.io.File;
 import java.util.EnumSet;
@@ -16,6 +17,8 @@ public final class JavaFxPlayback implements Playback {
 
     private static final double SPECTRUM_INTERVAL_SECONDS = 0.025;
     private static final int SPECTRUM_THRESHOLD_DB = -75;
+    private static final ReadOnlyObjectProperty<OutputStatus> NO_OUTPUT =
+            new ReadOnlyObjectWrapper<>(OutputStatus.NONE).getReadOnlyProperty();
     private static final Set<PlaybackStatus> SILENT = EnumSet.of(PlaybackStatus.PAUSED, PlaybackStatus.STOPPED,
             PlaybackStatus.HALTED, PlaybackStatus.DISPOSED);
 
@@ -91,6 +94,11 @@ public final class JavaFxPlayback implements Playback {
     @Override
     public PlaybackStatus getStatus() {
         return PlaybackStatus.from(player.getStatus());
+    }
+
+    @Override
+    public ReadOnlyObjectProperty<OutputStatus> outputProperty() {
+        return NO_OUTPUT;
     }
 
     @Override
