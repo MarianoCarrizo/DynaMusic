@@ -103,6 +103,28 @@ class JavaSoundFallbackSinkTest {
     }
 
     @Test
+    void aFailedFallbackDoesNotLeaveTheSinkMarkedAsStarted() {
+        primary.failStartWith(new OutputUnavailableException("no device"));
+        lines.becomeUnavailable();
+
+        assertThrows(OutputUnavailableException.class, sink::start);
+
+        assertThrows(OutputUnavailableException.class, sink::start);
+    }
+
+    @Test
+    void closeStillClosesTheActiveSinkWhenThePrimaryFailsToClose() {
+        lines.supportOnly(format -> true);
+        primary.failStartWith(new OutputUnavailableException("no device"));
+        sink.start();
+        primary.failCloseWith(new IllegalStateException("already gone"));
+
+        assertThrows(IllegalStateException.class, sink::close);
+
+        assertEquals(1, lines.last().closes());
+    }
+
+    @Test
     void closeReleasesBothSinks() {
         lines.supportOnly(format -> true);
         primary.failStartWith(new OutputUnavailableException("no device"));

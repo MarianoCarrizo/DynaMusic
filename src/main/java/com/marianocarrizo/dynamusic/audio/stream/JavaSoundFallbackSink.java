@@ -30,13 +30,13 @@ public final class JavaSoundFallbackSink implements PcmSink {
     @Override
     public void start() {
         if (started) return;
-        started = true;
         try {
             active.start();
         } catch (OutputUnavailableException unavailable) {
             if (active != primary) throw unavailable;
-            fallBack();
+            fallBack(true);
         }
+        started = true;
     }
 
     @Override
@@ -51,7 +51,7 @@ public final class JavaSoundFallbackSink implements PcmSink {
         try {
             return primary.write(data, offset, length);
         } catch (OutputUnavailableException unavailable) {
-            fallBack();
+            fallBack(started);
             int consumed = Math.min(Math.max(unavailable.consumedBytes(), 0), length);
             return consumed + active.write(data, offset + consumed, length - consumed);
         }
@@ -81,8 +81,11 @@ public final class JavaSoundFallbackSink implements PcmSink {
     @Override
     public void close() {
         started = false;
-        primary.close();
-        if (active != primary) active.close();
+        try {
+            primary.close();
+        } finally {
+            if (active != primary) active.close();
+        }
     }
 
     private void guarded(Consumer<PcmSink> action) {
@@ -90,14 +93,14 @@ public final class JavaSoundFallbackSink implements PcmSink {
             action.accept(active);
         } catch (OutputUnavailableException unavailable) {
             if (active != primary) throw unavailable;
-            fallBack();
+            fallBack(started);
         }
     }
 
-    private void fallBack() {
+    private void fallBack(boolean startActive) {
         positionBase = primary.framePosition();
         primary.close();
         active = JavaSoundOpening.open(lines, primary.format());
-        if (started) active.start();
+        if (startActive) active.start();
     }
 }

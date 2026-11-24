@@ -14,6 +14,7 @@ public final class FakeExclusiveSink implements PcmSink {
     private RuntimeException writeFailure;
     private RuntimeException suspendFailure;
     private RuntimeException stopFailure;
+    private RuntimeException closeFailure;
     private long paceMillis;
     private Runnable startHook;
 
@@ -35,6 +36,10 @@ public final class FakeExclusiveSink implements PcmSink {
 
     public void failStopWith(RuntimeException failure) {
         stopFailure = failure;
+    }
+
+    public void failCloseWith(RuntimeException failure) {
+        closeFailure = failure;
     }
 
     public void onStart(Runnable hook) {
@@ -126,5 +131,6 @@ public final class FakeExclusiveSink implements PcmSink {
     @Override
     public void close() {
         closes++;
+        if (closeFailure != null) throw closeFailure;
     }
 }
