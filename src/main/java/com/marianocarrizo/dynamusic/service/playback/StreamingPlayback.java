@@ -1,5 +1,6 @@
 package com.marianocarrizo.dynamusic.service.playback;
 
+import com.marianocarrizo.dynamusic.audio.stream.OutputStatus;
 import com.marianocarrizo.dynamusic.audio.stream.PcmOutput;
 import com.marianocarrizo.dynamusic.audio.stream.PcmSink;
 import com.marianocarrizo.dynamusic.audio.stream.PcmSource;
@@ -25,6 +26,8 @@ public final class StreamingPlayback implements Playback {
     private final ReadOnlyObjectWrapper<PlaybackStatus> status = new ReadOnlyObjectWrapper<>(PlaybackStatus.READY);
     private final ReadOnlyObjectWrapper<Duration> currentTime = new ReadOnlyObjectWrapper<>(Duration.ZERO);
     private final DoubleProperty volume = new SimpleDoubleProperty(DEFAULT_VOLUME);
+    private final ReadOnlyObjectWrapper<OutputStatus> output = new ReadOnlyObjectWrapper<>(OutputStatus.NONE);
+    private OutputStatus sinkOutput;
     private volatile int generation;
     private volatile Throwable error;
     private Runnable onReady;
@@ -36,10 +39,15 @@ public final class StreamingPlayback implements Playback {
         this.fx = fx;
         this.sourceRate = source.format().getSampleRate();
         this.totalFrames = source.totalFrames();
-        PcmOutput output = new PcmOutput(sink, source.format(), sourceRate, DEFAULT_VOLUME);
-        this.worker = new StreamWorker(source, output, new Bridge());
+        PcmOutput pcmOutput = new PcmOutput(sink, source.format(), sourceRate, DEFAULT_VOLUME);
+        this.sinkOutput = sink.status();
+        this.worker = new StreamWorker(source, pcmOutput, new Bridge());
         this.thread = new Thread(worker, THREAD_NAME);
-        volume.addListener((observable, previous, next) -> worker.setVolume(next.doubleValue()));
+        publishOutput();
+        volume.addListener((observable, previous, next) -> {
+            worker.setVolume(next.doubleValue());
+            publishOutput();
+        });
         thread.setDaemon(true);
         thread.setPriority(THREAD_PRIORITY);
         fx.execute(this::deliverReady);
@@ -117,6 +125,11 @@ public final class StreamingPlayback implements Playback {
     }
 
     @Override
+    public ReadOnlyObjectProperty<OutputStatus> outputProperty() {
+        return output.getReadOnlyProperty();
+    }
+
+    @Override
     public DoubleProperty volumeProperty() {
         return volume;
     }
@@ -165,6 +178,10 @@ public final class StreamingPlayback implements Playback {
         return current != PlaybackStatus.DISPOSED && current != PlaybackStatus.HALTED;
     }
 
+    private void publishOutput() {
+        output.set(sinkOutput.withAttenuation(volume.get() < DEFAULT_VOLUME));
+    }
+
     private void deliverReady() {
         readyDelivered = true;
         if (onReady != null) onReady.run();
@@ -183,6 +200,14 @@ public final class StreamingPlayback implements Playback {
         public void ended(int endGeneration) {
             fx.execute(() -> {
                 if (endGeneration == generation && isUsable() && onEnd != null) onEnd.run();
+            });
+        }
+
+        @Override
+        public void outputChanged(OutputStatus status) {
+            fx.execute(() -> {
+                sinkOutput = status;
+                publishOutput();
             });
         }
 

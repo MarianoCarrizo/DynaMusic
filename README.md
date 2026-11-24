@@ -55,7 +55,7 @@ Tus escenas y descargas se guardan en `%APPDATA%\DynaMusic` y no se borran al ac
 
 ## Correr desde el código
 
-Con JDK 21 y ffmpeg en el PATH:
+Con JDK 25 y ffmpeg en el PATH:
 
 ```bash
 ./mvnw javafx:run

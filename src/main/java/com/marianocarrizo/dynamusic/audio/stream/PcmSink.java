@@ -18,6 +18,13 @@ public interface PcmSink extends AutoCloseable {
 
     long framePosition();
 
+    default void suspend() {
+    }
+
+    default OutputStatus status() {
+        return OutputStatus.of(OutputRoute.SHARED, format());
+    }
+
     @Override
     void close();
 }

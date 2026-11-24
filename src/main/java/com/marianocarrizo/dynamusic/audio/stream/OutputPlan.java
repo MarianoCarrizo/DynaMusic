@@ -1,6 +1,8 @@
 package com.marianocarrizo.dynamusic.audio.stream;
 
 public enum OutputPlan {
+    EXCLUSIVE(true),
+    WASAPI_SHARED(true),
     EXACT(true),
     REDUCED_DEPTH(true),
     RESAMPLED(true),

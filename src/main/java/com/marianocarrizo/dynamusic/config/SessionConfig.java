@@ -75,6 +75,7 @@ public class SessionConfig {
 
     private Boolean streamingEngine;
 
+    private Boolean exclusiveOutput;
     private String skippedUpdateVersion;
 
     public SessionConfig() {}
@@ -117,8 +118,17 @@ public class SessionConfig {
         streamingEngine = enabled;
     }
 
+    public boolean isExclusiveOutputEnabled() {
+        return Boolean.TRUE.equals(exclusiveOutput);
+    }
+
+    public void setExclusiveOutputEnabled(boolean enabled) {
+        exclusiveOutput = enabled;
+    }
+
     public void adoptStreamingEngineFrom(SessionConfig other) {
         streamingEngine = other.streamingEngine;
+        exclusiveOutput = other.exclusiveOutput;
     }
 
     public String getSkippedUpdateVersion() {

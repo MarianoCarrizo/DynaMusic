@@ -1,11 +1,13 @@
 package com.marianocarrizo.dynamusic.component;
 
-import javafx.animation.Animation;
-import javafx.animation.PauseTransition;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.geometry.Insets;
 import javafx.scene.control.Label;
+import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
 import javafx.util.Duration;
 
 import java.io.IOException;
@@ -15,15 +17,15 @@ import java.util.function.DoubleConsumer;
 public final class SeekBar extends HBox {
 
     private static final String ZERO_TIME = "0:00";
-    private static final Duration SEEK_COOLDOWN = Duration.millis(150);
+    private static final String THUMB_SELECTOR = ".thumb";
 
     @FXML private Label lblCurrentTime;
     @FXML private FilledSlider slider;
     @FXML private Label lblTotalTime;
 
     private DoubleConsumer onSeekToFraction = fraction -> { };
-    private final PauseTransition seekCooldown = new PauseTransition(SEEK_COOLDOWN);
-    private double pendingSeek = Double.NaN;
+    private final SeekGesture gesture = new SeekGesture();
+    private Duration shownTotal = Duration.UNKNOWN;
     private boolean showingPlayback = false;
 
     public SeekBar() {
@@ -35,16 +37,12 @@ public final class SeekBar extends HBox {
         } catch (IOException e) {
             throw new UncheckedIOException("Could not load the SeekBar layout", e);
         }
+        slider.addEventFilter(MouseEvent.MOUSE_PRESSED, this::onPressed);
+        slider.addEventFilter(MouseEvent.MOUSE_DRAGGED, this::onDragged);
+        slider.addEventFilter(MouseEvent.MOUSE_RELEASED, this::onReleased);
         slider.valueProperty().addListener((obs, oldValue, newValue) -> {
-            if (!showingPlayback) {
-                requestSeek();
-            }
-        });
-        seekCooldown.setOnFinished(e -> {
-            if (!Double.isNaN(pendingSeek)) {
-                double fraction = pendingSeek;
-                pendingSeek = Double.NaN;
-                seekAndStartCooldown(fraction);
+            if (!showingPlayback && !gesture.isDragging()) {
+                seekTo(newValue.doubleValue() / slider.getMax());
             }
         });
     }
@@ -54,40 +52,91 @@ public final class SeekBar extends HBox {
     }
 
     public void showPlayback(Duration current, Duration total) {
-        if (!canFollowPlayback(current, total)) {
+        if (current == null || total == null || total.isUnknown() || total.toMillis() <= 0) {
+            return;
+        }
+        shownTotal = total;
+        lblTotalTime.setText(format(total));
+        if (!gesture.accepts(current.toSeconds(), total.toSeconds(), System.currentTimeMillis())) {
             return;
         }
         followPlaybackTo(current.toMillis() / total.toMillis() * slider.getMax());
         lblCurrentTime.setText(format(current));
-        lblTotalTime.setText(format(total));
     }
 
     public void rewindToStart() {
-        if (slider.isValueChanging()) {
+        if (gesture.isDragging()) {
             return;
         }
-        cancelPendingSeek();
+        gesture.cancel();
         followPlaybackTo(0);
         lblCurrentTime.setText(ZERO_TIME);
     }
 
     public void showNoTrack() {
-        cancelPendingSeek();
+        gesture.cancel();
+        shownTotal = Duration.UNKNOWN;
         followPlaybackTo(0);
         lblCurrentTime.setText(ZERO_TIME);
         lblTotalTime.setText(ZERO_TIME);
     }
 
     public void setSeekEnabled(boolean enabled) {
+        if (!enabled) {
+            gesture.cancel();
+        }
         slider.setDisable(!enabled);
     }
 
-    private boolean canFollowPlayback(Duration current, Duration total) {
-        return !isUserSeeking() && current != null && total != null && !total.isUnknown() && total.toMillis() > 0;
+    private void onPressed(MouseEvent event) {
+        if (event.getButton() != MouseButton.PRIMARY) {
+            return;
+        }
+        gesture.press(fractionOf(event));
+        showTarget();
+        event.consume();
     }
 
-    private boolean isUserSeeking() {
-        return slider.isValueChanging() || !Double.isNaN(pendingSeek);
+    private void onDragged(MouseEvent event) {
+        if (!gesture.isDragging()) {
+            return;
+        }
+        gesture.drag(fractionOf(event));
+        showTarget();
+        event.consume();
+    }
+
+    private void onReleased(MouseEvent event) {
+        if (!gesture.isDragging()) {
+            return;
+        }
+        double fraction = fractionOf(event);
+        gesture.drag(fraction);
+        showTarget();
+        gesture.release(fraction, System.currentTimeMillis()).ifPresent(onSeekToFraction);
+        event.consume();
+    }
+
+    private void seekTo(double fraction) {
+        gesture.jump(fraction, System.currentTimeMillis()).ifPresent(onSeekToFraction);
+        showTarget();
+    }
+
+    private double fractionOf(MouseEvent event) {
+        Region thumb = (Region) slider.lookup(THUMB_SELECTOR);
+        double thumbWidth = thumb == null ? 0 : thumb.getWidth();
+        Insets insets = slider.getInsets();
+        double start = insets.getLeft() + thumbWidth / 2;
+        double length = slider.getWidth() - insets.getLeft() - insets.getRight() - thumbWidth;
+        return SeekGesture.fractionAt(event.getX(), start, length);
+    }
+
+    private void showTarget() {
+        double fraction = gesture.target();
+        followPlaybackTo(fraction * slider.getMax());
+        if (!shownTotal.isUnknown()) {
+            lblCurrentTime.setText(format(shownTotal.multiply(fraction)));
+        }
     }
 
     private void followPlaybackTo(double value) {
@@ -97,25 +146,6 @@ public final class SeekBar extends HBox {
         } finally {
             showingPlayback = false;
         }
-    }
-
-    private void requestSeek() {
-        double fraction = slider.getValue() / slider.getMax();
-        if (seekCooldown.getStatus() == Animation.Status.RUNNING) {
-            pendingSeek = fraction;
-        } else {
-            seekAndStartCooldown(fraction);
-        }
-    }
-
-    private void seekAndStartCooldown(double fraction) {
-        onSeekToFraction.accept(fraction);
-        seekCooldown.playFromStart();
-    }
-
-    private void cancelPendingSeek() {
-        pendingSeek = Double.NaN;
-        seekCooldown.stop();
     }
 
     static String format(Duration duration) {

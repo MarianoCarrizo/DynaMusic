@@ -4,6 +4,7 @@ import com.marianocarrizo.dynamusic.audio.AudioFormat;
 import com.marianocarrizo.dynamusic.audio.AudioServices;
 import com.marianocarrizo.dynamusic.audio.TrackQualityStore;
 import com.marianocarrizo.dynamusic.audio.UnplayableAudioException;
+import com.marianocarrizo.dynamusic.audio.stream.OutputStatus;
 import com.marianocarrizo.dynamusic.config.SessionConfigManager;
 import com.marianocarrizo.dynamusic.enums.TrackType;
 import com.marianocarrizo.dynamusic.model.NowPlayingSource;
@@ -12,6 +13,7 @@ import com.marianocarrizo.dynamusic.service.playback.PlaybackPlan;
 import com.marianocarrizo.dynamusic.service.playback.PlaybackRouter;
 import com.marianocarrizo.dynamusic.service.playback.PlaybackStatus;
 import com.marianocarrizo.dynamusic.service.playback.PlaybackUse;
+import com.marianocarrizo.dynamusic.service.playback.ResumePoint;
 import com.marianocarrizo.dynamusic.tags.TrackTagStore;
 import javafx.application.Platform;
 import javafx.util.Duration;
@@ -77,6 +79,7 @@ public class MusicService {
     private boolean previewLoopEnabled;
     private BiConsumer<Duration, Duration> activeProgressListener = (current, total) -> { };
     private Runnable onPlaybackChanged = () -> { };
+    private Runnable onOutputChanged = () -> { };
     private Playback fadingOutPlayer;
     private File previewFile;
     private File playlistFile;
@@ -99,6 +102,7 @@ public class MusicService {
     private final AudioServices audio;
     private final PlaybackRouter engines;
     private volatile boolean streamingEnabled;
+    private volatile boolean exclusiveEnabled;
     private final PendingLoads pending = new PendingLoads(System::currentTimeMillis);
     private final PauseTransition expiryRefresh = new PauseTransition(
             Duration.millis(PendingLoads.LOADING_TIMEOUT_MILLIS + PendingLoads.EXPIRY_REFRESH_MARGIN_MILLIS));
@@ -107,6 +111,8 @@ public class MusicService {
     private int consecutivePlaylistFailures;
     private CompletableFuture<PlaybackPlan> playlistPrep = CompletableFuture.completedFuture(null);
     private int prefetchTicket;
+    private static final double OUTPUT_SWITCH_DEBOUNCE_MILLIS = 150;
+    private final PauseTransition outputSwitch = new PauseTransition(Duration.millis(OUTPUT_SWITCH_DEBOUNCE_MILLIS));
 
     // =========================================================================
     // T-07: Campos del modo playlist
@@ -147,7 +153,8 @@ public class MusicService {
 
     public MusicService(AudioServices audio) {
         this.audio = audio;
-        this.engines = PlaybackRouter.standard(audio.prep(), () -> streamingEnabled, Platform::runLater);
+        this.engines = PlaybackRouter.standard(audio.prep(), () -> streamingEnabled, () -> exclusiveEnabled,
+                Platform::runLater);
         this.players = new HashMap<>();
         this.trackFiles = new EnumMap<>(TrackType.class);
         this.trackGains = new EnumMap<>(TrackType.class);
@@ -157,6 +164,7 @@ public class MusicService {
         this.previewPlayer = null;
         tags.onLoaded(this::notifyPlaybackChanged);
         expiryRefresh.setOnFinished(event -> notifyPlaybackChanged());
+        outputSwitch.setOnFinished(event -> reopenActiveListen());
     }
 
     public TrackTagStore tags() {
@@ -212,6 +220,15 @@ public class MusicService {
 
     public void setOnPlaybackChanged(Runnable listener) {
         onPlaybackChanged = listener == null ? () -> { } : listener;
+    }
+
+    public void setOnOutputChanged(Runnable listener) {
+        onOutputChanged = listener == null ? () -> { } : listener;
+    }
+
+    public OutputStatus activeOutput() {
+        Playback active = activePlayer();
+        return active == null ? OutputStatus.NONE : active.outputProperty().get();
     }
 
     public void setActiveProgressListener(BiConsumer<Duration, Duration> listener) {
@@ -273,7 +290,40 @@ public class MusicService {
     }
 
     public void setStreamingEngineEnabled(boolean enabled) {
+        if (streamingEnabled == enabled) return;
         streamingEnabled = enabled;
+        scheduleOutputSwitch();
+    }
+
+    public void setExclusiveOutputEnabled(boolean enabled) {
+        if (exclusiveEnabled == enabled) return;
+        exclusiveEnabled = enabled;
+        scheduleOutputSwitch();
+    }
+
+    private void scheduleOutputSwitch() {
+        if (ReopenTarget.of(activeSource()) == ReopenTarget.NONE || activePlayer() == null) return;
+        outputSwitch.playFromStart();
+    }
+
+    private void reopenActiveListen() {
+        Playback active = activePlayer();
+        if (active == null || pending.isActive()) return;
+        ResumePoint resume = ResumePoint.of(active, isSounding(active));
+        switch (ReopenTarget.of(activeSource())) {
+            case PREVIEW -> previewTrack(previewFile, resume);
+            case PLAYLIST -> reopenPlaylist(resume);
+            case ON_DEMAND -> playOnDemand(onDemandFile, onDemandTitle, null, resume);
+            case NONE -> { }
+        }
+    }
+
+    private void reopenPlaylist(ResumePoint resume) {
+        File file = playlistFile;
+        if (file == null) return;
+        cancelActiveFade();
+        releasePlaylistPlayer();
+        requestPlaylistTrack(file, resume);
     }
 
     private void hold(Playback player, PlaybackPlan plan) {
@@ -303,6 +353,7 @@ public class MusicService {
     }
 
     private void observeStatus(Playback player) {
+        player.outputProperty().addListener((obs, oldOutput, newOutput) -> onOutputChanged.run());
         player.statusProperty().addListener((obs, oldStatus, newStatus) -> {
             if (newStatus != PlaybackStatus.PLAYING && player == fadingOutPlayer) fadingOutPlayer = null;
             notifyPlaybackChanged();
@@ -602,6 +653,10 @@ public class MusicService {
      * Pausa el reproductor de mood activo y, si hay uno de playlist sonando, también lo pausa.
      */
     public boolean previewTrack(File file) {
+        return previewTrack(file, ResumePoint.START);
+    }
+
+    private boolean previewTrack(File file, ResumePoint resume) {
         if (file == null || !file.exists()) return false;
 
         final PreviewTicket ticket = audioFocus.claimForNewPreview();
@@ -616,12 +671,12 @@ public class MusicService {
         final int pendingTicket = beginPending(NowPlayingSource.PREVIEW, null, file, null);
         requestMetadata(file);
         engines.plan(file, PlaybackUse.LISTEN).whenComplete((plan, error) -> Platform.runLater(
-                () -> openPreviewPlayer(file, plan, error, ticket, pendingTicket)));
+                () -> openPreviewPlayer(file, plan, error, ticket, pendingTicket, resume)));
         return true;
     }
 
     private void openPreviewPlayer(File file, PlaybackPlan plan, Throwable error, PreviewTicket ticket,
-                                   int pendingTicket) {
+                                   int pendingTicket, ResumePoint resume) {
         if (audioFocus.readinessOf(ticket) == PreviewReadiness.DISCARD) {
             if (error == null) plan.discard();
             finishPending(pendingTicket);
@@ -663,7 +718,7 @@ public class MusicService {
 
             player.setOnReady(() -> {
                 boolean current = player == previewPlayer;
-                if (current && audioFocus.readinessOf(ticket) == PreviewReadiness.PLAY) player.play();
+                if (current && audioFocus.readinessOf(ticket) == PreviewReadiness.PLAY) resume.applyTo(player);
                 finishPending(pendingTicket);
             });
         } catch (RuntimeException e) {
@@ -838,14 +893,14 @@ public class MusicService {
      */
     public void playPlaylistTrack(File file) {
         consecutivePlaylistFailures = 0;
-        requestPlaylistTrack(file);
+        requestPlaylistTrack(file, ResumePoint.START);
     }
 
     public void skipToPlaylistTrack(File file) {
-        requestPlaylistTrack(file);
+        requestPlaylistTrack(file, ResumePoint.START);
     }
 
-    private void requestPlaylistTrack(File file) {
+    private void requestPlaylistTrack(File file, ResumePoint resume) {
         if (mode != PlaybackMode.PLAYLIST) return;
         audioFocus.claimForRequest();
         cancelActiveFade();
@@ -860,7 +915,7 @@ public class MusicService {
                 failPlaylistLoad(seq, error);
                 return;
             }
-            openPlaylistPlayer(file, plan, seq);
+            openPlaylistPlayer(file, plan, seq, resume);
         }));
     }
 
@@ -878,7 +933,7 @@ public class MusicService {
         return audio;
     }
 
-    private void openPlaylistPlayer(File file, PlaybackPlan plan, int seq) {
+    private void openPlaylistPlayer(File file, PlaybackPlan plan, int seq, ResumePoint resume) {
         final double gain = plan.gain();
         if (!playlistLoads.isCurrent(seq) || mode != PlaybackMode.PLAYLIST) {
             plan.discard();
@@ -903,10 +958,10 @@ public class MusicService {
             }
         }));
         player.setOnError(() -> Platform.runLater(() -> handlePlaylistPlayerError(player, seq)));
-        player.setOnReady(() -> commitPlaylistPlayer(player, file, gain, seq));
+        player.setOnReady(() -> commitPlaylistPlayer(player, file, gain, seq, resume));
     }
 
-    private void commitPlaylistPlayer(Playback player, File file, double gain, int seq) {
+    private void commitPlaylistPlayer(Playback player, File file, double gain, int seq, ResumePoint resume) {
         if (!playlistLoads.isCurrent(seq) || mode != PlaybackMode.PLAYLIST) {
             disposePlayer(player);
             if (playlistLoads.isCurrent(seq)) finishPending(playlistPendingTicket);
@@ -919,7 +974,7 @@ public class MusicService {
         playlistPlayer = player;
         playlistFile = file;
         attachSpectrumListener(player);
-        player.play();
+        resume.applyTo(player);
         finishPending(playlistPendingTicket);
         notifyPlaybackChanged();
     }
@@ -1056,18 +1111,24 @@ public class MusicService {
     }
 
     public void playOnDemand(File file, String title, Runnable onStarted) {
+        playOnDemand(file, title, onStarted, ResumePoint.START);
+    }
+
+    private void playOnDemand(File file, String title, Runnable onStarted, ResumePoint resume) {
         if (file == null || !file.exists()) return;
         audioFocus.claimForRequest();
+        if (resume != ResumePoint.START) disposeOnDemandPlayer();
         final int seq = ++onDemandSeq;
         final int pendingTicket = beginPending(NowPlayingSource.ON_DEMAND, null, file, title);
 
         requestMetadata(file);
         engines.plan(file, PlaybackUse.LISTEN).whenComplete((plan, error) -> Platform.runLater(
-                () -> openOnDemandPlayer(file, title, onStarted, plan, error, seq, pendingTicket)));
+                () -> openOnDemandPlayer(file, title, onStarted, plan, error, seq, pendingTicket, resume)));
     }
 
     private void openOnDemandPlayer(File file, String title, Runnable onStarted, PlaybackPlan plan,
-                                    Throwable error, int seq, int pendingTicket) {
+                                    Throwable error, int seq, int pendingTicket,
+                                    ResumePoint resume) {
         if (seq != onDemandSeq) {
             if (error == null) plan.discard();
             finishPending(pendingTicket);
@@ -1124,7 +1185,7 @@ public class MusicService {
             onDemandPlayer = player;
             onDemandFile = file;
             onDemandTitle = title != null && !title.isBlank() ? title : null;
-            player.play();
+            resume.applyTo(player);
             if (onStarted != null) onStarted.run();
             finishPending(pendingTicket);
         });

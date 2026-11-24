@@ -1,5 +1,6 @@
 package com.marianocarrizo.dynamusic.ambiance;
 
+import com.marianocarrizo.dynamusic.audio.stream.OutputArbiter;
 import com.marianocarrizo.dynamusic.model.AuraConfig;
 import com.marianocarrizo.dynamusic.model.AuraPreset;
 import com.marianocarrizo.dynamusic.model.AuraSlot;
@@ -309,7 +310,7 @@ public class AmbianceStage {
             stage.toFront();
             return;
         }
-        if (currentPlayer != null) currentPlayer.play();
+        if (currentPlayer != null) playVideo(currentPlayer);
         stage.show();
         auraRenderer.start();
         notifyVisibility();
@@ -320,7 +321,7 @@ public class AmbianceStage {
         visible = false;
         auraRenderer.stop();
         settleTransition();
-        if (currentPlayer != null) currentPlayer.pause();
+        if (currentPlayer != null) pauseVideo(currentPlayer);
         stage.hide();
         notifyVisibility();
     }
@@ -991,6 +992,7 @@ public class AmbianceStage {
 
     private void disposeOutgoing() {
         if (outgoingPlayer != null) {
+            OutputArbiter.process().sharedStopped(outgoingPlayer);
             outgoingPlayer.stop();
             outgoingPlayer.dispose();
             outgoingPlayer = null;
@@ -1026,10 +1028,20 @@ public class AmbianceStage {
 
     private void disposePlayer() {
         if (currentPlayer != null) {
+            OutputArbiter.process().sharedStopped(currentPlayer);
             currentPlayer.stop();
             currentPlayer.dispose();
             currentPlayer = null;
         }
+    }
+
+    private static void playVideo(MediaPlayer player) {
+        OutputArbiter.process().startShared(player, OutputArbiter.HANDOFF_MILLIS, Platform::runLater, player::play);
+    }
+
+    private static void pauseVideo(MediaPlayer player) {
+        OutputArbiter.process().sharedStopped(player);
+        player.pause();
     }
 
     private void clearMedia() {
@@ -1151,7 +1163,7 @@ public class AmbianceStage {
                     }
                 };
                 player.setOnReady(readyHandler);
-                if (visible) player.play();
+                if (visible) playVideo(player);
                 applyFitToMediaView();
                 if (player.getStatus() == MediaPlayer.Status.READY) readyHandler.run();
             });

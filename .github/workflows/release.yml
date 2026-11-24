@@ -15,8 +15,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  JAVAFX_JMODS_URL: https://download2.gluonhq.com/openjfx/21.0.13/openjfx-21.0.13_windows-x64_bin-jmods.zip
-  JAVAFX_JMODS_SHA256: a28ace6c8d213ffbb3f37ff1d44a7b4ae6d837aff54d5af0e66e2213225ba18b
+  JAVAFX_JMODS_URL: https://download2.gluonhq.com/openjfx/25.0.5.1/openjfx-25.0.5.1_windows-x64_bin-jmods.zip
+  JAVAFX_JMODS_SHA256: 760434bc6de50bd465d05bf9b06f96498f9ce030ba5699911e6447753010cff0
   FFMPEG_URL: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/ffmpeg-n8.1.3-9-g29e619e767-win64-gpl-shared-8.1.zip
   FFMPEG_SHA256: dfe81c3aa0a546ee81980b1b824486dd0fe0a1d452f00cb55135379a74be7bcf
 
@@ -28,31 +28,40 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Set up JDK 21
+      - name: Set up JDK 25
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '25'
           cache: maven
 
       - name: Derive version
         shell: bash
         run: |
+          POM_VERSION=$(sed -n 's:.*<version>\(.*\)</version>.*:\1:p' pom.xml | head -1)
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             VERSION="${GITHUB_REF_NAME#v}"
             if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
               echo "Tag '$GITHUB_REF_NAME' is not vX.Y.Z" >&2
               exit 1
             fi
-            POM_VERSION=$(sed -n 's:.*<version>\(.*\)</version>.*:\1:p' pom.xml | head -1)
             if [[ "$POM_VERSION" != "$VERSION" ]]; then
               echo "Tag version $VERSION does not match pom.xml version $POM_VERSION" >&2
               exit 1
             fi
           else
-            VERSION="0.0.${GITHUB_RUN_NUMBER}"
+            VERSION="$POM_VERSION"
+            if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "pom.xml version '$VERSION' is not X.Y.Z" >&2
+              exit 1
+            fi
+          fi
+          INSTALLER_NAME="DynaMusic-Setup-${VERSION}"
+          if [[ "$GITHUB_REF" != refs/tags/v* ]]; then
+            INSTALLER_NAME="${INSTALLER_NAME}-ci.${GITHUB_RUN_NUMBER}"
           fi
           echo "APP_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "INSTALLER_NAME=$INSTALLER_NAME" >> "$GITHUB_ENV"
           echo "Version: $VERSION"
 
       - name: Run tests
@@ -91,7 +100,7 @@ jobs:
             --module-path $modulePath `
             --module com.marianocarrizo.dynamusic/com.marianocarrizo.dynamusic.MusicServiceStarter `
             --add-modules jdk.crypto.ec `
-            --java-options '--enable-native-access=javafx.graphics' `
+            --java-options '--enable-native-access=javafx.graphics,javafx.media,com.marianocarrizo.dynamusic' `
             --java-options "-Ddynamusic.version=$env:APP_VERSION" `
             --dest target/app-image
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -176,17 +185,20 @@ jobs:
         shell: bash
         working-directory: target/installer
         run: |
-          sha256sum "DynaMusic-Setup-${APP_VERSION}.exe" > "DynaMusic-Setup-${APP_VERSION}.exe.sha256"
-          cat "DynaMusic-Setup-${APP_VERSION}.exe.sha256"
+          if [ "$INSTALLER_NAME" != "DynaMusic-Setup-${APP_VERSION}" ]; then
+            mv "DynaMusic-Setup-${APP_VERSION}.exe" "${INSTALLER_NAME}.exe"
+          fi
+          sha256sum "${INSTALLER_NAME}.exe" > "${INSTALLER_NAME}.exe.sha256"
+          cat "${INSTALLER_NAME}.exe.sha256"
           ls -l
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: DynaMusic-Setup-${{ env.APP_VERSION }}
+          name: ${{ env.INSTALLER_NAME }}
           path: |
-            target/installer/DynaMusic-Setup-${{ env.APP_VERSION }}.exe
-            target/installer/DynaMusic-Setup-${{ env.APP_VERSION }}.exe.sha256
+            target/installer/${{ env.INSTALLER_NAME }}.exe
+            target/installer/${{ env.INSTALLER_NAME }}.exe.sha256
           if-no-files-found: error
           retention-days: 14
 

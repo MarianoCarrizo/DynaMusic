@@ -1,7 +1,10 @@
 package com.marianocarrizo.dynamusic.service.playback;
 
+import com.marianocarrizo.dynamusic.audio.stream.OutputArbiter;
+import com.marianocarrizo.dynamusic.audio.stream.OutputStatus;
 import com.marianocarrizo.dynamusic.service.AudioAnalyzer;
 import java.io.File;
+import javafx.application.Platform;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.beans.property.ReadOnlyObjectWrapper;
@@ -13,38 +16,49 @@ public final class JavaFxPlayback implements Playback {
 
     private static final double SPECTRUM_INTERVAL_SECONDS = 0.025;
     private static final int SPECTRUM_THRESHOLD_DB = -75;
+    private static final ReadOnlyObjectProperty<OutputStatus> NO_OUTPUT =
+            new ReadOnlyObjectWrapper<>(OutputStatus.NONE).getReadOnlyProperty();
 
     private final MediaPlayer player;
     private final ReadOnlyObjectWrapper<PlaybackStatus> status;
+    private final SharedUse sharedUse;
 
-    private JavaFxPlayback(MediaPlayer player) {
+    private JavaFxPlayback(MediaPlayer player, OutputArbiter arbiter) {
         this.player = player;
+        this.sharedUse = new SharedUse(arbiter, this, Platform::runLater);
         this.status = new ReadOnlyObjectWrapper<>(PlaybackStatus.from(player.getStatus()));
         player.statusProperty().addListener(
-                (obs, oldStatus, newStatus) -> status.set(PlaybackStatus.from(newStatus)));
+                (obs, oldStatus, newStatus) -> {
+                    PlaybackStatus mapped = PlaybackStatus.from(newStatus);
+                    status.set(mapped);
+                    sharedUse.observed(mapped);
+                });
     }
 
-    public static JavaFxPlayback open(File file) {
-        return new JavaFxPlayback(new MediaPlayer(new Media(file.toURI().toString())));
+    public static JavaFxPlayback open(File file, OutputArbiter arbiter) {
+        return new JavaFxPlayback(new MediaPlayer(new Media(file.toURI().toString())), arbiter);
     }
 
     @Override
     public void play() {
-        player.play();
+        sharedUse.start(player::play);
     }
 
     @Override
     public void pause() {
+        sharedUse.stop();
         player.pause();
     }
 
     @Override
     public void stop() {
+        sharedUse.stop();
         player.stop();
     }
 
     @Override
     public void dispose() {
+        sharedUse.stop();
         player.dispose();
     }
 
@@ -76,6 +90,11 @@ public final class JavaFxPlayback implements Playback {
     @Override
     public PlaybackStatus getStatus() {
         return PlaybackStatus.from(player.getStatus());
+    }
+
+    @Override
+    public ReadOnlyObjectProperty<OutputStatus> outputProperty() {
+        return NO_OUTPUT;
     }
 
     @Override

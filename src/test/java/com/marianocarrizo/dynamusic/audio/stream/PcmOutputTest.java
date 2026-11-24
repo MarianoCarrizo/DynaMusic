@@ -167,4 +167,31 @@ class PcmOutputTest {
         assertEquals(1, sink16.drains());
         assertTrue(sink16.closed());
     }
+
+    @Test
+    void pauseSuspendsTheSinkAfterFlushingIt() {
+        PcmOutput output = new PcmOutput(sink16, PCM16, RATE, 1.0);
+        sink16.playFrames(100);
+
+        output.pause();
+
+        assertEquals(1, sink16.flushes());
+        assertEquals(1, sink16.suspends());
+    }
+
+    @Test
+    void releaseSuspendsTheSink() {
+        PcmOutput output = new PcmOutput(sink16, PCM16, RATE, 1.0);
+
+        output.release();
+
+        assertEquals(1, sink16.suspends());
+    }
+
+    @Test
+    void statusReportsTheSinkOutput() {
+        PcmOutput output = new PcmOutput(sink16, PCM16, RATE, 1.0);
+
+        assertEquals("16/44.1 shared", output.status().label());
+    }
 }

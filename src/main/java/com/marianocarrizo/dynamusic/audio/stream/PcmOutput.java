@@ -52,6 +52,7 @@ public final class PcmOutput {
         sink.flush();
         clock.rebase(playedFrame, position);
         gain.restartFromSilence();
+        sink.suspend();
         return playedFrame;
     }
 
@@ -60,6 +61,14 @@ public final class PcmOutput {
         sink.flush();
         clock.rebase(sourceFrame, sink.framePosition());
         gain.restartFromSilence();
+    }
+
+    public void release() {
+        sink.suspend();
+    }
+
+    public OutputStatus status() {
+        return sink.status();
     }
 
     public void drain() {
