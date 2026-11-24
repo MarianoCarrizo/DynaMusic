@@ -4,6 +4,7 @@ import com.marianocarrizo.dynamusic.service.MusicService;
 import com.marianocarrizo.dynamusic.service.PlayQueue;
 import com.marianocarrizo.dynamusic.service.PlaybackOrder;
 import com.marianocarrizo.dynamusic.service.PlaylistManager;
+import com.marianocarrizo.dynamusic.tags.TrackTagStore;
 import javafx.application.Platform;
 
 import java.io.File;
@@ -11,7 +12,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 
-final class PlaylistPlayback {
+final class PlaylistPlayback implements QueuePanelController.Host {
 
     private final MusicService musicService;
     private final PlaylistManager playlistManager;
@@ -32,8 +33,18 @@ final class PlaylistPlayback {
         musicService.setOnOnDemandEnd(() -> Platform.runLater(this::continueAfterStandalone));
     }
 
-    PlayQueue queue() {
+    @Override
+    public PlayQueue queue() {
         return queue;
+    }
+
+    @Override
+    public TrackTagStore tags() {
+        return musicService.tags();
+    }
+
+    void enqueue(List<File> files, QueuePlacement placement) {
+        placement.apply(queue, files);
     }
 
     void play(File file) {
@@ -73,7 +84,8 @@ final class PlaylistPlayback {
         refreshView.run();
     }
 
-    void next() {
+    @Override
+    public void next() {
         order.next().ifPresentOrElse(this::begin, musicService::stopPlaylist);
         refreshView.run();
     }

@@ -58,6 +58,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
 
     @FXML private MoodPanelController moodPanelController;
     @FXML private LiveAuraController liveAuraController;
+    @FXML private QueuePanelController queuePanelController;
 
     @FXML private NowPlayingBarController nowPlayingBarController;
 
@@ -120,6 +121,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
         libraryPanelController.attach(this);
         playlistPanelController.attach(this);
         nowPlayingBarController.attach(this);
+        queuePanelController.attach(playlistPlayback);
         nowPlayingTracker.sync();
         liveAuraController.refresh();
         modeShell.install(mainRoot, modeTabPane, modeSwitchController, () -> updateWindowMood(moodPanelController.activeMood()));
@@ -348,6 +350,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
     @Override public SessionConfig session() { return sessionConfig; }
     @Override public ObservableBooleanValue moodActionsVisible() { return modeShell.sessionActiveProperty(); }
 
+    @Override public void enqueue(List<File> files, QueuePlacement placement) { playlistPlayback.enqueue(files, placement); }
     @Override public MusicService musicService() { return musicService; }
 
     @Override public AmbianceCoordinator ambiance() { return ambiance; }

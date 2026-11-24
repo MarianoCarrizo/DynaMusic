@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.marianocarrizo.dynamusic.controller.QueuePanelController"
+      spacing="6" prefHeight="240" minHeight="120" styleClass="playback-panel, listen-only">
+    <HBox spacing="8" alignment="CENTER_LEFT">
+        <Label text="UP NEXT" styleClass="lbl-panel-title"/>
+        <Label fx:id="lblQueueCount" styleClass="playlist-counter"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button text="Clear" onAction="#onClear" styleClass="btn-secondary"/>
+    </HBox>
+    <ListView fx:id="lstQueue" VBox.vgrow="ALWAYS"/>
+</VBox>

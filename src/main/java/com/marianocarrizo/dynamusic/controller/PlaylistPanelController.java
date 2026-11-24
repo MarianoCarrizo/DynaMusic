@@ -49,6 +49,7 @@ public final class PlaylistPanelController {
     }
 
 
+    private static final String SELECT_PROMPT = "Select playlist";
     private static final String EMPTY_LIST_HINT = "Drag tracks or folders here";
     private static final String DEFAULT_PLAYLIST_NAME = "New playlist";
     private static final String NAME_REJECTED_MESSAGE = "Name already exists or is blank.";
@@ -171,17 +172,20 @@ public final class PlaylistPanelController {
         if (refreshing) return;
         refreshing = true;
         try {
-            String current = cmbPlaylist.getValue();
+            String current = playlistManager.isTransientActive() ? null : cmbPlaylist.getValue();
             cmbPlaylist.getItems().setAll(
                 playlistManager.getPlaylists().stream()
                     .map(p -> p.getName())
                     .toList()
             );
             String active = playlistManager.getActivePlaylistName();
+            cmbPlaylist.setPromptText(playlistManager.isTransientActive() ? active : SELECT_PROMPT);
             if (active != null && cmbPlaylist.getItems().contains(active))
                 cmbPlaylist.setValue(active);
             else if (current != null && cmbPlaylist.getItems().contains(current))
                 cmbPlaylist.setValue(current);
+            else if (playlistManager.isTransientActive())
+                cmbPlaylist.setValue(null);
 
             int selected = lstPlaylistTracks.getSelectionModel().getSelectedIndex();
             lstPlaylistTracks.getItems().setAll(
