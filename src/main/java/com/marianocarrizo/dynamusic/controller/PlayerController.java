@@ -136,7 +136,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
         WindowFileDrop.install(mainRoot, fileOpener::open);
 
         Platform.runLater(() -> {
-            updateWindowMood(TrackType.NORMAL);
+            updateWindowMood(moodPanelController.activeMood());
             if (sessionConfig.isAmbianceIntroduced()) ambiance.open();
         });
     }
@@ -252,6 +252,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
 
     private void enterMode(MusicService.PlaybackMode target) {
         musicService.setPlaybackMode(target);
+        updateWindowMood(moodPanelController.activeMood());
         syncSourceUi();
     }
 
@@ -285,13 +286,8 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
     }
 
     private void updateWindowMood(TrackType type) {
-        if (type == null || mainRoot == null) return;
-        mainRoot.setId(switch (type) {
-            case PAUSED    -> "window-paused";
-            case RAGED     -> "window-raged";
-            case NORMAL    -> "window-normal";
-            case ADVANTAGE -> "window-advantage";
-        });
+        if (mainRoot == null) return;
+        mainRoot.setId(WindowAccent.rootId(musicService.getPlaybackMode(), type));
         if (sceneEditor != null) sceneEditor.refreshAccent();
     }
 
