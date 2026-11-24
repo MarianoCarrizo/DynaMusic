@@ -1,56 +1,67 @@
 package com.marianocarrizo.dynamusic.audio.stream;
 
 import java.io.ByteArrayOutputStream;
+import java.util.concurrent.CountDownLatch;
 import javax.sound.sampled.AudioFormat;
 
-final class FakePcmSink implements PcmSink {
+public final class FakePcmSink implements PcmSink {
 
     private final AudioFormat format;
     private final ByteArrayOutputStream written = new ByteArrayOutputStream();
-    private long framePosition;
-    private int starts;
-    private int stops;
-    private int flushes;
-    private int drains;
-    private int closes;
+    private volatile long framePosition;
+    private volatile int starts;
+    private volatile int stops;
+    private volatile int flushes;
+    private volatile int drains;
+    private volatile int closes;
+    private volatile int writeAttempts;
+    private volatile CountDownLatch writeGate;
 
-    FakePcmSink(AudioFormat format) {
+    public FakePcmSink(AudioFormat format) {
         this.format = format;
     }
 
-    byte[] bytes() {
+    public byte[] bytes() {
         return written.toByteArray();
     }
 
-    int[] samples(SampleWidth width) {
+    public int[] samples(SampleWidth width) {
         return PcmBytes.unpack(width, bytes());
     }
 
-    void playFrames(long frames) {
+    public void blockWrites(CountDownLatch gate) {
+        writeGate = gate;
+    }
+
+    public int writeAttempts() {
+        return writeAttempts;
+    }
+
+    public void playFrames(long frames) {
         framePosition += frames;
     }
 
-    int starts() {
+    public int starts() {
         return starts;
     }
 
-    int stops() {
+    public int stops() {
         return stops;
     }
 
-    int flushes() {
+    public int flushes() {
         return flushes;
     }
 
-    int drains() {
+    public int drains() {
         return drains;
     }
 
-    int closes() {
+    public int closes() {
         return closes;
     }
 
-    boolean closed() {
+    public boolean closed() {
         return closes > 0;
     }
 
@@ -71,6 +82,8 @@ final class FakePcmSink implements PcmSink {
 
     @Override
     public int write(byte[] data, int offset, int length) {
+        writeAttempts++;
+        awaitGate();
         written.write(data, offset, length);
         return length;
     }
@@ -94,5 +107,15 @@ final class FakePcmSink implements PcmSink {
     @Override
     public void close() {
         closes++;
+    }
+
+    private void awaitGate() {
+        CountDownLatch gate = writeGate;
+        if (gate == null) return;
+        try {
+            gate.await();
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

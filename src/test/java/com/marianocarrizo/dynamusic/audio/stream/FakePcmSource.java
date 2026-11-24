@@ -1,38 +1,38 @@
 package com.marianocarrizo.dynamusic.audio.stream;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import javax.sound.sampled.AudioFormat;
 
-final class FakePcmSource implements PcmSource {
+public final class FakePcmSource implements PcmSource {
 
     private final AudioFormat format;
     private final byte[] data;
-    private int position;
-    private int closes;
-    private int reads;
+    private volatile int position;
+    private volatile int closes;
+    private volatile int reads;
     private int failOnRead = -1;
-    private final List<Long> seeks = new ArrayList<>();
+    private final List<Long> seeks = new CopyOnWriteArrayList<>();
 
-    FakePcmSource(AudioFormat format, byte[] data) {
+    public FakePcmSource(AudioFormat format, byte[] data) {
         this.format = format;
         this.data = data;
     }
 
-    void failOnRead(int readNumber) {
+    public void failOnRead(int readNumber) {
         failOnRead = readNumber;
     }
 
-    List<Long> seeks() {
+    public List<Long> seeks() {
         return seeks;
     }
 
-    int closes() {
+    public int closes() {
         return closes;
     }
 
-    long positionFrame() {
+    public long positionFrame() {
         return position / format.getFrameSize();
     }
 
