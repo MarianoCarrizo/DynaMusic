@@ -10,7 +10,6 @@ import java.util.function.Consumer;
 final class StreamingEngineSection {
 
     static final String CHECKBOX_LABEL = "Streaming engine (experimental)";
-    static final String HINT = "Applies to the next track";
     static final String EXCLUSIVE_LABEL = "Exclusive output (bit-perfect)";
     static final String EXCLUSIVE_HINT = "Needs the streaming engine. Falls back to shared output when the device is busy";
     private static final double SPACING = 4;
@@ -22,7 +21,7 @@ final class StreamingEngineSection {
         CheckBox streamingBox = checkBox(CHECKBOX_LABEL, streaming, onStreaming);
         CheckBox exclusiveBox = checkBox(EXCLUSIVE_LABEL, exclusive, onExclusive);
         exclusiveBox.disableProperty().bind(streamingBox.selectedProperty().not());
-        return new VBox(SPACING, streamingBox, hint(HINT), exclusiveBox, hint(EXCLUSIVE_HINT));
+        return new VBox(SPACING, streamingBox, exclusiveBox, hint(EXCLUSIVE_HINT));
     }
 
     private static CheckBox checkBox(String label, boolean selected, Consumer<Boolean> onToggled) {
