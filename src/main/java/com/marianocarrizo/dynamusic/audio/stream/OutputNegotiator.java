@@ -12,6 +12,7 @@ public final class OutputNegotiator {
     private static final int MAX_RESAMPLED_CHANNELS = 2;
 
     private final Predicate<AudioFormat> exclusiveSupports;
+    private final Predicate<AudioFormat> wasapiSharedSupports;
     private final Predicate<AudioFormat> lineSupports;
     private final BooleanSupplier ffmpegAvailable;
 
@@ -21,13 +22,20 @@ public final class OutputNegotiator {
 
     public OutputNegotiator(Predicate<AudioFormat> exclusiveSupports, Predicate<AudioFormat> lineSupports,
             BooleanSupplier ffmpegAvailable) {
+        this(exclusiveSupports, format -> false, lineSupports, ffmpegAvailable);
+    }
+
+    public OutputNegotiator(Predicate<AudioFormat> exclusiveSupports, Predicate<AudioFormat> wasapiSharedSupports,
+            Predicate<AudioFormat> lineSupports, BooleanSupplier ffmpegAvailable) {
         this.exclusiveSupports = exclusiveSupports;
+        this.wasapiSharedSupports = wasapiSharedSupports;
         this.lineSupports = lineSupports;
         this.ffmpegAvailable = ffmpegAvailable;
     }
 
     public OutputChoice negotiate(AudioFormat source) {
         if (exclusiveOffered(source)) return new OutputChoice(OutputPlan.EXCLUSIVE, source);
+        if (wasapiSharedOffered(source)) return new OutputChoice(OutputPlan.WASAPI_SHARED, source);
         if (lineSupports.test(source)) return new OutputChoice(OutputPlan.EXACT, source);
         OutputChoice reduced = reducedDepth(source);
         if (reduced != null) return reduced;
@@ -36,8 +44,16 @@ public final class OutputNegotiator {
     }
 
     private boolean exclusiveOffered(AudioFormat source) {
+        return offered(source, exclusiveSupports);
+    }
+
+    private boolean wasapiSharedOffered(AudioFormat source) {
+        return offered(source, wasapiSharedSupports);
+    }
+
+    private static boolean offered(AudioFormat source, Predicate<AudioFormat> device) {
         boolean supportedDepth = EXCLUSIVE_DEPTHS.contains(source.getSampleSizeInBits());
-        return supportedDepth && source.getChannels() <= MAX_RESAMPLED_CHANNELS && exclusiveSupports.test(source);
+        return supportedDepth && source.getChannels() <= MAX_RESAMPLED_CHANNELS && device.test(source);
     }
 
     private OutputChoice reducedDepth(AudioFormat source) {

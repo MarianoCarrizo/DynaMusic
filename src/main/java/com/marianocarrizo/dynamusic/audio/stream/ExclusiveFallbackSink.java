@@ -2,12 +2,10 @@ package com.marianocarrizo.dynamusic.audio.stream;
 
 import java.util.function.Consumer;
 import javax.sound.sampled.AudioFormat;
-import javax.sound.sampled.LineUnavailableException;
 
 public final class ExclusiveFallbackSink implements PcmSink {
 
     public static final long DEFAULT_CLAIM_MILLIS = 1000;
-    private static final int REDUCED_BITS = 16;
 
     private final PcmSink exclusive;
     private final SharedLines lines;
@@ -141,13 +139,6 @@ public final class ExclusiveFallbackSink implements PcmSink {
     }
 
     private PcmSink openShared() {
-        AudioFormat source = exclusive.format();
-        try {
-            boolean reduces = source.getSampleSizeInBits() > REDUCED_BITS && !lines.supports(source);
-            if (!reduces) return lines.open(source);
-            return new ReducedDepthSink(source, lines.open(PcmFormats.withBits(source, REDUCED_BITS)));
-        } catch (LineUnavailableException unavailable) {
-            throw new OutputUnavailableException("No shared output is available", unavailable);
-        }
+        return JavaSoundOpening.open(lines, exclusive.format());
     }
 }

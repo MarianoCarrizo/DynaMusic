@@ -1,6 +1,7 @@
 package com.marianocarrizo.dynamusic.service.playback;
 
 import com.marianocarrizo.dynamusic.audio.stream.ExclusiveFallbackSink;
+import com.marianocarrizo.dynamusic.audio.stream.JavaSoundFallbackSink;
 import com.marianocarrizo.dynamusic.audio.stream.LinePcmSink;
 import com.marianocarrizo.dynamusic.audio.stream.OutputArbiter;
 import com.marianocarrizo.dynamusic.audio.stream.OutputChoice;
@@ -14,6 +15,8 @@ import com.marianocarrizo.dynamusic.audio.wasapi.ExclusiveSupport;
 import com.marianocarrizo.dynamusic.audio.wasapi.NativeWasapi;
 import com.marianocarrizo.dynamusic.audio.wasapi.WasapiApi;
 import com.marianocarrizo.dynamusic.audio.wasapi.WasapiExclusiveSink;
+import com.marianocarrizo.dynamusic.audio.wasapi.WasapiSharedApi;
+import com.marianocarrizo.dynamusic.audio.wasapi.WasapiSharedSink;
 import com.marianocarrizo.dynamusic.service.FfmpegLocator;
 import java.io.File;
 import java.io.IOException;
@@ -45,6 +48,7 @@ public final class LineStreamOpener implements StreamOpener {
     private final SourceFactory sources;
     private final SinkFactory sinks;
     private final SinkFactory exclusiveSinks;
+    private final SinkFactory wasapiSharedSinks;
     private final ResampleFactory resamplers;
     private final OutputNegotiator negotiator;
 
@@ -55,20 +59,39 @@ public final class LineStreamOpener implements StreamOpener {
 
     LineStreamOpener(SourceFactory sources, SinkFactory sinks, SinkFactory exclusiveSinks,
             ResampleFactory resamplers, OutputNegotiator negotiator) {
+        this(sources, sinks, exclusiveSinks, sinks, resamplers, negotiator);
+    }
+
+    LineStreamOpener(SourceFactory sources, SinkFactory sinks, SinkFactory exclusiveSinks,
+            SinkFactory wasapiSharedSinks, ResampleFactory resamplers, OutputNegotiator negotiator) {
         this.sources = sources;
         this.sinks = sinks;
         this.exclusiveSinks = exclusiveSinks;
+        this.wasapiSharedSinks = wasapiSharedSinks;
         this.resamplers = resamplers;
         this.negotiator = negotiator;
     }
 
     public static LineStreamOpener standard(BooleanSupplier exclusiveEnabled, OutputArbiter arbiter) {
-        WasapiApi wasapi = new NativeWasapi();
+        NativeWasapi wasapi = new NativeWasapi();
         SinkFactory exclusive = format -> new ExclusiveFallbackSink(new WasapiExclusiveSink(wasapi, format),
                 SharedLines.system(), arbiter);
-        return new LineStreamOpener(StreamSources::open, LinePcmSink::open, exclusive, StreamSources::resample,
-                new OutputNegotiator(exclusiveOffer(exclusiveEnabled, arbiter, wasapi), LinePcmSink::supports,
-                        FfmpegLocator::awaitAvailability));
+        SinkFactory wasapiShared = format -> new JavaSoundFallbackSink(new WasapiSharedSink(wasapi, format),
+                SharedLines.system());
+        return new LineStreamOpener(StreamSources::open, LinePcmSink::open, exclusive, wasapiShared,
+                StreamSources::resample,
+                new OutputNegotiator(exclusiveOffer(exclusiveEnabled, arbiter, wasapi), sharedOffer(wasapi),
+                        LinePcmSink::supports, FfmpegLocator::awaitAvailability));
+    }
+
+    static Predicate<AudioFormat> sharedOffer(WasapiSharedApi wasapi) {
+        return format -> {
+            try {
+                return wasapi.supportsShared(format);
+            } catch (RuntimeException | LinkageError unavailable) {
+                return false;
+            }
+        };
     }
 
     static Predicate<AudioFormat> exclusiveOffer(BooleanSupplier enabled, OutputArbiter arbiter, WasapiApi wasapi) {
@@ -102,7 +125,11 @@ public final class LineStreamOpener implements StreamOpener {
     }
 
     private PcmSink sinkFor(OutputChoice choice) throws LineUnavailableException {
-        SinkFactory factory = choice.plan() == OutputPlan.EXCLUSIVE ? exclusiveSinks : sinks;
+        SinkFactory factory = switch (choice.plan()) {
+            case EXCLUSIVE -> exclusiveSinks;
+            case WASAPI_SHARED -> wasapiSharedSinks;
+            default -> sinks;
+        };
         return factory.open(choice.sinkFormat());
     }
 

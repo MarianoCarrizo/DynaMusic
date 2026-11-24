@@ -2,7 +2,9 @@ package com.marianocarrizo.dynamusic.service.playback;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import java.util.concurrent.atomic.AtomicInteger;
+import com.marianocarrizo.dynamusic.audio.wasapi.SharedStream;
 import com.marianocarrizo.dynamusic.audio.wasapi.WasapiApi;
+import com.marianocarrizo.dynamusic.audio.wasapi.WasapiSharedApi;
 import com.marianocarrizo.dynamusic.audio.wasapi.ExclusiveSupport;
 import com.marianocarrizo.dynamusic.audio.wasapi.ExclusiveStream;
 import com.marianocarrizo.dynamusic.audio.stream.OutputArbiter;
@@ -39,6 +41,8 @@ class LineStreamOpenerTest {
     private FakePcmSource resampled;
     private FakePcmSink sink;
     private FakePcmSink exclusiveSink;
+    private FakePcmSink wasapiSharedSink;
+    private final List<AudioFormat> wasapiSharedRequests = new ArrayList<>();
     private final List<AudioFormat> exclusiveRequests = new ArrayList<>();
     private boolean sinkFails;
     private boolean sourceFails;
@@ -199,6 +203,71 @@ class LineStreamOpenerTest {
 
         assertTrue(unlinked.open(FILE).isEmpty());
         assertEquals(1, source.closes());
+    }
+
+    private LineStreamOpener sharedOpener(Predicate<AudioFormat> wasapiShared) {
+        return new LineStreamOpener(file -> source, format -> {
+            sinkRequests.add(format);
+            sink = new FakePcmSink(format);
+            return sink;
+        }, format -> {
+            exclusiveRequests.add(format);
+            exclusiveSink = new FakePcmSink(format);
+            return exclusiveSink;
+        }, format -> {
+            wasapiSharedRequests.add(format);
+            wasapiSharedSink = new FakePcmSink(format);
+            return wasapiSharedSink;
+        }, (file, target, frames) -> sourceOf(target),
+                new OutputNegotiator(format -> false, wasapiShared, format -> true, () -> false));
+    }
+
+    private static WasapiSharedApi sharedProbing(Boolean supported) {
+        return new WasapiSharedApi() {
+            @Override
+            public boolean supportsShared(AudioFormat format) {
+                if (supported == null) throw new ExceptionInInitializerError("avrt is missing");
+                return supported;
+            }
+
+            @Override
+            public SharedStream openShared(AudioFormat format) {
+                throw new UnsupportedOperationException();
+            }
+        };
+    }
+
+    @Test
+    void aWasapiSharedPlanOpensTheWasapiSharedSinkInTheSourceFormat() {
+        source = sourceOf(HI_RES);
+
+        Optional<PcmStream> stream = sharedOpener(format -> true).open(FILE);
+
+        assertSame(wasapiSharedSink, stream.orElseThrow().sink());
+        assertEquals(List.of(HI_RES), wasapiSharedRequests);
+        assertTrue(sinkRequests.isEmpty());
+        assertTrue(exclusiveRequests.isEmpty());
+    }
+
+    @Test
+    void aRejectedWasapiSharedProbeOpensTheJavaSoundSink() {
+        source = sourceOf(HI_RES);
+
+        Optional<PcmStream> stream = sharedOpener(format -> false).open(FILE);
+
+        assertSame(sink, stream.orElseThrow().sink());
+        assertTrue(wasapiSharedRequests.isEmpty());
+    }
+
+    @Test
+    void theSharedOfferFollowsTheNativeAnswer() {
+        assertTrue(LineStreamOpener.sharedOffer(sharedProbing(true)).test(HI_RES));
+        assertFalse(LineStreamOpener.sharedOffer(sharedProbing(false)).test(HI_RES));
+    }
+
+    @Test
+    void aNativeBindingErrorDeclinesWasapiSharedInsteadOfEscaping() {
+        assertFalse(LineStreamOpener.sharedOffer(sharedProbing(null)).test(HI_RES));
     }
 
     @Test

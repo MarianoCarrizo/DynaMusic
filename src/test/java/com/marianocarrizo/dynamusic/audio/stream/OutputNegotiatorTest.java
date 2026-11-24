@@ -182,6 +182,69 @@ class OutputNegotiatorTest {
         assertTrue(negotiator.negotiate(source(24, 96_000, 6)).plan() != OutputPlan.EXCLUSIVE);
     }
 
+    private static OutputNegotiator withShared(Predicate<AudioFormat> exclusive, Predicate<AudioFormat> shared,
+            Predicate<AudioFormat> line) {
+        return new OutputNegotiator(exclusive, shared, line, FFMPEG);
+    }
+
+    @Test
+    void wasapiSharedIsOfferedBeforeTheExactFormat() {
+        AudioFormat source = source(24, 96_000, 2);
+
+        OutputChoice choice = withShared(format -> false, format -> true, device(24, 192_000)).negotiate(source);
+
+        assertEquals(OutputPlan.WASAPI_SHARED, choice.plan());
+        assertEquals(source, choice.sinkFormat());
+    }
+
+    @Test
+    void exclusiveStillWinsOverWasapiShared() {
+        OutputChoice choice = withShared(format -> true, format -> true, device(24, 192_000))
+                .negotiate(source(24, 96_000, 2));
+
+        assertEquals(OutputPlan.EXCLUSIVE, choice.plan());
+    }
+
+    @Test
+    void aRejectedWasapiSharedFormatFallsToTheJavaSoundLadder() {
+        Predicate<AudioFormat> none = format -> false;
+
+        assertEquals(OutputPlan.EXACT,
+                withShared(none, none, device(24, 192_000)).negotiate(source(24, 96_000, 2)).plan());
+        assertEquals(OutputPlan.REDUCED_DEPTH,
+                withShared(none, none, device(16, 192_000)).negotiate(source(24, 96_000, 2)).plan());
+        assertEquals(OutputPlan.RESAMPLED,
+                withShared(none, none, device(16, 48_000)).negotiate(source(24, 96_000, 2)).plan());
+    }
+
+    @Test
+    void wasapiSharedCarriesSixteenAndTwentyFourBitMonoAndStereoSources() {
+        OutputNegotiator negotiator = withShared(format -> false, format -> true, device(16, 48_000));
+
+        assertEquals(OutputPlan.WASAPI_SHARED, negotiator.negotiate(source(16, 44_100, 2)).plan());
+        assertEquals(OutputPlan.WASAPI_SHARED, negotiator.negotiate(source(24, 192_000, 1)).plan());
+        assertEquals(OutputPlan.WASAPI_SHARED, negotiator.negotiate(source(24, 96_000, 2)).plan());
+    }
+
+    @Test
+    void unsupportedDepthsAndSurroundSourcesAreNeverProbedForWasapiShared() {
+        OutputNegotiator negotiator = withShared(format -> false, format -> {
+            throw new AssertionError("probed " + format);
+        }, device(32, 96_000));
+
+        assertEquals(OutputPlan.EXACT, negotiator.negotiate(source(8, 44_100, 2)).plan());
+        assertEquals(OutputPlan.EXACT, negotiator.negotiate(source(32, 44_100, 2)).plan());
+        assertTrue(negotiator.negotiate(source(24, 96_000, 6)).plan() != OutputPlan.WASAPI_SHARED);
+    }
+
+    @Test
+    void theThreeArgumentConstructorNeverOffersWasapiShared() {
+        OutputChoice choice = new OutputNegotiator(format -> false, device(24, 96_000), FFMPEG)
+                .negotiate(source(24, 96_000, 2));
+
+        assertEquals(OutputPlan.EXACT, choice.plan());
+    }
+
     @Test
     void theTwoArgumentConstructorNeverOffersExclusive() {
         OutputChoice choice = new OutputNegotiator(device(24, 96_000), FFMPEG).negotiate(source(24, 96_000, 2));
