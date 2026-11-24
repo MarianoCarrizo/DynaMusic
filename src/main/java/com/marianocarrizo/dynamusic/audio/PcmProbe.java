@@ -6,7 +6,7 @@ import java.io.RandomAccessFile;
 import java.util.Arrays;
 import java.util.Optional;
 
-final class PcmProbe {
+public final class PcmProbe {
 
     static final int MAX_NATIVE_BITS = 24;
     static final int MAX_NATIVE_SAMPLE_RATE = 96000;
@@ -23,19 +23,19 @@ final class PcmProbe {
     private static final int FLAC_STREAM_INFO_OFFSET = 8;
     private static final int FLAC_RATE_OFFSET = FLAC_STREAM_INFO_OFFSET + 10;
 
-    record Info(int bitsPerSample, int sampleRate, boolean floatingPoint) {
-        boolean exceedsNativeDepth() {
+    public record Info(int bitsPerSample, int sampleRate, boolean floatingPoint) {
+        public boolean exceedsNativeDepth() {
             return !floatingPoint && bitsPerSample > MAX_NATIVE_BITS;
         }
 
-        boolean exceedsNativeRate() {
+        public boolean exceedsNativeRate() {
             return sampleRate > MAX_NATIVE_SAMPLE_RATE;
         }
     }
 
     private PcmProbe() {}
 
-    static Optional<Info> read(File file, AudioFormat format) {
+    public static Optional<Info> read(File file, AudioFormat format) {
         try (RandomAccessFile source = new RandomAccessFile(file, "r")) {
             byte[] head = new byte[(int) Math.min(HEAD_BYTES, source.length())];
             source.readFully(head);
