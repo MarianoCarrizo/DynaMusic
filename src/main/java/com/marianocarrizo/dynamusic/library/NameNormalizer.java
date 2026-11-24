@@ -1,14 +1,14 @@
-package com.marianocarrizo.dynamusic.controller;
+package com.marianocarrizo.dynamusic.library;
 
 import java.text.Normalizer;
 import java.util.Locale;
 
-final class NameNormalizer {
+public final class NameNormalizer {
 
     private NameNormalizer() {
     }
 
-    static String normalize(String name) {
+    public static String normalize(String name) {
         String decomposed = Normalizer.normalize(name, Normalizer.Form.NFD);
         StringBuilder plain = new StringBuilder(decomposed.length());
         for (int i = 0; i < decomposed.length(); i++) {

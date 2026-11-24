@@ -1,5 +1,7 @@
 package com.marianocarrizo.dynamusic.controller;
 
+import com.marianocarrizo.dynamusic.library.NameNormalizer;
+
 final class LibraryFilter {
 
     static final LibraryFilter NONE = new LibraryFilter("");

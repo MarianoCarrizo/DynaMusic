@@ -5,7 +5,10 @@ import com.marianocarrizo.dynamusic.service.FfmpegLocator;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.Label;
@@ -55,6 +58,7 @@ public final class LibraryPanelController {
 
     private Host host;
     private File rootFolder;
+    private final ObjectProperty<File> rootFolderProperty = new SimpleObjectProperty<>();
     private File pendingReveal;
     private final AtomicInteger scanGeneration = new AtomicInteger();
     private final BooleanProperty loading = new SimpleBooleanProperty();
@@ -119,6 +123,10 @@ public final class LibraryPanelController {
         return names;
     }
 
+    ReadOnlyObjectProperty<File> rootFolderProperty() {
+        return rootFolderProperty;
+    }
+
     Optional<File> selectedItem() {
         TreeItem<File> selected = treeFiles.getSelectionModel().getSelectedItem();
         return selected == null ? Optional.empty() : Optional.ofNullable(selected.getValue());
@@ -129,6 +137,7 @@ public final class LibraryPanelController {
         File last = new File(path);
         if (!last.isDirectory()) return;
         rootFolder = last;
+        rootFolderProperty.set(last);
         host.session().setLastFolderPath(path);
         Platform.runLater(this::rebuildTree);
     }
@@ -153,6 +162,7 @@ public final class LibraryPanelController {
     void showFolder(File folder) {
         if (folder == null || !folder.isDirectory()) return;
         rootFolder = folder;
+        rootFolderProperty.set(folder);
         host.session().setLastFolderPath(folder.getAbsolutePath());
         host.saveSession();
         searchDebounce.stop();
