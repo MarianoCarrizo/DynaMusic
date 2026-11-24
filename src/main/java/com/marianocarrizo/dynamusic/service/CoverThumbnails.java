@@ -10,7 +10,6 @@ import java.io.File;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
@@ -23,7 +22,6 @@ public final class CoverThumbnails {
     public static final int PIXELS = 150;
     static final int CACHE_SIZE = 240;
     private static final int WORKERS = 2;
-    private static final String PLACEHOLDER_RESOURCE = "/images/cover-placeholder.png";
 
     private record Waiter(BooleanSupplier wanted, Consumer<Optional<Image>> sink) {
     }
@@ -35,15 +33,6 @@ public final class CoverThumbnails {
         thread.setDaemon(true);
         return thread;
     });
-    private Image placeholder;
-
-    public Image placeholder() {
-        if (placeholder == null) {
-            placeholder = new Image(Objects.requireNonNull(getClass().getResource(PLACEHOLDER_RESOURCE)).toExternalForm(),
-                    PIXELS, PIXELS, true, true);
-        }
-        return placeholder;
-    }
 
     public void load(String key, File coverTrack, File folder, BooleanSupplier wanted,
                      Consumer<Optional<Image>> onResult) {

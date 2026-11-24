@@ -1,6 +1,5 @@
 package com.marianocarrizo.dynamusic.controller;
 
-import com.marianocarrizo.dynamusic.model.AppMode;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
@@ -17,47 +16,54 @@ class BrowseIndexTriggerTest {
     private final BrowseIndexTrigger trigger = new BrowseIndexTrigger();
 
     @Test
-    void nothingStartsInSession() {
-        assertTrue(trigger.due(AppMode.SESSION, FIRST).isEmpty());
+    void foldersNeverStartTheIndex() {
+        assertTrue(trigger.due(LibraryView.FOLDERS, FIRST).isEmpty());
     }
 
     @Test
-    void nothingStartsWithoutAFolder() {
-        assertTrue(trigger.due(AppMode.LISTEN, null).isEmpty());
+    void nothingStartsWithoutALibraryFolder() {
+        assertTrue(trigger.due(LibraryView.ALBUMS, null).isEmpty());
+        assertTrue(trigger.due(LibraryView.ARTISTS, null).isEmpty());
     }
 
     @Test
-    void firstListenEntryWithAFolderStartsTheIndex() {
-        assertEquals(Optional.of(FIRST), trigger.due(AppMode.LISTEN, FIRST));
+    void firstAlbumsSelectionStartsTheIndex() {
+        assertEquals(Optional.of(FIRST), trigger.due(LibraryView.ALBUMS, FIRST));
+    }
+
+    @Test
+    void firstArtistsSelectionStartsTheIndex() {
+        assertEquals(Optional.of(FIRST), trigger.due(LibraryView.ARTISTS, FIRST));
     }
 
     @Test
     void sameFolderIsNotIndexedTwice() {
-        trigger.due(AppMode.LISTEN, FIRST);
+        trigger.due(LibraryView.ALBUMS, FIRST);
 
-        assertTrue(trigger.due(AppMode.LISTEN, FIRST).isEmpty());
+        assertTrue(trigger.due(LibraryView.ALBUMS, FIRST).isEmpty());
+        assertTrue(trigger.due(LibraryView.ARTISTS, FIRST).isEmpty());
     }
 
     @Test
-    void goingToSessionAndBackDoesNotRestartIt() {
-        trigger.due(AppMode.LISTEN, FIRST);
-        trigger.due(AppMode.SESSION, FIRST);
+    void leavingAndComingBackDoesNotRestartIt() {
+        trigger.due(LibraryView.ALBUMS, FIRST);
+        trigger.due(LibraryView.FOLDERS, FIRST);
 
-        assertTrue(trigger.due(AppMode.LISTEN, FIRST).isEmpty());
+        assertTrue(trigger.due(LibraryView.ALBUMS, FIRST).isEmpty());
     }
 
     @Test
-    void folderChangeInListenRestartsIt() {
-        trigger.due(AppMode.LISTEN, FIRST);
+    void folderChangeWhileBrowsingRestartsIt() {
+        trigger.due(LibraryView.ALBUMS, FIRST);
 
-        assertEquals(Optional.of(SECOND), trigger.due(AppMode.LISTEN, SECOND));
+        assertEquals(Optional.of(SECOND), trigger.due(LibraryView.ALBUMS, SECOND));
     }
 
     @Test
-    void folderChangeInSessionWaitsForTheNextListenEntry() {
-        trigger.due(AppMode.LISTEN, FIRST);
+    void folderChangeWhileInFoldersWaitsForTheNextBrowse() {
+        trigger.due(LibraryView.ALBUMS, FIRST);
 
-        assertTrue(trigger.due(AppMode.SESSION, SECOND).isEmpty());
-        assertEquals(Optional.of(SECOND), trigger.due(AppMode.LISTEN, SECOND));
+        assertTrue(trigger.due(LibraryView.FOLDERS, SECOND).isEmpty());
+        assertEquals(Optional.of(SECOND), trigger.due(LibraryView.ARTISTS, SECOND));
     }
 }

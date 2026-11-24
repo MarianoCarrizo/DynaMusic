@@ -40,7 +40,7 @@ import java.util.Optional;
 public class PlayerController implements SceneHost, UpdateBarController.Host, SceneBarController.Host,
         AmbianceToolbarController.Host, LiveAuraController.Host, MoodPanelController.Host,
         LibraryPanelController.Host, PlaylistPanelController.Host, YouTubeBarController.Host,
-        NowPlayingBarController.Host, AudioSettingsController.Host, BrowsePanelController.Host {
+        NowPlayingBarController.Host, AudioSettingsController.Host {
 
     private static final String CAFECITO_URL = "https://cafecito.app/duhonha";
     private HostServices hostServices;
@@ -61,7 +61,6 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
     @FXML private MoodPanelController moodPanelController;
     @FXML private LiveAuraController liveAuraController;
     @FXML private QueuePanelController queuePanelController;
-    @FXML private BrowsePanelController browsePanelController;
 
     @FXML private NowPlayingBarController nowPlayingBarController;
 
@@ -124,11 +123,10 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
         audioSettingsController.attach(this);
         liveAuraController.attach(this);
         moodPanelController.attach(this);
-        libraryPanelController.attach(this);
+        libraryPanelController.attach(this, modeShell.modeProperty());
         playlistPanelController.attach(this);
         nowPlayingBarController.attach(this);
         queuePanelController.attach(playlistPlayback);
-        browsePanelController.attach(this, libraryPanelController.rootFolderProperty(), modeShell.modeProperty());
         nowPlayingTracker.sync();
         liveAuraController.refresh();
         modeShell.install(mainRoot, modeTabPane, modeSwitchController, () -> updateWindowMood(moodPanelController.activeMood()));
@@ -512,7 +510,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
         sessionConfig.setAmbianceScreenIndex(screenIdx);
         Platform.runLater(() -> ambianceToolbarController.restoreScreen(screenIdx));
 
-        libraryPanelController.restoreFolder(cfg.getLastFolderPath());
+        libraryPanelController.restoreFolder(cfg.getLastFolderPath(), cfg.getLibraryRoot());
         sessionConfig.setLibraryCollapsed(cfg.isLibraryCollapsed());
         sessionConfig.setLibraryDividerPosition(cfg.getLibraryDividerPosition());
         libraryVisibility.setDividerPosition(cfg.getLibraryDividerPosition());

@@ -76,12 +76,6 @@
                         </content>
                     </Tab>
 
-                    <Tab text="Library" styleClass="listen-only">
-                        <content>
-                            <fx:include fx:id="browsePanel" source="browse_panel.fxml"/>
-                        </content>
-                    </Tab>
-
                     <!-- T-11: Tab Playlists: panel de gestión de playlists -->
                     <Tab fx:id="playlistsTab" text="Playlists">
                         <content>

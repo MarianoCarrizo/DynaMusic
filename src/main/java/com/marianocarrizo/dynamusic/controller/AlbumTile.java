@@ -5,7 +5,6 @@ import com.marianocarrizo.dynamusic.service.CoverThumbnails;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
-import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.VBox;
 
@@ -15,7 +14,7 @@ final class AlbumTile extends VBox {
     private static final double SPACING = 4;
 
     private final CoverThumbnails covers;
-    private final ImageView cover = new ImageView();
+    private final CoverBox cover = new CoverBox(SIZE);
     private final Label title = new Label();
     private final Label artist = new Label();
     private volatile Album album;
@@ -26,10 +25,6 @@ final class AlbumTile extends VBox {
         getStyleClass().add("album-tile");
         title.getStyleClass().add("album-tile-title");
         artist.getStyleClass().add("album-tile-artist");
-        cover.setFitWidth(SIZE);
-        cover.setFitHeight(SIZE);
-        cover.setPreserveRatio(true);
-        cover.setSmooth(true);
         setMinWidth(SIZE);
         setPrefWidth(SIZE);
         setMaxWidth(SIZE);

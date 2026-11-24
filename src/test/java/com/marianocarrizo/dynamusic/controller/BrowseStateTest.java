@@ -39,6 +39,14 @@ class BrowseStateTest {
     }
 
     @Test
+    void onlyTheMissingFolderOffersToOpenOne() {
+        assertTrue(BrowseState.NO_FOLDER.offersFolder());
+        assertFalse(BrowseState.INDEXING.offersFolder());
+        assertFalse(BrowseState.EMPTY.offersFolder());
+        assertFalse(BrowseState.READY.offersFolder());
+    }
+
+    @Test
     void placeholdersHaveText() {
         for (BrowseState state : BrowseState.values()) {
             assertEquals(state.showsPlaceholder(), !state.message().isEmpty());

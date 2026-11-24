@@ -1,10 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ProgressIndicator?>
-<?import javafx.scene.control.ToggleButton?>
-<?import javafx.scene.control.ToggleGroup?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
@@ -12,26 +9,16 @@
 <VBox xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.marianocarrizo.dynamusic.controller.BrowsePanelController"
       spacing="8" VBox.vgrow="ALWAYS">
-    <padding>
-        <Insets top="10" right="4" bottom="4" left="4"/>
-    </padding>
-    <HBox spacing="8" alignment="CENTER_LEFT">
-        <fx:define>
-            <ToggleGroup fx:id="sectionGroup"/>
-        </fx:define>
+    <HBox fx:id="header" spacing="8" alignment="CENTER_LEFT">
         <Button fx:id="btnBack" text="Back" onAction="#onBack" styleClass="btn-secondary"/>
-        <HBox spacing="0" alignment="CENTER_LEFT">
-            <ToggleButton fx:id="btnAlbums" text="Albums" toggleGroup="$sectionGroup" selected="true"
-                          styleClass="mode-switch-button, mode-switch-first"/>
-            <ToggleButton fx:id="btnArtists" text="Artists" toggleGroup="$sectionGroup"
-                          styleClass="mode-switch-button, mode-switch-last"/>
-        </HBox>
         <Label fx:id="lblContext" styleClass="lbl-panel-title" minWidth="0" HBox.hgrow="ALWAYS" maxWidth="Infinity"/>
         <ProgressIndicator fx:id="indexingIndicator" styleClass="now-playing-loading" prefWidth="14" prefHeight="14"
                            minWidth="14" minHeight="14" maxWidth="14" maxHeight="14"/>
-        <Label fx:id="lblStatus" styleClass="playlist-counter"/>
     </HBox>
     <StackPane fx:id="stage" VBox.vgrow="ALWAYS">
-        <Label fx:id="lblPlaceholder" styleClass="empty-state-hint" wrapText="true"/>
+        <VBox alignment="CENTER" spacing="12" styleClass="library-empty">
+            <Label fx:id="lblPlaceholder" styleClass="empty-state-hint" wrapText="true"/>
+            <Button fx:id="btnOpenFolder" text="Open folder" styleClass="btn-secondary"/>
+        </VBox>
     </StackPane>
 </VBox>

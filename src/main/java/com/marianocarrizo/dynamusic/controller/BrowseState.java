@@ -1,7 +1,7 @@
 package com.marianocarrizo.dynamusic.controller;
 
 enum BrowseState {
-    NO_FOLDER("Open a folder in the Folders panel to browse your music."),
+    NO_FOLDER("Choose your music folder to browse albums and artists."),
     INDEXING("Indexing your library..."),
     EMPTY("No audio files found in this folder."),
     READY("");
@@ -14,6 +14,10 @@ enum BrowseState {
 
     String message() {
         return message;
+    }
+
+    boolean offersFolder() {
+        return this == NO_FOLDER;
     }
 
     boolean showsPlaceholder() {

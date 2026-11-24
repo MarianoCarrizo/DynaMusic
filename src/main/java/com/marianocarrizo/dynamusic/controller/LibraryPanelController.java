@@ -1,22 +1,32 @@
 package com.marianocarrizo.dynamusic.controller;
 
 import com.marianocarrizo.dynamusic.config.SessionConfig;
+import com.marianocarrizo.dynamusic.model.AppMode;
 import com.marianocarrizo.dynamusic.service.FfmpegLocator;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
+import javafx.beans.binding.ObjectBinding;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
+import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Toggle;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
 import javafx.util.Duration;
@@ -40,7 +50,7 @@ public final class LibraryPanelController {
         return thread;
     });
 
-    interface Host extends LibraryCell.Host {
+    interface Host extends LibraryCell.Host, BrowsePanelController.Host {
         SessionConfig session();
 
         void saveSession();
@@ -55,18 +65,30 @@ public final class LibraryPanelController {
     @FXML private TreeView<File> treeFiles;
     @FXML private VBox emptyState;
     @FXML private Label loadingLabel;
+    @FXML private ToggleGroup viewGroup;
+    @FXML private ToggleButton btnFolders;
+    @FXML private ToggleButton btnAlbums;
+    @FXML private ToggleButton btnArtists;
+    @FXML private Label lblViewStatus;
+    @FXML private StackPane foldersStack;
+    @FXML private Node browsePanel;
+    @FXML private BrowsePanelController browsePanelController;
 
     private Host host;
     private File rootFolder;
-    private final ObjectProperty<File> rootFolderProperty = new SimpleObjectProperty<>();
+    private final LibraryRootSelection libraryRoot = new LibraryRootSelection();
+    private final StringProperty rootFolderPath = new SimpleStringProperty("");
+    private final ObjectProperty<LibraryView> selectedView = new SimpleObjectProperty<>(LibraryView.FOLDERS);
+    private ObjectBinding<LibraryView> shownView;
     private File pendingReveal;
     private final AtomicInteger scanGeneration = new AtomicInteger();
     private final BooleanProperty loading = new SimpleBooleanProperty();
     private final PauseTransition searchDebounce = new PauseTransition(SEARCH_DEBOUNCE);
     private final TypeAheadMatcher typeAhead = new TypeAheadMatcher(System::currentTimeMillis, TYPE_AHEAD_TIMEOUT_MILLIS);
 
-    void attach(Host host) {
+    void attach(Host host, ReadOnlyObjectProperty<AppMode> mode) {
         this.host = host;
+        attachViews(host, mode);
         emptyState.visibleProperty().bind(treeFiles.rootProperty().isNull().and(loading.not()));
         loadingLabel.visibleProperty().bind(treeFiles.rootProperty().isNull().and(loading));
         treeFiles.visibleProperty().bind(treeFiles.rootProperty().isNotNull());
@@ -88,6 +110,44 @@ public final class LibraryPanelController {
                 selectedItem().filter(file -> !file.isDirectory()).ifPresent(host::startPreview);
             }
         });
+    }
+
+    private void attachViews(Host host, ReadOnlyObjectProperty<AppMode> mode) {
+        btnFolders.setUserData(LibraryView.FOLDERS);
+        btnAlbums.setUserData(LibraryView.ALBUMS);
+        btnArtists.setUserData(LibraryView.ARTISTS);
+        viewGroup.selectedToggleProperty().addListener((obs, previous, chosen) -> onViewChosen(previous, chosen));
+        shownView = Bindings.createObjectBinding(
+                () -> LibraryView.effective(mode.get(), selectedView.get()), mode, selectedView);
+        browsePanelController.attach(host, libraryRoot.property(), this::onOpenFolder);
+        shownView.addListener((obs, previous, current) -> showView(current));
+        browsePanelController.statusProperty().addListener((obs, previous, current) -> refreshViewStatus());
+        rootFolderPath.addListener((obs, previous, current) -> refreshViewStatus());
+        showView(shownView.get());
+    }
+
+    private void onViewChosen(Toggle previous, Toggle chosen) {
+        if (chosen == null) {
+            viewGroup.selectToggle(previous);
+            return;
+        }
+        selectedView.set((LibraryView) chosen.getUserData());
+    }
+
+    private void showView(LibraryView view) {
+        boolean folders = !view.browses();
+        foldersStack.setVisible(folders);
+        foldersStack.setManaged(folders);
+        txtSearch.setVisible(folders);
+        txtSearch.setManaged(folders);
+        browsePanel.setVisible(!folders);
+        browsePanel.setManaged(!folders);
+        browsePanelController.show(view);
+        refreshViewStatus();
+    }
+
+    private void refreshViewStatus() {
+        lblViewStatus.setText(shownView.get().status(rootFolderPath.get(), browsePanelController.statusProperty().get()));
     }
 
     private void onSearchChanged(String text) {
@@ -123,21 +183,19 @@ public final class LibraryPanelController {
         return names;
     }
 
-    ReadOnlyObjectProperty<File> rootFolderProperty() {
-        return rootFolderProperty;
-    }
-
     Optional<File> selectedItem() {
         TreeItem<File> selected = treeFiles.getSelectionModel().getSelectedItem();
         return selected == null ? Optional.empty() : Optional.ofNullable(selected.getValue());
     }
 
-    void restoreFolder(String path) {
+    void restoreFolder(String path, String libraryRootPath) {
+        libraryRoot.restore(libraryRootPath);
+        libraryRoot.current().ifPresent(root -> host.session().setLibraryRoot(root.getAbsolutePath()));
         if (path == null) return;
         File last = new File(path);
         if (!last.isDirectory()) return;
         rootFolder = last;
-        rootFolderProperty.set(last);
+        rootFolderPath.set(last.getAbsolutePath());
         host.session().setLastFolderPath(path);
         Platform.runLater(this::rebuildTree);
     }
@@ -151,7 +209,9 @@ public final class LibraryPanelController {
             File last = new File(lastPath);
             if (last.isDirectory()) chooser.setInitialDirectory(last);
         }
-        showFolder(chooser.showDialog(null));
+        File chosen = chooser.showDialog(null);
+        if (libraryRoot.choose(chosen)) host.session().setLibraryRoot(chosen.getAbsolutePath());
+        showFolder(chosen);
     }
 
     @FXML
@@ -162,7 +222,7 @@ public final class LibraryPanelController {
     void showFolder(File folder) {
         if (folder == null || !folder.isDirectory()) return;
         rootFolder = folder;
-        rootFolderProperty.set(folder);
+        rootFolderPath.set(folder.getAbsolutePath());
         host.session().setLastFolderPath(folder.getAbsolutePath());
         host.saveSession();
         searchDebounce.stop();

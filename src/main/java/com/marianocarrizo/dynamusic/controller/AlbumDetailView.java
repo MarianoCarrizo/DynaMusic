@@ -10,7 +10,6 @@ import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
-import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -26,7 +25,7 @@ final class AlbumDetailView extends VBox {
 
     private final AlbumActions actions;
     private final CoverThumbnails covers;
-    private final ImageView cover = new ImageView();
+    private final CoverBox cover = new CoverBox(COVER_SIZE);
     private final Label title = new Label();
     private final Label subtitle = new Label();
     private final ListView<TrackEntry> trackList = new ListView<>();
@@ -37,10 +36,6 @@ final class AlbumDetailView extends VBox {
         this.actions = actions;
         this.covers = covers;
         getStyleClass().add("album-detail");
-        cover.setFitWidth(COVER_SIZE);
-        cover.setFitHeight(COVER_SIZE);
-        cover.setPreserveRatio(true);
-        cover.setSmooth(true);
         title.getStyleClass().add("album-detail-title");
         subtitle.getStyleClass().add("album-tile-artist");
         trackList.setCellFactory(list -> new TrackCell(menuHost));

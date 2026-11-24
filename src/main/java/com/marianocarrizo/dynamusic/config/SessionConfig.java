@@ -49,6 +49,8 @@ public class SessionConfig {
     // Last folder opened with "Open Folder" — null if never used
     private String lastFolderPath;
 
+    private String libraryRoot;
+
     // Lista de playlists del usuario (nueva — aditiva; null en sesiones antiguas)
     private List<Playlist> playlists;
 
@@ -342,6 +344,9 @@ public class SessionConfig {
 
     public String getLastFolderPath() { return lastFolderPath; }
     public void setLastFolderPath(String path) { this.lastFolderPath = path; }
+
+    public String getLibraryRoot() { return libraryRoot; }
+    public void setLibraryRoot(String path) { this.libraryRoot = path; }
 
     // --- Playlists ---
 

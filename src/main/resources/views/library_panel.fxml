@@ -6,15 +6,33 @@
       fx:controller="com.marianocarrizo.dynamusic.controller.LibraryPanelController"
       spacing="10" VBox.vgrow="ALWAYS">
     <Button text="📂 Open Folder" onAction="#onOpenFolder" maxWidth="Infinity" styleClass="btn-secondary"/>
+    <HBox fx:id="viewBar" spacing="8" alignment="CENTER_LEFT" styleClass="listen-only">
+        <fx:define>
+            <ToggleGroup fx:id="viewGroup"/>
+        </fx:define>
+        <HBox spacing="0" alignment="CENTER_LEFT">
+            <ToggleButton fx:id="btnFolders" text="Folders" toggleGroup="$viewGroup" selected="true"
+                          styleClass="mode-switch-button, mode-switch-first"/>
+            <ToggleButton fx:id="btnAlbums" text="Albums" toggleGroup="$viewGroup"
+                          styleClass="mode-switch-button, mode-switch-middle"/>
+            <ToggleButton fx:id="btnArtists" text="Artists" toggleGroup="$viewGroup"
+                          styleClass="mode-switch-button, mode-switch-last"/>
+        </HBox>
+        <Label fx:id="lblViewStatus" styleClass="playlist-counter" textOverrun="CENTER_ELLIPSIS"
+               alignment="CENTER_RIGHT" minWidth="0" maxWidth="Infinity" HBox.hgrow="ALWAYS"/>
+    </HBox>
     <TextField fx:id="txtSearch" promptText="Search folders and tracks..."/>
     <StackPane VBox.vgrow="ALWAYS">
-        <TreeView fx:id="treeFiles" showRoot="false"/>
-        <Label fx:id="loadingLabel" text="Loading library..." styleClass="empty-state-hint"/>
-        <VBox fx:id="emptyState" alignment="CENTER" spacing="12" styleClass="library-empty">
-            <Label text="Nothing to play yet" styleClass="empty-state-title"/>
-            <Button text="Open folder" onAction="#onOpenFolder" styleClass="btn-secondary"/>
-            <Label text="Drop audio files here" styleClass="empty-state-hint"/>
-            <Button text="Paste a YouTube link" onAction="#onPasteYoutubeLink" styleClass="btn-secondary"/>
-        </VBox>
+        <StackPane fx:id="foldersStack">
+            <TreeView fx:id="treeFiles" showRoot="false"/>
+            <Label fx:id="loadingLabel" text="Loading library..." styleClass="empty-state-hint"/>
+            <VBox fx:id="emptyState" alignment="CENTER" spacing="12" styleClass="library-empty">
+                <Label text="Nothing to play yet" styleClass="empty-state-title"/>
+                <Button text="Open folder" onAction="#onOpenFolder" styleClass="btn-secondary"/>
+                <Label text="Drop audio files here" styleClass="empty-state-hint"/>
+                <Button text="Paste a YouTube link" onAction="#onPasteYoutubeLink" styleClass="btn-secondary"/>
+            </VBox>
+        </StackPane>
+        <fx:include fx:id="browsePanel" source="browse_panel.fxml"/>
     </StackPane>
 </VBox>
