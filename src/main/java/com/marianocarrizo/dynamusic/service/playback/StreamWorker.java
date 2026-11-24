@@ -22,6 +22,7 @@ final class StreamWorker implements Runnable {
     private int seekGeneration;
     private boolean running;
     private boolean ended;
+    private long resumeFrame = NO_SEEK;
     private int generation;
     private double postedSeconds;
 
@@ -120,18 +121,28 @@ final class StreamWorker implements Runnable {
     private void applySeek(long frame) throws IOException {
         output.seek(frame);
         source.seekToFrame(frame);
+        resumeFrame = NO_SEEK;
         running = false;
         ended = false;
         postPosition();
     }
 
-    private void switchRunning(boolean play) {
+    private void switchRunning(boolean play) throws IOException {
         if (play) {
+            resumeFromPausedFrame();
             output.start();
         } else {
-            output.pause();
+            long playedFrame = output.pause();
+            if (!ended) resumeFrame = playedFrame;
         }
         running = play;
+    }
+
+    private void resumeFromPausedFrame() throws IOException {
+        if (resumeFrame == NO_SEEK) return;
+        long frame = resumeFrame;
+        resumeFrame = NO_SEEK;
+        source.seekToFrame(frame);
     }
 
     private void pump() throws IOException {

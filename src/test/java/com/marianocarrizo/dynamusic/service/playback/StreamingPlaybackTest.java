@@ -229,6 +229,28 @@ class StreamingPlaybackTest {
     }
 
     @Test
+    void resumeRewindsTheSourceToTheFramePlayedAtPause() throws Exception {
+        open(constantPcm(TOTAL_FRAMES * 4, CONSTANT_SAMPLE));
+        CountDownLatch gate = new CountDownLatch(1);
+        sink.blockWrites(gate);
+
+        playback.play();
+        await(() -> sink.writeAttempts() >= 1);
+        sink.playFrames(1000);
+        int stopsBefore = sink.stops();
+        playback.pause();
+        gate.countDown();
+        await(() -> sink.stops() > stopsBefore);
+        assertEquals(0, source.seeks().size());
+
+        playback.play();
+
+        await(() -> source.seeks().size() == 1);
+        assertEquals(1000L, source.seeks().get(0));
+        assertEquals(1, sink.flushes() - 1);
+    }
+
+    @Test
     void currentTimeFollowsTheSinkPosition() throws Exception {
         open(constantPcm(TOTAL_FRAMES * 4, CONSTANT_SAMPLE));
         CountDownLatch gate = new CountDownLatch(1);

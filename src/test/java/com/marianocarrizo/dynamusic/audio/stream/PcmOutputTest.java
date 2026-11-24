@@ -126,6 +126,38 @@ class PcmOutputTest {
     }
 
     @Test
+    void pauseFlushesTheQueuedTailAndReturnsThePlayedFrame() {
+        PcmOutput output = new PcmOutput(sink16, PCM16, RATE, 1.0);
+        int[] constant = new int[882];
+        Arrays.fill(constant, 10_000);
+        byte[] block = PcmBytes.pack(SampleWidth.BITS_16, constant);
+        output.write(block, block.length);
+        sink16.playFrames(100);
+
+        long played = output.pause();
+
+        assertEquals(100, played);
+        assertEquals(1, sink16.flushes());
+        assertEquals(100, output.sourceFrame());
+    }
+
+    @Test
+    void resumeAfterPauseRampsUpFromSilence() {
+        PcmOutput output = new PcmOutput(sink16, PCM16, RATE, 1.0);
+        int[] constant = new int[882];
+        Arrays.fill(constant, 10_000);
+        output.pause();
+        output.start();
+
+        byte[] block = PcmBytes.pack(SampleWidth.BITS_16, constant);
+        output.write(block, block.length);
+        int[] samples = sink16.samples(SampleWidth.BITS_16);
+
+        assertTrue(samples[0] < 100);
+        assertTrue(samples[samples.length - 1] > 9_000);
+    }
+
+    @Test
     void closeAndDrainReachTheSink() {
         PcmOutput output = new PcmOutput(sink16, PCM16, RATE, 1.0);
 

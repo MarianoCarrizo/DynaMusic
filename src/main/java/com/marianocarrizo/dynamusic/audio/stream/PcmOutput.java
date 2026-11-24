@@ -44,9 +44,15 @@ public final class PcmOutput {
         sink.start();
     }
 
-    public void pause() {
+    public long pause() {
         sink.stop();
-        clock.pause(sink.framePosition());
+        long position = sink.framePosition();
+        clock.pause(position);
+        long playedFrame = clock.sourceFrame(position);
+        sink.flush();
+        clock.rebase(playedFrame, position);
+        gain.restartFromSilence();
+        return playedFrame;
     }
 
     public void seek(long sourceFrame) {
