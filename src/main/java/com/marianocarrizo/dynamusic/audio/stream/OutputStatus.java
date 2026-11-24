@@ -25,6 +25,7 @@ public record OutputStatus(OutputRoute route, int bits, int rate, boolean attenu
         return switch (route) {
             case NONE -> "";
             case SHARED -> format() + " shared";
+            case WASAPI_SHARED -> format() + " shared (WASAPI)";
             case EXCLUSIVE -> format() + " exclusive" + (attenuated ? NOT_BIT_PERFECT : "");
         };
     }

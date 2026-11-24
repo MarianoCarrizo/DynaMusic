@@ -1,18 +1,27 @@
 package com.marianocarrizo.dynamusic.audio.wasapi;
 
 import java.lang.foreign.Arena;
+import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
+import java.lang.invoke.MethodHandle;
 
 final class AudioClient {
 
     private static final Guid RENDER_CLIENT_IID = new Guid("F294ACFC-3146-4483-A7BF-ADDCA7C260E2");
+    private static final int SHARE_MODE_SHARED = 0;
     private static final int SHARE_MODE_EXCLUSIVE = 1;
     private static final int STREAMFLAGS_EVENTCALLBACK = 0x00040000;
+    private static final int STREAMFLAGS_SRC_DEFAULT_QUALITY = 0x08000000;
+    private static final int STREAMFLAGS_AUTOCONVERTPCM = 0x80000000;
+    private static final long SHARED_BUFFER_HNS = 1_000_000L;
+    private static final int SHARED_FLAGS = STREAMFLAGS_EVENTCALLBACK | STREAMFLAGS_AUTOCONVERTPCM
+            | STREAMFLAGS_SRC_DEFAULT_QUALITY;
     private static final int INITIALIZE_SLOT = 3;
     private static final int GET_BUFFER_SIZE_SLOT = 4;
     private static final int GET_CURRENT_PADDING_SLOT = 6;
     private static final int IS_FORMAT_SUPPORTED_SLOT = 7;
+    private static final int GET_MIX_FORMAT_SLOT = 8;
     private static final int GET_DEVICE_PERIOD_SLOT = 9;
     private static final int START_SLOT = 10;
     private static final int STOP_SLOT = 11;
@@ -26,6 +35,9 @@ final class AudioClient {
     private static final ComMethod GET_CURRENT_PADDING = ComMethod.of(GET_CURRENT_PADDING_SLOT, ValueLayout.ADDRESS);
     private static final ComMethod IS_FORMAT_SUPPORTED = ComMethod.of(IS_FORMAT_SUPPORTED_SLOT, ValueLayout.JAVA_INT,
             ValueLayout.ADDRESS, ValueLayout.ADDRESS);
+    private static final ComMethod GET_MIX_FORMAT = ComMethod.of(GET_MIX_FORMAT_SLOT, ValueLayout.ADDRESS);
+    private static final MethodHandle FREE_TASK_MEMORY = Win32Library.OLE32.bind("CoTaskMemFree",
+            FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final ComMethod GET_DEVICE_PERIOD = ComMethod.of(GET_DEVICE_PERIOD_SLOT, ValueLayout.ADDRESS,
             ValueLayout.ADDRESS);
     private static final ComMethod START = ComMethod.of(START_SLOT);
@@ -48,6 +60,22 @@ final class AudioClient {
     int initializeExclusive(long periodHns, MemorySegment format) {
         return INITIALIZE.invoke(object, SHARE_MODE_EXCLUSIVE, STREAMFLAGS_EVENTCALLBACK, periodHns, periodHns,
                 format, MemorySegment.NULL);
+    }
+
+    int initializeShared(MemorySegment format) {
+        return INITIALIZE.invoke(object, SHARE_MODE_SHARED, SHARED_FLAGS, SHARED_BUFFER_HNS, 0L, format, MemorySegment.NULL);
+    }
+
+    int mixChannels() {
+        MemorySegment output = arena.allocate(ValueLayout.ADDRESS);
+        Hresult.check("GetMixFormat", GET_MIX_FORMAT.invoke(object, output));
+        MemorySegment mix = output.get(ValueLayout.ADDRESS, 0);
+        try {
+            MemorySegment header = mix.reinterpret(WaveFormat.CHANNELS_OFFSET + Short.BYTES);
+            return header.get(ValueLayout.JAVA_SHORT_UNALIGNED, WaveFormat.CHANNELS_OFFSET);
+        } finally {
+            NativeCall.invoke(FREE_TASK_MEMORY, mix);
+        }
     }
 
     int isExclusiveSupported(MemorySegment format) {

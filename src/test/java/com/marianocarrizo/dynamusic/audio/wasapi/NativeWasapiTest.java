@@ -1,5 +1,6 @@
 package com.marianocarrizo.dynamusic.audio.wasapi;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -39,6 +40,41 @@ class NativeWasapiTest {
             stream.stop();
             stream.reset();
         }
+    }
+
+    private static void playSilenceThroughTheSharedSink(AudioFormat format) {
+        NativeWasapi api = new NativeWasapi();
+        assumeTrue(api.supportsShared(format));
+        WasapiSharedSink sink = new WasapiSharedSink(api, format);
+        byte[] silence = new byte[format.getFrameSize() * SILENT_BLOCK_FRAMES];
+
+        try {
+            sink.start();
+            for (int i = 0; i < SILENT_BLOCKS; i++) {
+                assertEquals(silence.length, sink.write(silence, 0, silence.length));
+            }
+            sink.drain();
+            sink.stop();
+            assertTrue(sink.framePosition() > 0);
+            sink.flush();
+        } finally {
+            sink.close();
+        }
+    }
+
+    @Test
+    void sharedSinkPlaysSilenceAtTwentyFourBitNinetySixKilohertz() {
+        playSilenceThroughTheSharedSink(FORMAT);
+    }
+
+    @Test
+    void sharedSinkPlaysSilenceAtSixteenBitCdRate() {
+        playSilenceThroughTheSharedSink(PcmFormats.signedLittleEndian(16, 44_100f, 2));
+    }
+
+    @Test
+    void sharedSinkPlaysMonoSilence() {
+        playSilenceThroughTheSharedSink(PcmFormats.signedLittleEndian(24, 48_000f, 1));
     }
 
     @Test

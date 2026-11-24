@@ -77,6 +77,25 @@ class WaveFormatTest {
     }
 
     @Test
+    void floatStereoDescribesThirtyTwoBitIeeeSamples() {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment format = WaveFormat.createFloat(arena, 96_000, 2);
+            byte[] subFormat = new byte[16];
+            MemorySegment.copy(format, 24, MemorySegment.ofArray(subFormat), 0, 16);
+
+            assertEquals((short) 0xFFFE, shortAt(format, 0));
+            assertEquals(2, shortAt(format, 2));
+            assertEquals(96_000, intAt(format, 4));
+            assertEquals(768_000, intAt(format, 8));
+            assertEquals(8, shortAt(format, 12));
+            assertEquals(32, shortAt(format, 14));
+            assertEquals(32, shortAt(format, 18));
+            assertEquals(3, intAt(format, 20));
+            assertArrayEquals(WaveFormat.IEEE_FLOAT.toBytes(), subFormat);
+        }
+    }
+
+    @Test
     void subFormatIsIntegerPcm() {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment format = WaveFormat.create(arena, SampleContainer.PADDED_32, 48_000, 2);

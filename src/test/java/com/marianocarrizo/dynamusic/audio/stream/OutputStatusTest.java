@@ -24,6 +24,16 @@ class OutputStatusTest {
     }
 
     @Test
+    void wasapiSharedNamesTheMixerPath() {
+        assertEquals("24/96 shared (WASAPI)", status(OutputRoute.WASAPI_SHARED, 24, 96_000).label());
+    }
+
+    @Test
+    void wasapiSharedIsNeverBitPerfect() {
+        assertFalse(status(OutputRoute.WASAPI_SHARED, 24, 96_000).bitPerfect());
+    }
+
+    @Test
     void fractionalRatesKeepTheirDecimals() {
         assertEquals("16/44.1 exclusive", status(OutputRoute.EXCLUSIVE, 16, 44_100).label());
         assertEquals("24/88.2 shared", status(OutputRoute.SHARED, 24, 88_200).label());

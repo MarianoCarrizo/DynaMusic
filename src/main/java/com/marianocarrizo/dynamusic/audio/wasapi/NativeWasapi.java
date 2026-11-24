@@ -4,7 +4,7 @@ import com.marianocarrizo.dynamusic.audio.stream.OutputUnavailableException;
 import java.util.List;
 import javax.sound.sampled.AudioFormat;
 
-public final class NativeWasapi implements WasapiApi {
+public final class NativeWasapi implements WasapiApi, WasapiSharedApi {
 
     private static final int MIN_CHANNELS = 1;
     private static final int MAX_CHANNELS = 2;
@@ -30,6 +30,25 @@ public final class NativeWasapi implements WasapiApi {
     public ExclusiveStream open(AudioFormat format, long periodHns) {
         try {
             return NativeExclusiveStream.open(format, periodHns);
+        } catch (LinkageError unavailable) {
+            throw new OutputUnavailableException("The native audio layer is unavailable", unavailable);
+        }
+    }
+
+    @Override
+    public boolean supportsShared(AudioFormat format) {
+        if (!FloatPcm.isSourceSupported(format.getSampleSizeInBits(), format.getChannels())) return false;
+        try {
+            return NativeSharedStream.supports(format);
+        } catch (OutputUnavailableException | LinkageError unavailable) {
+            return false;
+        }
+    }
+
+    @Override
+    public SharedStream openShared(AudioFormat format) {
+        try {
+            return NativeSharedStream.open(format);
         } catch (LinkageError unavailable) {
             throw new OutputUnavailableException("The native audio layer is unavailable", unavailable);
         }
