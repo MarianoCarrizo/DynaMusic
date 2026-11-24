@@ -1,5 +1,6 @@
 package com.marianocarrizo.dynamusic.controller;
 
+import javafx.beans.binding.Bindings;
 import javafx.scene.control.MenuItem;
 
 import java.io.File;
@@ -35,6 +36,7 @@ final class FileTrackMenuItems {
 
     private static MenuItem queueItem(String text, QueuePlacement placement, Host host, Supplier<File> track) {
         MenuItem item = new MenuItem(text);
+        item.visibleProperty().bind(Bindings.not(host.moodActionsVisible()));
         item.setOnAction(e -> {
             File file = track.get();
             if (file != null && file.isFile()) host.enqueue(List.of(file), placement);

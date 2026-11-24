@@ -10,6 +10,7 @@ import javafx.application.Platform;
 import java.io.File;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 final class PlaylistPlayback implements QueuePanelController.Host {
@@ -22,10 +23,11 @@ final class PlaylistPlayback implements QueuePanelController.Host {
     private final Runnable refreshView;
 
     PlaylistPlayback(MusicService musicService, PlaylistManager playlistManager,
-                     Consumer<MusicService.PlaybackMode> enterMode, Runnable refreshView) {
+                     Consumer<MusicService.PlaybackMode> enterMode, Runnable refreshView,
+                     BooleanSupplier queueEnabled) {
         this.musicService = musicService;
         this.playlistManager = playlistManager;
-        this.order = new PlaybackOrder(queue, playlistManager);
+        this.order = new PlaybackOrder(queue, playlistManager, queueEnabled);
         this.enterMode = enterMode;
         this.refreshView = refreshView;
         musicService.setOnPlaylistEnd(() -> Platform.runLater(this::advanceAfterEnd));

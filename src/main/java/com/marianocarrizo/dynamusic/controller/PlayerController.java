@@ -95,7 +95,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
     private final NowPlayingTracker nowPlayingTracker = new NowPlayingTracker(
             musicService::playbackState, playlistManager::getActivePlaylistName, nowPlaying);
     private final PlaylistPlayback playlistPlayback = new PlaylistPlayback(
-            musicService, playlistManager, this::enterMode, this::refreshPlaylistView);
+            musicService, playlistManager, this::enterMode, this::refreshPlaylistView, modeShell::isListen);
     private final ActiveTransport transport = new ActiveTransport(musicService, playlistPlayback::startCurrent, () -> !modeShell.isListen());
     private final RepeatSettings repeatSettings = new RepeatSettings(
             mode -> musicService.setLoop(mode.repeatsTrack()), playlistManager::setRepeat,

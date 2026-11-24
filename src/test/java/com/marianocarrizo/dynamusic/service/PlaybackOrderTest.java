@@ -186,4 +186,37 @@ class PlaybackOrderTest {
         assertEquals(Optional.of(Q1), order.afterStandalone());
         assertEquals(Optional.empty(), order.afterStandalone());
     }
+
+    @Test
+    void previousWhileAQueuedTrackSoundsReturnsToTheCurrentPlaylistTrack() {
+        order.playing(manager.startAt(1).orElseThrow());
+        queue.add(List.of(Q1));
+        assertEquals(Optional.of(Q1), order.next());
+
+        assertEquals(Optional.of(P2), order.previous());
+        assertEquals(Optional.of(P1), order.previous());
+    }
+
+    @Test
+    void aDisabledQueueIsNeverConsumedOrPeeked() {
+        PlaybackOrder session = new PlaybackOrder(queue, manager, () -> false);
+        session.playing(manager.startAt(0).orElseThrow());
+        queue.add(List.of(Q1));
+
+        assertEquals(Optional.of(P2), session.peekNext());
+        assertEquals(Optional.of(P2), session.afterEnd());
+        assertEquals(Optional.empty(), session.afterStandalone());
+        assertEquals(List.of(Q1), queue.items());
+    }
+
+    @Test
+    void aDisabledQueueDoesNotStartPlaybackAfterAStandaloneTrack() {
+        PlayQueue lone = new PlayQueue();
+        lone.add(List.of(Q1));
+        PlaybackOrder session = new PlaybackOrder(lone, new PlaylistManager(), () -> false);
+
+        assertEquals(Optional.empty(), session.startCurrent());
+        assertEquals(Optional.empty(), session.afterStandalone());
+        assertEquals(List.of(Q1), lone.items());
+    }
 }

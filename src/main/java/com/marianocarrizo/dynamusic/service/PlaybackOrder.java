@@ -4,17 +4,24 @@ import com.marianocarrizo.dynamusic.model.RepeatMode;
 
 import java.io.File;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 
 public final class PlaybackOrder {
 
     private final PlayQueue queue;
     private final PlaylistManager context;
+    private final BooleanSupplier queueEnabled;
     private File sounding;
     private boolean soundingFromQueue;
 
     public PlaybackOrder(PlayQueue queue, PlaylistManager context) {
+        this(queue, context, () -> true);
+    }
+
+    public PlaybackOrder(PlayQueue queue, PlaylistManager context, BooleanSupplier queueEnabled) {
         this.queue = queue;
         this.context = context;
+        this.queueEnabled = queueEnabled;
     }
 
     public void playing(File file) {
@@ -23,7 +30,7 @@ public final class PlaybackOrder {
     }
 
     public Optional<File> next() {
-        Optional<File> queued = queue.poll();
+        Optional<File> queued = pollQueue();
         if (queued.isPresent()) return remember(queued, true);
         return remember(context.next(), false);
     }
@@ -34,24 +41,29 @@ public final class PlaybackOrder {
     }
 
     public Optional<File> afterStandalone() {
-        return remember(queue.poll(), true);
+        return remember(pollQueue(), true);
     }
 
     public Optional<File> previous() {
+        if (soundingFromQueue) return remember(context.startCurrent(), false);
         return remember(context.prev(), false);
     }
 
     public Optional<File> startCurrent() {
         Optional<File> current = context.startCurrent();
         if (current.isPresent()) return remember(current, false);
-        return remember(queue.poll(), true);
+        return remember(pollQueue(), true);
     }
 
     public Optional<File> peekNext() {
         if (repeatsSounding() && soundingFromQueue) return Optional.of(sounding);
         if (repeatsSounding()) return context.peekNext();
-        Optional<File> queued = queue.peek();
+        Optional<File> queued = queueEnabled.getAsBoolean() ? queue.peek() : Optional.empty();
         return queued.isPresent() ? queued : context.peekNext();
+    }
+
+    private Optional<File> pollQueue() {
+        return queueEnabled.getAsBoolean() ? queue.poll() : Optional.empty();
     }
 
     private boolean repeatsSounding() {
