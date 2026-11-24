@@ -16,6 +16,10 @@ public interface Playback {
 
     void dispose();
 
+    default boolean awaitRelease(long millis) {
+        return true;
+    }
+
     void seek(Duration time);
 
     Duration getCurrentTime();

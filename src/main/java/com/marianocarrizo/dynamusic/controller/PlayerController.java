@@ -10,9 +10,11 @@ import com.marianocarrizo.dynamusic.model.RepeatMode;
 import com.marianocarrizo.dynamusic.model.Playlist;
 import com.marianocarrizo.dynamusic.model.PlaylistItem;
 import com.marianocarrizo.dynamusic.model.Scene;
+import com.marianocarrizo.dynamusic.service.AppShutdown;
 import com.marianocarrizo.dynamusic.service.MusicService;
 import com.marianocarrizo.dynamusic.service.PlaylistManager;
 import com.marianocarrizo.dynamusic.service.UpdateManager;
+import com.marianocarrizo.dynamusic.service.playback.PlaybackShutdown;
 import javafx.animation.Animation;
 import javafx.animation.PauseTransition;
 import javafx.application.HostServices;
@@ -85,6 +87,10 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
     private boolean applyingSession = false;
 
     private final PauseTransition saveDebounce = new PauseTransition(Duration.millis(400));
+    private final AppShutdown appShutdown = new AppShutdown(List.of(
+            new PlaybackShutdown(musicService::playersForShutdown)::run,
+            () -> { if (saveDebounce.getStatus() == Animation.Status.RUNNING) manager.save(sessionConfig); },
+            () -> UpdateManager.get().launchPendingInstaller(), AppShutdown::exit));
 
     private final MoodTrackLoader trackLoader = new MoodTrackLoader(
             musicService, sessionConfig, () -> manager.save(sessionConfig),
@@ -556,13 +562,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
     @Override
     public void shutdownApp() {
         if (sceneEditor != null) sceneEditor.dispose();
-        if (saveDebounce.getStatus() == Animation.Status.RUNNING) {
-            saveDebounce.stop();
-            manager.save(sessionConfig);
-        }
-        UpdateManager.get().launchPendingInstaller();
-        Platform.exit();
-        System.exit(0);
+        appShutdown.run();
     }
 
     @FXML
