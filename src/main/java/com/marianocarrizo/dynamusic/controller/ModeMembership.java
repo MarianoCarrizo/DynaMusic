@@ -20,8 +20,11 @@ enum ModeMembership {
         return styleClass;
     }
 
-    String selector() {
-        return "." + styleClass;
+    static boolean marked(Collection<String> styleClasses) {
+        for (ModeMembership membership : values()) {
+            if (styleClasses.contains(membership.styleClass)) return true;
+        }
+        return false;
     }
 
     static boolean visibleIn(AppMode mode, Collection<String> styleClasses) {

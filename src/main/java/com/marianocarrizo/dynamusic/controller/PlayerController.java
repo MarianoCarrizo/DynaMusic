@@ -133,7 +133,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
 
         if (modeTabPane != null) {
             modeTabPane.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
-                if (applyingSession || newTab == null || modeShell.isListen()) return;
+                if (applyingSession || newTab == null || !modeShell.tabsFollowSession()) return;
                 boolean isPlaylist = newTab == playlistsTab;
                 sessionConfig.setActiveMode(isPlaylist ? "playlist" : "mood");
                 manager.save(sessionConfig);
@@ -495,7 +495,6 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
         sessionConfig.adoptStreamingEngineFrom(cfg);
         sessionConfig.adoptSkippedUpdateVersionFrom(cfg);
         sessionConfig.adoptAppModeFrom(cfg);
-        modeShell.restore();
         audioSettingsController.applySaved();
 
         String lastImgDir = cfg.getLastImageFolderPath();
@@ -531,6 +530,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
             playlistPanelController.refresh();
             applyingSession = false;
         }
+        modeShell.restore();
 
         Platform.runLater(() -> {
             nowPlayingBarController.restoreVolume(cfg.getMasterVolume());

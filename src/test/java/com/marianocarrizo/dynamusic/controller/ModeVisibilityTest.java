@@ -4,6 +4,8 @@ import com.marianocarrizo.dynamusic.model.AppMode;
 import javafx.scene.layout.Pane;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -66,5 +68,29 @@ class ModeVisibilityTest {
 
         visibility.apply(AppMode.SESSION);
         assertTrue(shared.isVisible());
+    }
+
+    @Test
+    void nodesReachableOnlyThroughTheStructureFunctionAreFound() {
+        Pane hiddenHolder = new Pane();
+        Pane inner = new Pane();
+        inner.getStyleClass().add(ModeMembership.SESSION_ONLY.styleClass());
+        Pane nested = new Pane(inner);
+        root.getChildren().add(hiddenHolder);
+
+        new ModeVisibility(root, node -> node == hiddenHolder ? List.of(nested) : node instanceof Pane pane ? pane.getChildren() : List.of())
+                .apply(AppMode.LISTEN);
+
+        assertFalse(inner.isVisible());
+    }
+
+    @Test
+    void aNodeReachedTwiceIsCollectedOnce() {
+        Pane twice = marked(ModeMembership.LISTEN_ONLY);
+
+        ModeVisibility visibility = new ModeVisibility(root, node -> node == root ? List.of(twice, twice) : List.of());
+        visibility.apply(AppMode.SESSION);
+
+        assertFalse(twice.isVisible());
     }
 }

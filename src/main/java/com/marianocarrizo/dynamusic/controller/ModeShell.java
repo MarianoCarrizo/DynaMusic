@@ -44,6 +44,10 @@ final class ModeShell implements ModeSwitchController.Host {
         transition.whenSession(mode.get(), action);
     }
 
+    boolean tabsFollowSession() {
+        return mode.get() == AppMode.SESSION && !tabs.isSwapping();
+    }
+
     boolean isListen() {
         return mode.get() == AppMode.LISTEN;
     }

@@ -20,6 +20,7 @@ final class ModeTabs {
     private final List<Tab> declared;
     private final Map<AppMode, Tab> remembered = new EnumMap<>(AppMode.class);
     private AppMode shown;
+    private boolean swapping;
 
     ModeTabs(List<Tab> declared, Surface surface) {
         this.declared = List.copyOf(declared);
@@ -47,8 +48,17 @@ final class ModeTabs {
         List<Tab> visible = declared.stream()
                 .filter(tab -> ModeMembership.visibleIn(mode, tab.getStyleClass()))
                 .toList();
-        surface.show(visible, choose(mode, current, visible));
+        swapping = true;
+        try {
+            surface.show(visible, choose(mode, current, visible));
+        } finally {
+            swapping = false;
+        }
         shown = mode;
+    }
+
+    boolean isSwapping() {
+        return swapping;
     }
 
     private Tab choose(AppMode mode, Tab current, List<Tab> visible) {

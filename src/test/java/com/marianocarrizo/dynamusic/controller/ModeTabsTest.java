@@ -7,12 +7,16 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ModeTabsTest {
 
     private static final class FakeSurface implements ModeTabs.Surface {
         List<Tab> tabs = List.of();
         Tab selected;
+        boolean swappingDuringShow;
+        ModeTabs owner;
 
         @Override
         public Tab selected() {
@@ -21,6 +25,7 @@ class ModeTabsTest {
 
         @Override
         public void show(List<Tab> shown, Tab chosen) {
+            swappingDuringShow = owner.isSwapping();
             tabs = shown;
             selected = chosen;
         }
@@ -31,6 +36,10 @@ class ModeTabsTest {
     private final Tab playlists = tab("Playlists", null);
     private final FakeSurface surface = new FakeSurface();
     private final ModeTabs tabs = new ModeTabs(List.of(moods, library, playlists), surface);
+
+    {
+        surface.owner = tabs;
+    }
 
     private static Tab tab(String title, ModeMembership membership) {
         Tab tab = new Tab(title);
@@ -83,5 +92,13 @@ class ModeTabsTest {
         tabs.show(AppMode.LISTEN);
 
         assertEquals(library, surface.selected);
+    }
+
+    @Test
+    void swappingIsReportedOnlyWhileTheSurfaceIsBeingChanged() {
+        tabs.show(AppMode.SESSION);
+
+        assertTrue(surface.swappingDuringShow);
+        assertFalse(tabs.isSwapping());
     }
 }
