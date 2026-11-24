@@ -2,7 +2,7 @@ package com.marianocarrizo.dynamusic.audio.stream;
 
 import javax.sound.sampled.AudioFormat;
 
-final class FakeExclusiveSink implements PcmSink {
+public final class FakeExclusiveSink implements PcmSink {
 
     private final AudioFormat format;
     private long framePosition;
@@ -14,44 +14,49 @@ final class FakeExclusiveSink implements PcmSink {
     private RuntimeException writeFailure;
     private RuntimeException suspendFailure;
     private RuntimeException stopFailure;
+    private long paceMillis;
 
-    FakeExclusiveSink(AudioFormat format) {
+    public FakeExclusiveSink(AudioFormat format) {
         this.format = format;
     }
 
-    void failStartWith(RuntimeException failure) {
+    public void failStartWith(RuntimeException failure) {
         startFailure = failure;
     }
 
-    void failWritesWith(RuntimeException failure) {
+    public void failWritesWith(RuntimeException failure) {
         writeFailure = failure;
     }
 
-    void failSuspendWith(RuntimeException failure) {
+    public void failSuspendWith(RuntimeException failure) {
         suspendFailure = failure;
     }
 
-    void failStopWith(RuntimeException failure) {
+    public void failStopWith(RuntimeException failure) {
         stopFailure = failure;
     }
 
-    void playFrames(long frames) {
+    public void paceWritesBy(long millis) {
+        paceMillis = millis;
+    }
+
+    public void playFrames(long frames) {
         framePosition += frames;
     }
 
-    int starts() {
+    public int starts() {
         return starts;
     }
 
-    int writes() {
+    public int writes() {
         return writes;
     }
 
-    int suspends() {
+    public int suspends() {
         return suspends;
     }
 
-    int closes() {
+    public int closes() {
         return closes;
     }
 
@@ -80,7 +85,17 @@ final class FakeExclusiveSink implements PcmSink {
     public int write(byte[] data, int offset, int length) {
         if (writeFailure != null) throw writeFailure;
         writes++;
+        pace();
         return length;
+    }
+
+    private void pace() {
+        if (paceMillis == 0) return;
+        try {
+            Thread.sleep(paceMillis);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     @Override

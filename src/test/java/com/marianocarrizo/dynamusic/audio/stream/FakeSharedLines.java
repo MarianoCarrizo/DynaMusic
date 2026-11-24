@@ -6,25 +6,25 @@ import java.util.function.Predicate;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.LineUnavailableException;
 
-final class FakeSharedLines implements SharedLines {
+public final class FakeSharedLines implements SharedLines {
 
     private final List<FakePcmSink> opened = new ArrayList<>();
     private Predicate<AudioFormat> supported = format -> true;
     private boolean unavailable;
 
-    void supportOnly(Predicate<AudioFormat> supported) {
+    public void supportOnly(Predicate<AudioFormat> supported) {
         this.supported = supported;
     }
 
-    void becomeUnavailable() {
+    public void becomeUnavailable() {
         unavailable = true;
     }
 
-    List<FakePcmSink> opened() {
+    public List<FakePcmSink> opened() {
         return opened;
     }
 
-    FakePcmSink last() {
+    public FakePcmSink last() {
         return opened.get(opened.size() - 1);
     }
 
