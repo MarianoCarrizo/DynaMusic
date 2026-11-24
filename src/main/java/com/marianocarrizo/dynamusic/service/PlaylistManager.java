@@ -176,9 +176,10 @@ public class PlaylistManager {
     }
 
     public int insertTracks(String playlistName, List<File> files, int index) {
-        Optional<Playlist> found = findByName(playlistName);
-        if (found.isEmpty()) return 0;
-        Playlist playlist = found.get();
+        return findByName(playlistName).map(playlist -> insertInto(playlist, files, index)).orElse(0);
+    }
+
+    private int insertInto(Playlist playlist, List<File> files, int index) {
         List<String> newPaths = newPathsOnly(playlist, files);
         if (newPaths.isEmpty()) return 0;
         int oldSize = playlist.size();
@@ -220,9 +221,14 @@ public class PlaylistManager {
     }
 
     public void removeTrack(String playlistName, int index) {
-        Optional<Playlist> found = findByName(playlistName);
-        if (found.isEmpty()) return;
-        Playlist playlist = found.get();
+        findByName(playlistName).ifPresent(playlist -> removeFrom(playlist, index));
+    }
+
+    public void removeActive(int index) {
+        if (activePlaylist != null) removeFrom(activePlaylist, index);
+    }
+
+    private void removeFrom(Playlist playlist, int index) {
         int oldSize = playlist.size();
         if (index < 0 || index >= oldSize) return;
         playlist.removeAt(index);
@@ -232,9 +238,14 @@ public class PlaylistManager {
     }
 
     public void reorderTrack(String playlistName, int from, int to) {
-        Optional<Playlist> found = findByName(playlistName);
-        if (found.isEmpty()) return;
-        Playlist playlist = found.get();
+        findByName(playlistName).ifPresent(playlist -> reorderIn(playlist, from, to));
+    }
+
+    public void reorderActive(int from, int to) {
+        if (activePlaylist != null) reorderIn(activePlaylist, from, to);
+    }
+
+    private void reorderIn(Playlist playlist, int from, int to) {
         int size = playlist.size();
         if (from < 0 || from >= size || to < 0 || to >= size || from == to) return;
         playlist.reorder(from, to);

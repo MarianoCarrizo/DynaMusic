@@ -94,4 +94,51 @@ class PlaylistTransientTest {
         assertEquals(Optional.of(A), manager.startCurrent());
         assertTrue(manager.isTransientActive());
     }
+
+    @Test
+    void removingFromTheActiveContextLeavesAnEqualNamedSavedPlaylistAlone() {
+        manager.createPlaylist("Album");
+        manager.addTrack("Album", C);
+        manager.playTransient("Album", List.of(A, B), 0);
+
+        manager.removeActive(0);
+
+        assertEquals(1, manager.size());
+        assertEquals(Optional.of(B), manager.startCurrent());
+        assertEquals(List.of(C.getAbsolutePath()), manager.findByName("Album").orElseThrow().getPaths());
+    }
+
+    @Test
+    void reorderingTheActiveContextLeavesAnEqualNamedSavedPlaylistAlone() {
+        manager.createPlaylist("album");
+        manager.addTrack("album", C);
+        manager.addTrack("album", D);
+        manager.playTransient("Album", List.of(A, B), 0);
+
+        manager.reorderActive(0, 1);
+
+        assertEquals(List.of(B.getAbsolutePath(), A.getAbsolutePath()), manager.getActivePaths());
+        assertEquals(List.of(C.getAbsolutePath(), D.getAbsolutePath()), manager.findByName("album").orElseThrow().getPaths());
+    }
+
+    @Test
+    void activeEditsWorkOnASavedActivePlaylist() {
+        manager.createPlaylist("mine");
+        manager.addTrack("mine", A);
+        manager.addTrack("mine", B);
+        manager.setActivePlaylist("mine");
+
+        manager.reorderActive(0, 1);
+        manager.removeActive(0);
+
+        assertEquals(List.of(A.getAbsolutePath()), manager.findByName("mine").orElseThrow().getPaths());
+    }
+
+    @Test
+    void activeEditsWithoutAnActivePlaylistDoNothing() {
+        manager.removeActive(0);
+        manager.reorderActive(0, 1);
+
+        assertEquals(0, manager.size());
+    }
 }
