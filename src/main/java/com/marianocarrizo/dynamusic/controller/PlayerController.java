@@ -37,7 +37,7 @@ import java.util.Optional;
 public class PlayerController implements SceneHost, UpdateBarController.Host, SceneBarController.Host,
         AmbianceToolbarController.Host, LiveAuraController.Host, MoodPanelController.Host,
         LibraryPanelController.Host, PlaylistPanelController.Host, YouTubeBarController.Host,
-        NowPlayingBarController.Host, CacheSettingsController.Host {
+        NowPlayingBarController.Host, AudioSettingsController.Host {
 
     private static final String CAFECITO_URL = "https://cafecito.app/duhonha";
     private HostServices hostServices;
@@ -52,7 +52,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
     @FXML private UpdateBarController updateBarController;
     @FXML private SceneBarController sceneBarController;
     @FXML private AmbianceToolbarController ambianceToolbarController;
-    @FXML private CacheSettingsController cacheSettingsController;
+    @FXML private AudioSettingsController audioSettingsController;
 
     @FXML private MoodPanelController moodPanelController;
     @FXML private LiveAuraController liveAuraController;
@@ -110,7 +110,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
         updateBarController.attach(this);
         sceneBarController.attach(this);
         ambianceToolbarController.attach(this);
-        cacheSettingsController.attach(this);
+        audioSettingsController.attach(this);
         liveAuraController.attach(this);
         moodPanelController.attach(this);
         libraryPanelController.attach(this);
@@ -485,7 +485,8 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
         sessionConfig.adoptScenesFrom(cfg);
         sessionConfig.adoptAmbianceIntroductionFrom(cfg);
         sessionConfig.adoptAudioCacheLimitFrom(cfg);
-        cacheSettingsController.applySavedLimit();
+        sessionConfig.adoptStreamingEngineFrom(cfg);
+        audioSettingsController.applySaved();
 
         String lastImgDir = cfg.getLastImageFolderPath();
         if (lastImgDir != null) {

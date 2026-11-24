@@ -2,9 +2,9 @@
 <?import javafx.scene.control.*?>
 
 <Button xmlns:fx="http://javafx.com/fxml/1"
-        fx:controller="com.marianocarrizo.dynamusic.controller.CacheSettingsController"
+        fx:controller="com.marianocarrizo.dynamusic.controller.AudioSettingsController"
         text="⚙" onAction="#onOpen" styleClass="btn-window-control">
     <tooltip>
-        <Tooltip text="Audio cache settings"/>
+        <Tooltip text="Audio settings"/>
     </tooltip>
 </Button>
