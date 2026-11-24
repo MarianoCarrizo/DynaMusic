@@ -56,7 +56,12 @@ jobs:
               exit 1
             fi
           fi
+          INSTALLER_NAME="DynaMusic-Setup-${VERSION}"
+          if [[ "$GITHUB_REF" != refs/tags/v* ]]; then
+            INSTALLER_NAME="${INSTALLER_NAME}-ci.${GITHUB_RUN_NUMBER}"
+          fi
           echo "APP_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "INSTALLER_NAME=$INSTALLER_NAME" >> "$GITHUB_ENV"
           echo "Version: $VERSION"
 
       - name: Run tests
@@ -180,17 +185,20 @@ jobs:
         shell: bash
         working-directory: target/installer
         run: |
-          sha256sum "DynaMusic-Setup-${APP_VERSION}.exe" > "DynaMusic-Setup-${APP_VERSION}.exe.sha256"
-          cat "DynaMusic-Setup-${APP_VERSION}.exe.sha256"
+          if [ "$INSTALLER_NAME" != "DynaMusic-Setup-${APP_VERSION}" ]; then
+            mv "DynaMusic-Setup-${APP_VERSION}.exe" "${INSTALLER_NAME}.exe"
+          fi
+          sha256sum "${INSTALLER_NAME}.exe" > "${INSTALLER_NAME}.exe.sha256"
+          cat "${INSTALLER_NAME}.exe.sha256"
           ls -l
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: DynaMusic-Setup-${{ env.APP_VERSION }}
+          name: ${{ env.INSTALLER_NAME }}
           path: |
-            target/installer/DynaMusic-Setup-${{ env.APP_VERSION }}.exe
-            target/installer/DynaMusic-Setup-${{ env.APP_VERSION }}.exe.sha256
+            target/installer/${{ env.INSTALLER_NAME }}.exe
+            target/installer/${{ env.INSTALLER_NAME }}.exe.sha256
           if-no-files-found: error
           retention-days: 14
 
