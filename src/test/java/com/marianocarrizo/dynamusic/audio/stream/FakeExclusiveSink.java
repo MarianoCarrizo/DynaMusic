@@ -15,6 +15,7 @@ public final class FakeExclusiveSink implements PcmSink {
     private RuntimeException suspendFailure;
     private RuntimeException stopFailure;
     private long paceMillis;
+    private Runnable startHook;
 
     public FakeExclusiveSink(AudioFormat format) {
         this.format = format;
@@ -34,6 +35,10 @@ public final class FakeExclusiveSink implements PcmSink {
 
     public void failStopWith(RuntimeException failure) {
         stopFailure = failure;
+    }
+
+    public void onStart(Runnable hook) {
+        startHook = hook;
     }
 
     public void paceWritesBy(long millis) {
@@ -73,6 +78,7 @@ public final class FakeExclusiveSink implements PcmSink {
     @Override
     public void start() {
         if (startFailure != null) throw startFailure;
+        if (startHook != null) startHook.run();
         starts++;
     }
 

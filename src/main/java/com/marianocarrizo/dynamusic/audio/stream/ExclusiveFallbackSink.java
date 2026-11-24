@@ -110,7 +110,9 @@ public final class ExclusiveFallbackSink implements PcmSink {
             exclusive.start();
         } catch (OutputUnavailableException unavailable) {
             fallBack();
+            return;
         }
+        if (arbiter.sharedInUse()) fallBack();
     }
 
     private void guarded(Consumer<PcmSink> action) {

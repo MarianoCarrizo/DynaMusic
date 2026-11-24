@@ -175,6 +175,17 @@ class StreamingPlaybackTest {
     }
 
     @Test
+    void theNaturalEndReleasesTheDeviceWithoutWaitingForAnotherWrite() throws Exception {
+        open(patternPcm(TOTAL_FRAMES / 2));
+
+        playback.play();
+        await(() -> ends.get() == 1);
+
+        await(() -> sink.suspends() == 1);
+        assertEquals(0, errors.get());
+    }
+
+    @Test
     void seekFlushesTheSinkRebasesTimeAndResumesAtTheTarget() throws Exception {
         byte[] pcm = patternPcm(TOTAL_FRAMES);
         open(pcm);
@@ -413,7 +424,8 @@ class StreamingPlaybackTest {
         playback.seek(Duration.seconds(1));
 
         await(() -> sink.starts() == 2);
-        assertEquals(0, sink.suspends());
+        settle();
+        assertEquals(ends.get(), sink.suspends());
     }
 
     @Test

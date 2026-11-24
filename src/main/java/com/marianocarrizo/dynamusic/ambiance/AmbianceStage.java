@@ -1036,8 +1036,7 @@ public class AmbianceStage {
     }
 
     private static void playVideo(MediaPlayer player) {
-        OutputArbiter.process().sharedStarting(player, OutputArbiter.HANDOFF_MILLIS);
-        player.play();
+        OutputArbiter.process().startShared(player, OutputArbiter.HANDOFF_MILLIS, Platform::runLater, player::play);
     }
 
     private static void pauseVideo(MediaPlayer player) {

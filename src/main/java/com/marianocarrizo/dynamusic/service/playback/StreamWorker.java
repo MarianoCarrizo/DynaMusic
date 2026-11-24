@@ -164,6 +164,7 @@ final class StreamWorker implements Runnable {
 
     private void finishStream() {
         output.drain();
+        output.release();
         ended = true;
         postPosition();
         listener.ended(generation);

@@ -159,6 +159,17 @@ class ExclusiveFallbackSinkTest {
     }
 
     @Test
+    void sharedPlaybackThatArrivesDuringTheExclusiveStartReleasesTheDeviceAtOnce() {
+        exclusive.onStart(() -> arbiter.sharedStarting(new Object(), 1));
+
+        sink.start();
+
+        assertFalse(arbiter.holdsExclusive());
+        assertEquals(1, lines.last().starts());
+        assertEquals("24/96 shared", sink.status().label());
+    }
+
+    @Test
     void aFailureMidWriteSendsOnlyTheUnconsumedRemainderToShared() {
         sink.start();
         exclusive.failWritesWith(new OutputUnavailableException("device invalidated").consuming(8));

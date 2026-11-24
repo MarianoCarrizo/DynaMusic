@@ -1,11 +1,15 @@
 package com.marianocarrizo.dynamusic.audio.stream;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class OutputArbiterTest {
@@ -110,6 +114,69 @@ class OutputArbiterTest {
         arbiter.releaseExclusive(ours);
 
         assertTrue(starting.get(LONG_MILLIS, TimeUnit.MILLISECONDS));
+    }
+
+    @Test
+    void startSharedRunsAtOnceWhenNobodyHoldsTheDevice() {
+        AtomicInteger starts = new AtomicInteger();
+
+        arbiter.startShared(theirs, SHORT_MILLIS, Runnable::run, starts::incrementAndGet);
+
+        assertEquals(1, starts.get());
+    }
+
+    @Test
+    void startSharedDefersUntilTheHolderReleases() {
+        AtomicInteger starts = new AtomicInteger();
+        arbiter.claimExclusive(ours, SHORT_MILLIS);
+
+        arbiter.startShared(theirs, SHORT_MILLIS, Runnable::run, starts::incrementAndGet);
+        assertEquals(0, starts.get());
+        assertTrue(arbiter.sharedInUse());
+
+        arbiter.releaseExclusive(ours);
+
+        assertEquals(1, starts.get());
+    }
+
+    @Test
+    void aDeferredStartRunsOnTheGivenExecutor() {
+        List<Runnable> queued = new ArrayList<>();
+        AtomicInteger starts = new AtomicInteger();
+        arbiter.claimExclusive(ours, SHORT_MILLIS);
+        arbiter.startShared(theirs, SHORT_MILLIS, queued::add, starts::incrementAndGet);
+
+        arbiter.releaseExclusive(ours);
+
+        assertEquals(0, starts.get());
+        queued.forEach(Runnable::run);
+        assertEquals(1, starts.get());
+    }
+
+    @Test
+    void stoppingBeforeTheReleaseCancelsTheDeferredStart() {
+        AtomicInteger starts = new AtomicInteger();
+        arbiter.claimExclusive(ours, SHORT_MILLIS);
+        arbiter.startShared(theirs, SHORT_MILLIS, Runnable::run, starts::incrementAndGet);
+
+        arbiter.sharedStopped(theirs);
+        arbiter.releaseExclusive(ours);
+
+        assertEquals(0, starts.get());
+    }
+
+    @Test
+    void aDeferredStartRunsOnlyOnce() {
+        AtomicInteger starts = new AtomicInteger();
+        arbiter.claimExclusive(ours, SHORT_MILLIS);
+        arbiter.startShared(theirs, SHORT_MILLIS, Runnable::run, starts::incrementAndGet);
+
+        arbiter.releaseExclusive(ours);
+        arbiter.sharedStopped(theirs);
+        arbiter.claimExclusive(ours, SHORT_MILLIS);
+        arbiter.releaseExclusive(ours);
+
+        assertEquals(1, starts.get());
     }
 
     @Test

@@ -4,8 +4,7 @@ import com.marianocarrizo.dynamusic.audio.stream.OutputArbiter;
 import com.marianocarrizo.dynamusic.audio.stream.OutputStatus;
 import com.marianocarrizo.dynamusic.service.AudioAnalyzer;
 import java.io.File;
-import java.util.EnumSet;
-import java.util.Set;
+import javafx.application.Platform;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.beans.property.ReadOnlyObjectWrapper;
@@ -19,22 +18,20 @@ public final class JavaFxPlayback implements Playback {
     private static final int SPECTRUM_THRESHOLD_DB = -75;
     private static final ReadOnlyObjectProperty<OutputStatus> NO_OUTPUT =
             new ReadOnlyObjectWrapper<>(OutputStatus.NONE).getReadOnlyProperty();
-    private static final Set<PlaybackStatus> SILENT = EnumSet.of(PlaybackStatus.PAUSED, PlaybackStatus.STOPPED,
-            PlaybackStatus.HALTED, PlaybackStatus.DISPOSED);
 
     private final MediaPlayer player;
     private final ReadOnlyObjectWrapper<PlaybackStatus> status;
-    private final OutputArbiter arbiter;
+    private final SharedUse sharedUse;
 
     private JavaFxPlayback(MediaPlayer player, OutputArbiter arbiter) {
         this.player = player;
-        this.arbiter = arbiter;
+        this.sharedUse = new SharedUse(arbiter, this, Platform::runLater);
         this.status = new ReadOnlyObjectWrapper<>(PlaybackStatus.from(player.getStatus()));
         player.statusProperty().addListener(
                 (obs, oldStatus, newStatus) -> {
                     PlaybackStatus mapped = PlaybackStatus.from(newStatus);
                     status.set(mapped);
-                    if (SILENT.contains(mapped)) arbiter.sharedStopped(this);
+                    sharedUse.observed(mapped);
                 });
     }
 
@@ -44,25 +41,24 @@ public final class JavaFxPlayback implements Playback {
 
     @Override
     public void play() {
-        arbiter.sharedStarting(this, OutputArbiter.HANDOFF_MILLIS);
-        player.play();
+        sharedUse.start(player::play);
     }
 
     @Override
     public void pause() {
-        arbiter.sharedStopped(this);
+        sharedUse.stop();
         player.pause();
     }
 
     @Override
     public void stop() {
-        arbiter.sharedStopped(this);
+        sharedUse.stop();
         player.stop();
     }
 
     @Override
     public void dispose() {
-        arbiter.sharedStopped(this);
+        sharedUse.stop();
         player.dispose();
     }
 
