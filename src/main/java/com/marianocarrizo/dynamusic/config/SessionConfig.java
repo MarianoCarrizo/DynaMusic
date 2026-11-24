@@ -75,6 +75,8 @@ public class SessionConfig {
 
     private Boolean streamingEngine;
 
+    private String skippedUpdateVersion;
+
     public SessionConfig() {}
 
     public static SessionConfig firstRun() {
@@ -117,6 +119,18 @@ public class SessionConfig {
 
     public void adoptStreamingEngineFrom(SessionConfig other) {
         streamingEngine = other.streamingEngine;
+    }
+
+    public String getSkippedUpdateVersion() {
+        return skippedUpdateVersion;
+    }
+
+    public void setSkippedUpdateVersion(String version) {
+        skippedUpdateVersion = version;
+    }
+
+    public void adoptSkippedUpdateVersionFrom(SessionConfig other) {
+        skippedUpdateVersion = other.skippedUpdateVersion;
     }
 
     public List<Scene> getScenes() {
