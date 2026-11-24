@@ -2,14 +2,18 @@ package com.marianocarrizo.dynamusic.controller;
 
 import com.marianocarrizo.dynamusic.service.MusicService;
 
+import java.util.function.BooleanSupplier;
+
 final class ActiveTransport {
 
     private final MusicService musicService;
     private final Runnable startPlaylist;
+    private final BooleanSupplier moodAllowed;
 
-    ActiveTransport(MusicService musicService, Runnable startPlaylist) {
+    ActiveTransport(MusicService musicService, Runnable startPlaylist, BooleanSupplier moodAllowed) {
         this.musicService = musicService;
         this.startPlaylist = startPlaylist;
+        this.moodAllowed = moodAllowed;
     }
 
     void togglePlayPause() {
@@ -25,7 +29,7 @@ final class ActiveTransport {
     void seek(double fraction) {
         switch (musicService.activeSource()) {
             case PREVIEW -> musicService.seekPreview(fraction);
-            case MOOD -> musicService.seekCurrentTrack(fraction);
+            case MOOD -> seekMood(fraction);
             case PLAYLIST -> musicService.seekPlaylist(fraction);
             case ON_DEMAND -> musicService.seekOnDemand(fraction);
             default -> { }
@@ -37,7 +41,12 @@ final class ActiveTransport {
         else musicService.previewPlay();
     }
 
+    private void seekMood(double fraction) {
+        if (moodAllowed.getAsBoolean()) musicService.seekCurrentTrack(fraction);
+    }
+
     private void toggleMood() {
+        if (!moodAllowed.getAsBoolean()) return;
         if (musicService.isPlaying()) musicService.fadeOutAndPause(null);
         else musicService.fadeInAndPlay();
     }

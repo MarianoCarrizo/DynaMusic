@@ -765,3 +765,31 @@
     -fx-font-size: 12px;
     -fx-font-style: italic;
 }
+
+.mode-switch {
+    -fx-padding: 0 0 0 12px;
+}
+.mode-switch-button {
+    -fx-background-color: #2a2a32;
+    -fx-text-fill: #b0b0b8;
+    -fx-border-color: #4f4f5c;
+    -fx-border-width: 1px;
+    -fx-background-radius: 0px;
+    -fx-border-radius: 0px;
+    -fx-font-size: 11px;
+    -fx-padding: 3px 14px;
+    -fx-cursor: hand;
+}
+.mode-switch-button:hover {
+    -fx-background-color: #3a3a43;
+    -fx-text-fill: #ffffff;
+}
+.mode-switch-button:selected {
+    -fx-background-color: -mood-accent;
+    -fx-border-color: -mood-accent;
+    -fx-text-fill: -mood-accent-text;
+    -fx-font-weight: bold;
+}
+.mode-switch-last {
+    -fx-border-width: 1px 1px 1px 0px;
+}

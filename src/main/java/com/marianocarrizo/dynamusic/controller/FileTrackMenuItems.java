@@ -25,6 +25,7 @@ final class FileTrackMenuItems {
             File file = track.get();
             if (file != null && file.isFile()) host.assignTrack(type, file);
         });
+        assign.visibleProperty().bind(host.moodActionsVisible());
         return List.of(playNow, assign, new PlaylistTargetMenu(host, track, excludedPlaylist));
     }
 }
