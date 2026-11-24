@@ -12,10 +12,10 @@
 
 /* El contenedor interno real */
 .main-container {
-    -mood-accent: #2ecc71;
+    -mood-accent: #845be9;
     -mood-accent-hover: derive(-mood-accent, 25%);
     -mood-accent-text: #0b0b0e;
-    -mood-selection: #1e4a2b;
+    -mood-selection: #2d2250;
     -mood-selection-focused: derive(-mood-selection, 18%);
     -fx-background-color: #1e1e24;
     -fx-font-family: "Segoe UI", Helvetica, Arial, sans-serif;
@@ -217,12 +217,12 @@
    BARRA SUPERIOR PERSONALIZADA Base
    ========================================================================= */
 .window-header {
-    -fx-background-color: #16161a;
+    -fx-background-color: #1b1730;
     -fx-background-radius: 0px !important; /* Calce plano con el marco superior */
 }
 
 .window-title {
-    -fx-text-fill: #808085;
+    -fx-text-fill: -mood-accent;
     -fx-font-size: 11px;
     -fx-font-weight: bold;
     -fx-padding: 0 0 0 4px;

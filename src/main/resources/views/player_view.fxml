@@ -3,6 +3,7 @@
 <?import javafx.scene.layout.*?>
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.media.MediaView?>
+<?import javafx.scene.image.Image?>
 <?import javafx.scene.image.ImageView?>
 <?import com.marianocarrizo.dynamusic.component.SeekBar?>
 
@@ -21,6 +22,11 @@
             <padding>
                 <Insets top="8" right="12" bottom="8" left="12"/>
             </padding>
+            <ImageView fitWidth="16" fitHeight="16" preserveRatio="true" smooth="true">
+                <image>
+                    <Image url="@../icon.png"/>
+                </image>
+            </ImageView>
             <Label text="DynaMusic" styleClass="window-title"/>
             <Region HBox.hgrow="ALWAYS" />
             <fx:include fx:id="audioSettings" source="audio_settings_button.fxml"/>
