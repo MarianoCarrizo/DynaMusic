@@ -70,7 +70,7 @@ public final class PlaybackRouter {
         try {
             if (choose(enabled, use, file) != EngineChoice.STREAMING) return Optional.empty();
             return opener.open(file).map(stream -> new StreamingPlan(stream, fx));
-        } catch (RuntimeException unavailable) {
+        } catch (RuntimeException | LinkageError unavailable) {
             return Optional.empty();
         }
     }

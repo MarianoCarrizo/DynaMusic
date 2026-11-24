@@ -76,7 +76,7 @@ public final class LineStreamOpener implements StreamOpener {
             if (!enabled.getAsBoolean() || arbiter.sharedInUse()) return false;
             try {
                 return wasapi.probe(format) == ExclusiveSupport.SUPPORTED;
-            } catch (RuntimeException unavailable) {
+            } catch (RuntimeException | LinkageError unavailable) {
                 return false;
             }
         };
@@ -95,7 +95,7 @@ public final class LineStreamOpener implements StreamOpener {
             PcmSource playable = playableSource(file, source, choice.get());
             source = playable;
             return Optional.of(new PcmStream(playable, sinkFor(choice.get())));
-        } catch (IOException | LineUnavailableException | RuntimeException failure) {
+        } catch (IOException | LineUnavailableException | RuntimeException | LinkageError failure) {
             closeQuietly(source);
             return Optional.empty();
         }

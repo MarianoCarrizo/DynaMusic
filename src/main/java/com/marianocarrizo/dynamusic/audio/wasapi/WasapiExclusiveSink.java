@@ -85,7 +85,7 @@ public final class WasapiExclusiveSink implements PcmSink {
             stagedFrames += chunk;
             done += chunk;
             position.accept(chunk);
-            if (stagedFrames == periodFrames) submitStaged();
+            if (stagedFrames == periodFrames) submitStaged((done - chunk) * sourceFrameBytes);
         }
         return frames * sourceFrameBytes;
     }
@@ -149,6 +149,14 @@ public final class WasapiExclusiveSink implements PcmSink {
         stream.submit(staging, periodFrames);
         position.submit(periodFrames);
         stagedFrames = 0;
+    }
+
+    private void submitStaged(int consumedBytes) {
+        try {
+            submitStaged();
+        } catch (OutputUnavailableException failure) {
+            throw failure.consuming(consumedBytes);
+        }
     }
 
     private void submitSilentPeriod() {

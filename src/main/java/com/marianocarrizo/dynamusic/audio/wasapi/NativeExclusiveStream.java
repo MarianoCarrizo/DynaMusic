@@ -63,9 +63,10 @@ final class NativeExclusiveStream implements ExclusiveStream {
             event = Win32Event.create();
             client.setEventHandle(event);
             render = client.renderClient();
+            int bufferFrames = client.bufferFrames();
             ProAudioTask task = ProAudioTask.enter(endpoint.arena());
-            return new NativeExclusiveStream(endpoint, client, render, event, task, container,
-                    client.bufferFrames(), channels);
+            return new NativeExclusiveStream(endpoint, client, render, event, task, container, bufferFrames,
+                    channels);
         } catch (RuntimeException failure) {
             if (render != null) render.release();
             client.release();

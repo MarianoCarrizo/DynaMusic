@@ -171,6 +171,37 @@ class LineStreamOpenerTest {
     }
 
     @Test
+    void aNativeBindingErrorDeclinesExclusiveInsteadOfEscaping() {
+        WasapiApi unlinked = new WasapiApi() {
+            @Override
+            public ExclusiveSupport probe(AudioFormat format) {
+                throw new ExceptionInInitializerError("avrt is missing");
+            }
+
+            @Override
+            public ExclusiveStream open(AudioFormat format, long periodHns) {
+                throw new NoClassDefFoundError("ProAudioTask");
+            }
+        };
+        Predicate<AudioFormat> offer = LineStreamOpener.exclusiveOffer(() -> true, new OutputArbiter(), unlinked);
+
+        assertFalse(offer.test(HI_RES));
+    }
+
+    @Test
+    void aLinkageErrorWhileOpeningTheSinkYieldsNoStream() {
+        source = sourceOf(HI_RES);
+        LineStreamOpener unlinked = new LineStreamOpener(file -> source, format -> new FakePcmSink(format),
+                format -> {
+                    throw new NoClassDefFoundError("Win32Library");
+                }, (file, target, frames) -> sourceOf(target),
+                new OutputNegotiator(format -> true, format -> true, () -> false));
+
+        assertTrue(unlinked.open(FILE).isEmpty());
+        assertEquals(1, source.closes());
+    }
+
+    @Test
     void anExclusivePlanOpensTheExclusiveSinkInTheSourceFormat() {
         source = sourceOf(HI_RES);
 

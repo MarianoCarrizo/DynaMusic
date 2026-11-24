@@ -16,6 +16,8 @@ final class FakeExclusiveStream implements ExclusiveStream {
     private int closes;
     private boolean periodAvailable = true;
     private RuntimeException submitFailure;
+    private int submitsBeforeFailure;
+    private int submits;
 
     FakeExclusiveStream(SampleContainer container, int periodFrames, int channels) {
         this.container = container;
@@ -47,6 +49,11 @@ final class FakeExclusiveStream implements ExclusiveStream {
         periodAvailable = false;
     }
 
+    void failSubmitsAfter(int goodSubmits, RuntimeException failure) {
+        submitsBeforeFailure = goodSubmits;
+        submitFailure = failure;
+    }
+
     void failSubmitsWith(RuntimeException failure) {
         submitFailure = failure;
     }
@@ -75,7 +82,8 @@ final class FakeExclusiveStream implements ExclusiveStream {
 
     @Override
     public void submit(byte[] containerBytes, int frames) {
-        if (submitFailure != null) throw submitFailure;
+        if (submitFailure != null && submits >= submitsBeforeFailure) throw submitFailure;
+        submits++;
         submittedBytes.write(containerBytes, 0, frames * frameBytes);
         submitted += frames;
         calls.add("submit");

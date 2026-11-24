@@ -349,6 +349,19 @@ class WasapiExclusiveSinkTest {
     }
 
     @Test
+    void aFailureMidWriteReportsTheBytesOfWholePeriodsAlreadySubmitted() {
+        FakeWasapiApi api = apiWith(SampleContainer.PADDED_32);
+        WasapiExclusiveSink sink = started(api, TWENTY_FOUR_BIT);
+        api.stream().failSubmitsAfter(1, new OutputUnavailableException("device invalidated"));
+        byte[] data = frames24(PERIOD * 2 + 2, 1);
+
+        OutputUnavailableException failure = assertThrows(OutputUnavailableException.class,
+                () -> sink.write(data, 0, data.length));
+
+        assertEquals(PERIOD * TWENTY_FOUR_BIT.getFrameSize(), failure.consumedBytes());
+    }
+
+    @Test
     void aDeviceThatStopsRequestingAudioFailsTheWrite() {
         FakeWasapiApi api = apiWith(SampleContainer.PADDED_32);
         WasapiExclusiveSink sink = started(api, TWENTY_FOUR_BIT);

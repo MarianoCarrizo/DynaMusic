@@ -159,6 +159,17 @@ class ExclusiveFallbackSinkTest {
     }
 
     @Test
+    void aFailureMidWriteSendsOnlyTheUnconsumedRemainderToShared() {
+        sink.start();
+        exclusive.failWritesWith(new OutputUnavailableException("device invalidated").consuming(8));
+
+        int accepted = sink.write(BLOCK, 0, BLOCK.length);
+
+        assertEquals(BLOCK.length, accepted);
+        assertEquals(BLOCK.length - 8, lines.last().bytes().length);
+    }
+
+    @Test
     void aFailureWhileStoppingFallsBackInsteadOfThrowing() {
         sink.start();
         exclusive.failStopWith(new OutputUnavailableException("device invalidated"));

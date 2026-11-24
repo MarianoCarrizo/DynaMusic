@@ -61,7 +61,8 @@ public final class ExclusiveFallbackSink implements PcmSink {
             return exclusive.write(data, offset, length);
         } catch (OutputUnavailableException unavailable) {
             fallBack();
-            return active.write(data, offset, length);
+            int consumed = Math.min(Math.max(unavailable.consumedBytes(), 0), length);
+            return consumed + active.write(data, offset + consumed, length - consumed);
         }
     }
 

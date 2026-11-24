@@ -21,14 +21,18 @@ public final class NativeWasapi implements WasapiApi {
             } finally {
                 client.release();
             }
-        } catch (OutputUnavailableException unavailable) {
+        } catch (OutputUnavailableException | LinkageError unavailable) {
             return ExclusiveSupport.UNAVAILABLE;
         }
     }
 
     @Override
     public ExclusiveStream open(AudioFormat format, long periodHns) {
-        return NativeExclusiveStream.open(format, periodHns);
+        try {
+            return NativeExclusiveStream.open(format, periodHns);
+        } catch (LinkageError unavailable) {
+            throw new OutputUnavailableException("The native audio layer is unavailable", unavailable);
+        }
     }
 
     private static ExclusiveSupport support(Endpoint endpoint, AudioClient client, AudioFormat format,

@@ -125,6 +125,17 @@ class PlaybackRouterTest {
     }
 
     @Test
+    void anOpenerFailingToLinkTheNativeLayerFallsBackToJavaFx() {
+        opener = file -> {
+            throw new ExceptionInInitializerError("avrt is missing");
+        };
+
+        PlaybackPlan plan = router().plan(flacFixture(), PlaybackUse.LISTEN).join();
+
+        assertInstanceOf(JavaFxPlan.class, plan);
+    }
+
+    @Test
     void togglingTheSettingAffectsOnlyPlansRequestedAfterwards() {
         PlaybackRouter router = router();
         enabled.set(false);
