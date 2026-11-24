@@ -39,6 +39,10 @@ final class FakeSharedStream implements SharedStream {
         return submitted;
     }
 
+    void consumeEverything() {
+        consumed = submitted;
+    }
+
     void stopSignalling() {
         eventsFlow = false;
     }

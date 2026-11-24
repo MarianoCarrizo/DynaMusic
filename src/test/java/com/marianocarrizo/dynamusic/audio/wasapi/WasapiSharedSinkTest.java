@@ -195,6 +195,18 @@ class WasapiSharedSinkTest {
     }
 
     @Test
+    void drainSamplesThePositionWhenTheDeviceAlreadyPlayedEverything() {
+        FakeSharedApi api = api();
+        WasapiSharedSink sink = started(api, TWENTY_FOUR_BIT);
+        write(sink, frames24(PER_EVENT, 1));
+        api.stream().consumeEverything();
+
+        sink.drain();
+
+        assertEquals(PER_EVENT, sink.framePosition());
+    }
+
+    @Test
     void drainGivesUpWhenTheDeviceStopsSignalling() {
         FakeSharedApi api = api();
         WasapiSharedSink sink = started(api, TWENTY_FOUR_BIT);

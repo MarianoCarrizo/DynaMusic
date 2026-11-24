@@ -94,6 +94,7 @@ public final class WasapiSharedSink implements PcmSink {
                 + DRAIN_SLACK_MILLIS;
         long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(millis);
         int padding = stream.padding();
+        position.sample(padding);
         while (padding > 0 && System.nanoTime() < deadline) {
             stream.awaitSpace(DRAIN_POLL_MILLIS);
             padding = stream.padding();
