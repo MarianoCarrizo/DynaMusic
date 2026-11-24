@@ -210,7 +210,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
     }
 
     public boolean moodKeysEnabled() {
-        return MoodShortcuts.enabled(modeTabPane.getSelectionModel().getSelectedItem(), moodsTab);
+        return MoodShortcuts.enabled(sessionConfig.getAppMode(), modeTabPane.getSelectionModel().getSelectedItem(), moodsTab);
     }
 
     private void restoreRepeatModes(SessionConfig saved) {
@@ -287,7 +287,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
 
     private void updateWindowMood(TrackType type) {
         if (mainRoot == null) return;
-        mainRoot.setId(WindowAccent.rootId(musicService.getPlaybackMode(), type));
+        mainRoot.setId(WindowAccent.rootId(sessionConfig.getAppMode(), musicService.getPlaybackMode(), type));
         if (sceneEditor != null) sceneEditor.refreshAccent();
     }
 
@@ -483,6 +483,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
         sessionConfig.adoptAudioCacheLimitFrom(cfg);
         sessionConfig.adoptStreamingEngineFrom(cfg);
         sessionConfig.adoptSkippedUpdateVersionFrom(cfg);
+        sessionConfig.adoptAppModeFrom(cfg);
         audioSettingsController.applySaved();
 
         String lastImgDir = cfg.getLastImageFolderPath();

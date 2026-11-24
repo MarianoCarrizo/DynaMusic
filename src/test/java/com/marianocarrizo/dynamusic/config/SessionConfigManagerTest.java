@@ -7,6 +7,7 @@ import com.marianocarrizo.dynamusic.enums.TrackType;
 import com.marianocarrizo.dynamusic.model.AuraSlot;
 import com.marianocarrizo.dynamusic.model.BackgroundConfig;
 import com.marianocarrizo.dynamusic.model.Scene;
+import com.marianocarrizo.dynamusic.model.AppMode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -151,5 +152,40 @@ class SessionConfigManagerTest {
         mgr.save(cfg);
 
         assertTrue(mgr.load().isLibraryCollapsed());
+    }
+
+    @Test
+    void missingFileStartsInListen(@TempDir Path dir) {
+        SessionConfig cfg = new SessionConfigManager(dir.resolve("session.json")).load();
+
+        assertEquals(AppMode.LISTEN, cfg.getAppMode());
+    }
+
+    @Test
+    void existingSessionWithScenesAndNoSavedModeStartsInSession(@TempDir Path dir) {
+        SessionConfigManager mgr = new SessionConfigManager(dir.resolve("session.json"));
+        SessionConfig cfg = new SessionConfig();
+        cfg.getActiveScene();
+        mgr.save(cfg);
+
+        assertEquals(AppMode.SESSION, mgr.load().getAppMode());
+    }
+
+    @Test
+    void savedModeSurvivesARoundTrip(@TempDir Path dir) {
+        SessionConfigManager mgr = new SessionConfigManager(dir.resolve("session.json"));
+        SessionConfig cfg = new SessionConfig();
+        cfg.getActiveScene();
+        cfg.setAppMode(AppMode.LISTEN);
+        mgr.save(cfg);
+
+        assertEquals(AppMode.LISTEN, mgr.load().getAppMode());
+    }
+
+    @Test
+    void malformedFileFallsBackToSession(@TempDir Path dir) throws IOException {
+        Path file = Files.writeString(dir.resolve("session.json"), "{ nope");
+
+        assertEquals(AppMode.SESSION, new SessionConfigManager(file).load().getAppMode());
     }
 }

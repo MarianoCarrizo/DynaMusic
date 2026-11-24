@@ -2,6 +2,7 @@ package com.marianocarrizo.dynamusic.config;
 
 import com.marianocarrizo.dynamusic.audio.cache.CacheLimit;
 import com.marianocarrizo.dynamusic.enums.TrackType;
+import com.marianocarrizo.dynamusic.model.AppMode;
 import com.marianocarrizo.dynamusic.model.BackgroundConfig;
 import com.marianocarrizo.dynamusic.model.NowPlayingSource;
 import com.marianocarrizo.dynamusic.model.Playlist;
@@ -78,11 +79,14 @@ public class SessionConfig {
     private Boolean exclusiveOutput;
     private String skippedUpdateVersion;
 
+    private String appMode;
+
     public SessionConfig() {}
 
     public static SessionConfig firstRun() {
         SessionConfig fresh = new SessionConfig();
         fresh.ambianceIntroduced = Boolean.FALSE;
+        fresh.appMode = AppMode.LISTEN.storedName();
         return fresh;
     }
 
@@ -129,6 +133,18 @@ public class SessionConfig {
     public void adoptStreamingEngineFrom(SessionConfig other) {
         streamingEngine = other.streamingEngine;
         exclusiveOutput = other.exclusiveOutput;
+    }
+
+    public AppMode getAppMode() {
+        return AppMode.fromStored(appMode);
+    }
+
+    public void setAppMode(AppMode mode) {
+        appMode = mode == null ? null : mode.storedName();
+    }
+
+    public void adoptAppModeFrom(SessionConfig other) {
+        appMode = other.appMode;
     }
 
     public String getSkippedUpdateVersion() {
