@@ -3,6 +3,7 @@ package com.marianocarrizo.dynamusic.audio.stream;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import javax.sound.sampled.AudioFormat;
 
 public final class FakePcmSource implements PcmSource {
@@ -13,6 +14,7 @@ public final class FakePcmSource implements PcmSource {
     private volatile int closes;
     private volatile int reads;
     private int failOnRead = -1;
+    private volatile CountDownLatch seekGate;
     private final List<Long> seeks = new CopyOnWriteArrayList<>();
 
     public FakePcmSource(AudioFormat format, byte[] data) {
@@ -22,6 +24,10 @@ public final class FakePcmSource implements PcmSource {
 
     public void failOnRead(int readNumber) {
         failOnRead = readNumber;
+    }
+
+    public void blockSeeks(CountDownLatch gate) {
+        seekGate = gate;
     }
 
     public List<Long> seeks() {
@@ -61,11 +67,22 @@ public final class FakePcmSource implements PcmSource {
     @Override
     public void seekToFrame(long frame) {
         seeks.add(frame);
+        awaitSeekGate();
         position = (int) (frame * format.getFrameSize());
     }
 
     @Override
     public void close() {
         closes++;
+    }
+
+    private void awaitSeekGate() {
+        CountDownLatch gate = seekGate;
+        if (gate == null) return;
+        try {
+            gate.await();
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

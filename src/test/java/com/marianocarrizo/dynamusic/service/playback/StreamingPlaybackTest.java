@@ -406,6 +406,49 @@ class StreamingPlaybackTest {
     }
 
     @Test
+    void seeksQueuedWhileTheWorkerIsBusyExecuteOnlyTheLatest() throws Exception {
+        open(constantPcm(TOTAL_FRAMES * 4, CONSTANT_SAMPLE));
+        CountDownLatch gate = new CountDownLatch(1);
+        sink.blockWrites(gate);
+        playback.play();
+        await(() -> sink.writeAttempts() >= 1);
+
+        for (int second = 1; second <= 3; second++) {
+            playback.seek(Duration.seconds(second * 0.5));
+        }
+        playback.seek(Duration.seconds(3));
+        gate.countDown();
+
+        await(() -> source.seeks().size() >= 1);
+        settle();
+        assertEquals(1, source.seeks().size());
+        assertEquals(3L * TOTAL_FRAMES, source.seeks().get(0));
+        assertEquals(0, errors.get());
+    }
+
+    @Test
+    void seeksArrivingDuringASeekCollapseIntoTheLastOneWithoutAnExtraStart() throws Exception {
+        open(constantPcm(TOTAL_FRAMES * 4, CONSTANT_SAMPLE));
+        playback.play();
+        await(() -> sink.starts() == 1);
+        CountDownLatch gate = new CountDownLatch(1);
+        source.blockSeeks(gate);
+
+        playback.seek(Duration.seconds(1));
+        await(() -> source.seeks().size() == 1);
+        playback.seek(Duration.seconds(2));
+        playback.seek(Duration.seconds(3));
+        gate.countDown();
+
+        await(() -> source.seeks().size() == 2);
+        await(() -> sink.starts() == 2);
+        settle();
+        assertEquals(TOTAL_FRAMES, source.seeks().get(0));
+        assertEquals(3L * TOTAL_FRAMES, source.seeks().get(1));
+        assertEquals(2, sink.starts());
+    }
+
+    @Test
     void seekingWhilePausedReleasesTheDevice() throws Exception {
         open(constantPcm(TOTAL_FRAMES * 4, CONSTANT_SAMPLE));
 

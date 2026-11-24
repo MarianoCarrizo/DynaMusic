@@ -103,7 +103,10 @@ final class StreamWorker implements Runnable {
                 play = wantPlaying;
                 if (seek != NO_SEEK) generation = seekGeneration;
             }
-            if (seek != NO_SEEK) applySeek(seek, play);
+            if (seek != NO_SEEK) {
+                applySeek(seek, play);
+                if (hasPendingSeek()) continue;
+            }
             if (play != running) switchRunning(play);
             if (play && !ended) pump();
         }
@@ -180,6 +183,12 @@ final class StreamWorker implements Runnable {
         if (current.equals(postedOutput)) return;
         postedOutput = current;
         listener.outputChanged(current);
+    }
+
+    private boolean hasPendingSeek() {
+        synchronized (lock) {
+            return seekFrame != NO_SEEK;
+        }
     }
 
     private boolean isClosing() {
