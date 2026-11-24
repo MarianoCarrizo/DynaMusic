@@ -142,6 +142,7 @@ public class MusicService {
     // Callback que el controlador suministra para avanzar al siguiente track
     private Runnable onPlaylistEnd = null;
     private Runnable onPlaylistTrackFailed = null;
+    private Runnable onOnDemandEnd = () -> { };
 
     // =========================================================================
     // Constructor
@@ -1098,6 +1099,10 @@ public class MusicService {
         this.onPlaylistTrackFailed = r;
     }
 
+    public void setOnOnDemandEnd(Runnable r) {
+        this.onOnDemandEnd = r;
+    }
+
     private void disposeOnDemandPlayer() {
         if (onDemandPlayer != null) {
             onDemandPlayer.detachSpectrum();
@@ -1160,6 +1165,7 @@ public class MusicService {
             } else {
                 player.pause();
                 player.seek(Duration.ZERO);
+                onOnDemandEnd.run();
             }
         }));
         player.setOnError(() -> {

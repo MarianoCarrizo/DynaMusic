@@ -34,6 +34,8 @@ public class PlaylistManager {
 
     private boolean currentTrackRemoved;
 
+    private boolean transientActive;
+
     private boolean shuffle;
     private RepeatMode repeat = RepeatMode.OFF;
 
@@ -82,7 +84,7 @@ public class PlaylistManager {
         if (name == null) return false;
         boolean removed = playlists.removeIf(
                 p -> p.getName() != null && p.getName().equalsIgnoreCase(name));
-        if (removed && activePlaylist != null
+        if (removed && activePlaylist != null && !transientActive
                 && activePlaylist.getName() != null
                 && activePlaylist.getName().equalsIgnoreCase(name)) {
             activePlaylist = null;
@@ -123,6 +125,7 @@ public class PlaylistManager {
         Optional<Playlist> found = findByName(name);
         if (found.isPresent() && found.get() == activePlaylist) return;
         currentTrackRemoved = false;
+        transientActive = false;
         if (found.isEmpty()) {
             activePlaylist = null;
             order = new int[0];
@@ -182,7 +185,7 @@ public class PlaylistManager {
         int at = Math.max(0, Math.min(index, oldSize));
         List<PlaylistItem> items = playlist.getItems();
         for (int i = 0; i < newPaths.size(); i++) items.add(at + i, new PlaylistItem(newPaths.get(i)));
-        if (isActivePlaylist(playlistName)) {
+        if (isActive(playlist)) {
             remapOrder(insertionMapping(oldSize, at, newPaths.size()), playlist.size());
         }
         return newPaths.size();
@@ -212,7 +215,7 @@ public class PlaylistManager {
     public void addItem(String playlistName, PlaylistItem item) {
         findByName(playlistName).ifPresent(pl -> {
             pl.addItem(item);
-            if (isActivePlaylist(playlistName)) rebuildOrder();
+            if (isActive(pl)) rebuildOrder();
         });
     }
 
@@ -223,7 +226,7 @@ public class PlaylistManager {
         int oldSize = playlist.size();
         if (index < 0 || index >= oldSize) return;
         playlist.removeAt(index);
-        if (isActivePlaylist(playlistName)) {
+        if (isActive(playlist)) {
             remapOrder(removalMapping(oldSize, index), playlist.size());
         }
     }
@@ -235,7 +238,7 @@ public class PlaylistManager {
         int size = playlist.size();
         if (from < 0 || from >= size || to < 0 || to >= size || from == to) return;
         playlist.reorder(from, to);
-        if (isActivePlaylist(playlistName)) {
+        if (isActive(playlist)) {
             remapOrder(moveMapping(size, from, to), size);
         }
     }
@@ -328,10 +331,24 @@ public class PlaylistManager {
         clampPosition();
     }
 
-    private boolean isActivePlaylist(String name) {
-        return activePlaylist != null
-                && activePlaylist.getName() != null
-                && activePlaylist.getName().equalsIgnoreCase(name);
+    private boolean isActive(Playlist playlist) {
+        return playlist == activePlaylist;
+    }
+
+    public void playTransient(String label, List<File> files, int start) {
+        Playlist context = new Playlist(label);
+        for (File file : files) context.add(file.getAbsolutePath());
+        activePlaylist = context;
+        transientActive = true;
+        currentTrackRemoved = false;
+        order = new int[context.size()];
+        for (int i = 0; i < order.length; i++) order[i] = i;
+        position = Math.max(0, Math.min(start, order.length - 1));
+        if (shuffle) buildShuffledOrder();
+    }
+
+    public boolean isTransientActive() {
+        return transientActive;
     }
 
     // =========================================================================
@@ -343,7 +360,7 @@ public class PlaylistManager {
      * (índice natural) en position=0 para que el track actual no cambie al activar shuffle.
      */
     private void buildShuffledOrder() {
-        int n = activePlaylist.size();
+        int n = activePlaylist == null ? 0 : activePlaylist.size();
         if (n == 0) {
             order = new int[0];
             position = 0;
