@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LibraryScannerTest {
@@ -35,7 +36,7 @@ class LibraryScannerTest {
     }
 
     private TreeItem<File> scan(String filter) {
-        return new LibraryScanner(filter, () -> false).scan(dir.toFile());
+        return new LibraryScanner(new LibraryFilter(filter), () -> false).scan(dir.toFile());
     }
 
     @Test
@@ -74,7 +75,7 @@ class LibraryScannerTest {
     void cancelledScanStopsWithoutDescending() throws IOException {
         Files.createFile(dir.resolve("a.mp3"));
 
-        TreeItem<File> root = new LibraryScanner("", () -> true).scan(dir.toFile());
+        TreeItem<File> root = new LibraryScanner(LibraryFilter.NONE, () -> true).scan(dir.toFile());
 
         assertTrue(root.getChildren().isEmpty());
     }
@@ -90,5 +91,72 @@ class LibraryScannerTest {
         }
 
         assertEquals(List.of("a.mp3"), leafNames(scan("")));
+    }
+
+    private static List<String> folderNames(TreeItem<File> node) {
+        List<String> names = new ArrayList<>();
+        node.getChildren().stream().filter(child -> child.getValue().isDirectory())
+                .forEach(child -> names.add(child.getValue().getName()));
+        return names;
+    }
+
+    @Test
+    void matchingFolderIsKeptWithAllItsContents() throws IOException {
+        Path album = Files.createDirectory(dir.resolve("Red Hot Chili Peppers 24bit"));
+        Files.createFile(album.resolve("one.mp3"));
+        Files.createFile(album.resolve("two.mp3"));
+        Files.createFile(Files.createDirectory(dir.resolve("Other")).resolve("three.mp3"));
+
+        TreeItem<File> root = scan("red hot");
+
+        assertEquals(List.of("Red Hot Chili Peppers 24bit"), folderNames(root));
+        assertEquals(List.of("one.mp3", "two.mp3"), leafNames(root));
+    }
+
+    @Test
+    void matchingFolderKeepsItsAncestorsAndLeavesItCollapsed() throws IOException {
+        Path outer = Files.createDirectory(dir.resolve("Rock"));
+        Path album = Files.createDirectory(outer.resolve("Red Hot"));
+        Files.createFile(album.resolve("one.mp3"));
+
+        TreeItem<File> rock = scan("red").getChildren().get(0);
+
+        assertEquals("Rock", rock.getValue().getName());
+        assertTrue(rock.isExpanded());
+        assertEquals("Red Hot", rock.getChildren().get(0).getValue().getName());
+        assertFalse(rock.getChildren().get(0).isExpanded());
+    }
+
+    @Test
+    void matchingTrackKeepsAndExpandsItsAncestors() throws IOException {
+        Path album = Files.createDirectory(dir.resolve("album"));
+        Files.createFile(album.resolve("rain.mp3"));
+        Files.createFile(album.resolve("sun.mp3"));
+
+        TreeItem<File> folder = scan("rain").getChildren().get(0);
+
+        assertTrue(folder.isExpanded());
+        assertEquals(List.of("rain.mp3"), leafNames(folder));
+    }
+
+    @Test
+    void matchingFolderWithoutAudioIsDropped() throws IOException {
+        Files.createDirectory(dir.resolve("Red Hot"));
+
+        assertTrue(scan("red").getChildren().isEmpty());
+    }
+
+    @Test
+    void folderMatchIgnoresCaseAndAccents() throws IOException {
+        Files.createFile(Files.createDirectory(dir.resolve("Café Tacvba")).resolve("a.mp3"));
+
+        assertEquals(List.of("Café Tacvba"), folderNames(scan("CAFE")));
+    }
+
+    @Test
+    void emptyFilterLeavesFoldersCollapsed() throws IOException {
+        Files.createFile(Files.createDirectory(dir.resolve("album")).resolve("a.mp3"));
+
+        assertFalse(scan("").getChildren().get(0).isExpanded());
     }
 }

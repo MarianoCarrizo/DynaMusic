@@ -2,6 +2,7 @@ package com.marianocarrizo.dynamusic.controller;
 
 import com.marianocarrizo.dynamusic.config.SessionConfig;
 import com.marianocarrizo.dynamusic.service.FfmpegLocator;
+import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -12,16 +13,23 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
+import javafx.util.Duration;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public final class LibraryPanelController {
+
+    private static final Duration SEARCH_DEBOUNCE = Duration.millis(200);
+    private static final long TYPE_AHEAD_TIMEOUT_MILLIS = 1000;
 
     private static final ExecutorService SCAN_EXECUTOR = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "library-scan");
@@ -50,13 +58,16 @@ public final class LibraryPanelController {
     private File pendingReveal;
     private final AtomicInteger scanGeneration = new AtomicInteger();
     private final BooleanProperty loading = new SimpleBooleanProperty();
+    private final PauseTransition searchDebounce = new PauseTransition(SEARCH_DEBOUNCE);
+    private final TypeAheadMatcher typeAhead = new TypeAheadMatcher(System::currentTimeMillis, TYPE_AHEAD_TIMEOUT_MILLIS);
 
     void attach(Host host) {
         this.host = host;
         emptyState.visibleProperty().bind(treeFiles.rootProperty().isNull().and(loading.not()));
         loadingLabel.visibleProperty().bind(treeFiles.rootProperty().isNull().and(loading));
         treeFiles.visibleProperty().bind(treeFiles.rootProperty().isNotNull());
-        txtSearch.textProperty().addListener((obs, oldVal, newVal) -> rebuildTree());
+        searchDebounce.setOnFinished(e -> rebuildTree());
+        txtSearch.textProperty().addListener((obs, oldVal, newVal) -> onSearchChanged(newVal));
         treeFiles.setCellFactory(tv -> new LibraryCell(host));
         FfmpegLocator.onResolved(() -> Platform.runLater(treeFiles::refresh));
         treeFiles.setOnKeyPressed(e -> {
@@ -67,11 +78,45 @@ public final class LibraryPanelController {
                 });
             }
         });
+        treeFiles.addEventHandler(KeyEvent.KEY_TYPED, this::onTypeAhead);
         treeFiles.setOnMouseClicked(e -> {
             if (e.getClickCount() == 2) {
                 selectedItem().filter(file -> !file.isDirectory()).ifPresent(host::startPreview);
             }
         });
+    }
+
+    private void onSearchChanged(String text) {
+        if (text == null || text.isBlank()) {
+            searchDebounce.stop();
+            rebuildTree();
+        } else {
+            searchDebounce.playFromStart();
+        }
+    }
+
+    private void onTypeAhead(KeyEvent e) {
+        String typed = e.getCharacter();
+        if (typed.length() != 1 || e.isShortcutDown() || e.isAltDown() || e.isMetaDown()) return;
+        char letter = typed.charAt(0);
+        boolean spaceInPrefix = letter == ' ' && typeAhead.hasPending();
+        if (Character.isISOControl(letter) || (Character.isWhitespace(letter) && !spaceInPrefix)) return;
+        List<String> names = visibleNames();
+        int match = typeAhead.next(names, treeFiles.getSelectionModel().getSelectedIndex(), letter);
+        if (match == TypeAheadMatcher.NOT_FOUND) return;
+        treeFiles.getSelectionModel().select(match);
+        treeFiles.scrollTo(match);
+        e.consume();
+    }
+
+    private List<String> visibleNames() {
+        int rows = treeFiles.getExpandedItemCount();
+        List<String> names = new ArrayList<>(rows);
+        for (int row = 0; row < rows; row++) {
+            File file = treeFiles.getTreeItem(row).getValue();
+            names.add(file == null ? "" : file.getName());
+        }
+        return names;
     }
 
     Optional<File> selectedItem() {
@@ -110,6 +155,7 @@ public final class LibraryPanelController {
         rootFolder = folder;
         host.session().setLastFolderPath(folder.getAbsolutePath());
         host.saveSession();
+        searchDebounce.stop();
         txtSearch.clear();
         treeFiles.setRoot(null);
         rebuildTree();
@@ -155,7 +201,7 @@ public final class LibraryPanelController {
         if (rootFolder == null) return;
         int generation = scanGeneration.incrementAndGet();
         LibraryScanner scanner = new LibraryScanner(
-                txtSearch.getText().toLowerCase(), () -> scanGeneration.get() != generation);
+                new LibraryFilter(txtSearch.getText()), () -> scanGeneration.get() != generation);
         File folder = rootFolder;
         loading.set(true);
         Task<TreeItem<File>> scan = new Task<>() {

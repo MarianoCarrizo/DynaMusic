@@ -6,7 +6,7 @@
       fx:controller="com.marianocarrizo.dynamusic.controller.LibraryPanelController"
       spacing="10" VBox.vgrow="ALWAYS">
     <Button text="📂 Open Folder" onAction="#onOpenFolder" maxWidth="Infinity" styleClass="btn-secondary"/>
-    <TextField fx:id="txtSearch" promptText="Search track by name..."/>
+    <TextField fx:id="txtSearch" promptText="Search folders and tracks..."/>
     <StackPane VBox.vgrow="ALWAYS">
         <TreeView fx:id="treeFiles" showRoot="false"/>
         <Label fx:id="loadingLabel" text="Loading library..." styleClass="empty-state-hint"/>
