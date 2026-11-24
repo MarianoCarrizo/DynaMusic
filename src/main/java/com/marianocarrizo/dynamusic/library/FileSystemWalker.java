@@ -18,11 +18,14 @@ public final class FileSystemWalker implements FileWalker {
     static final int MAX_DEPTH = 12;
 
     @Override
-    public void walk(Path root, Consumer<FileStat> sink, BooleanSupplier cancelled) {
+    public boolean walk(Path root, Consumer<FileStat> sink, BooleanSupplier cancelled) {
+        if (!Files.isDirectory(root)) return false;
         try {
             Files.walkFileTree(root, EnumSet.noneOf(FileVisitOption.class), MAX_DEPTH + 1, new Visitor(sink, cancelled));
+            return true;
         } catch (IOException | RuntimeException unreadable) {
             System.err.println("Could not read folder: " + unreadable.getMessage());
+            return false;
         }
     }
 

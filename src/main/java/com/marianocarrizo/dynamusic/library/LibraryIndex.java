@@ -3,6 +3,7 @@ package com.marianocarrizo.dynamusic.library;
 import com.marianocarrizo.dynamusic.tags.TrackTags;
 
 import java.nio.file.Path;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -86,6 +87,7 @@ public final class LibraryIndex {
         private final PublishGate progressGate = gates.get();
         private final Map<String, TrackEntry> current = new LinkedHashMap<>();
         private Map<String, TrackEntry> cached = Map.of();
+        private Map<String, TrackEntry> outside = Map.of();
         private int filesSeen;
         private int tagsRead;
         private int snapshotReads;
@@ -97,24 +99,28 @@ public final class LibraryIndex {
 
         void run() {
             try {
-                cached = underRoot(store.load());
+                split(store.load());
                 publish(owner, LibraryGrouping.group(cached.values()));
-                walker.walk(root, this::visit, this::superseded);
-                finish();
+                boolean walked = walker.walk(root, this::visit, this::superseded);
+                finish(walked);
             } catch (RuntimeException failed) {
                 System.err.println("Library index failed: " + failed.getMessage());
                 publish(owner, IndexProgress.IDLE);
             }
         }
 
-        private void finish() {
+        private void finish(boolean walked) {
             if (superseded()) {
-                if (tagsRead > 0) store.save(merged().values());
+                if (tagsRead > 0) store.save(withOutside(merged()));
+                return;
+            }
+            if (!walked) {
+                publish(owner, IndexProgress.FAILED);
                 return;
             }
             if (tagsRead > 0 || current.size() != cached.size()) {
                 publish(owner, LibraryGrouping.group(current.values()));
-                store.save(current.values());
+                store.save(withOutside(current));
             }
             publish(owner, new IndexProgress(filesSeen, tagsRead, true));
         }
@@ -149,12 +155,20 @@ public final class LibraryIndex {
             return all;
         }
 
-        private Map<String, TrackEntry> underRoot(Map<String, TrackEntry> all) {
+        private void split(Map<String, TrackEntry> all) {
             Map<String, TrackEntry> inside = new LinkedHashMap<>();
+            Map<String, TrackEntry> elsewhere = new LinkedHashMap<>();
             for (TrackEntry entry : all.values()) {
-                if (isUnder(entry.path())) inside.put(entry.path(), entry);
+                (isUnder(entry.path()) ? inside : elsewhere).put(entry.path(), entry);
             }
-            return inside;
+            cached = inside;
+            outside = elsewhere;
+        }
+
+        private Collection<TrackEntry> withOutside(Map<String, TrackEntry> slice) {
+            Map<String, TrackEntry> all = new LinkedHashMap<>(outside);
+            all.putAll(slice);
+            return all.values();
         }
 
         private boolean isUnder(String path) {

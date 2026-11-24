@@ -6,5 +6,5 @@ import java.util.function.Consumer;
 
 public interface FileWalker {
 
-    void walk(Path root, Consumer<FileStat> sink, BooleanSupplier cancelled);
+    boolean walk(Path root, Consumer<FileStat> sink, BooleanSupplier cancelled);
 }

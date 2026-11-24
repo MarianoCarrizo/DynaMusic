@@ -27,6 +27,7 @@ class LibraryIndexTest {
     private final List<IndexProgress> progress = new ArrayList<>();
     private Runnable onRead = () -> { };
     private boolean failReads;
+    private boolean walkSucceeds = true;
 
     private final TagSource tags = file -> {
         reads.add(file.toString());
@@ -37,9 +38,10 @@ class LibraryIndexTest {
 
     private final FileWalker walker = (root, sink, cancelled) -> {
         for (FileStat file : files) {
-            if (cancelled.getAsBoolean()) return;
+            if (cancelled.getAsBoolean()) return true;
             sink.accept(file);
         }
+        return walkSucceeds;
     };
 
     private final IndexStore store = new IndexStore() {
@@ -223,6 +225,7 @@ class LibraryIndexTest {
         holder[0] = new LibraryIndex(tags, (root, sink, cancelled) -> {
             sink.accept(files.get(0));
             holder[0].cancel();
+            return true;
         }, store, Runnable::run, Runnable::run, () -> new PublishGate(1, Long.MAX_VALUE, () -> 0));
 
         holder[0].open(ROOT);
@@ -316,5 +319,51 @@ class LibraryIndexTest {
         index.cancel();
 
         assertTrue(signals.get(0).getAsBoolean());
+    }
+
+    @Test
+    void scanningAnotherRootKeepsTheEntriesOfTheFirstOne() {
+        Path other = Path.of("/elsewhere").toAbsolutePath();
+        files.add(file("a/1.flac", 10, 1));
+        newIndex().open(ROOT);
+        files.clear();
+        files.add(new FileStat(other.resolve("b/1.flac"), 10, 1));
+        newIndex().open(other);
+        files.clear();
+        files.add(file("a/1.flac", 10, 1));
+        reads.clear();
+
+        newIndex().open(ROOT);
+
+        assertTrue(reads.isEmpty());
+        assertEquals(1, lastSnapshot().trackCount());
+        assertEquals(2, stored.size());
+    }
+
+    @Test
+    void unreachableRootKeepsTheCacheAndReportsFailure() {
+        files.add(file("a/1.flac", 10, 1));
+        newIndex().open(ROOT);
+        saves.clear();
+        snapshots.clear();
+        files.clear();
+        walkSucceeds = false;
+
+        newIndex().open(ROOT);
+
+        assertTrue(saves.isEmpty());
+        assertEquals(1, stored.size());
+        assertEquals(1, snapshots.size());
+        assertEquals(IndexProgress.FAILED, lastProgress());
+    }
+
+    @Test
+    void unreachableRootWithoutACacheStillSavesNothing() {
+        walkSucceeds = false;
+
+        newIndex().open(ROOT);
+
+        assertTrue(saves.isEmpty());
+        assertTrue(lastProgress().failed());
     }
 }

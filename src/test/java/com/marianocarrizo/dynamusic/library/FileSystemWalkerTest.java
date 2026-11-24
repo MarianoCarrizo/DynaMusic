@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FileSystemWalkerTest {
@@ -78,11 +79,12 @@ class FileSystemWalkerTest {
     }
 
     @Test
-    void missingRootIsNotAnError() {
+    void missingRootReportsFailureWithoutThrowing() {
         List<FileStat> found = new ArrayList<>();
 
-        walker.walk(root.resolve("absent"), found::add, () -> false);
+        boolean walked = walker.walk(root.resolve("absent"), found::add, () -> false);
 
+        assertFalse(walked);
         assertTrue(found.isEmpty());
     }
 }

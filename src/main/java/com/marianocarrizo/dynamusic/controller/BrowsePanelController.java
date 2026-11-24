@@ -147,6 +147,7 @@ public final class BrowsePanelController {
 
     private String statusText() {
         if (!progress.done()) return progress.filesSeen() + " files";
+        if (progress.failed()) return "Could not read this folder";
         int albums = snapshot.albums().size();
         return albums == 0 ? "" : albums + (albums == 1 ? " album" : " albums");
     }
