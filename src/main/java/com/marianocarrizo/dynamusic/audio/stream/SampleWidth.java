@@ -1,6 +1,6 @@
 package com.marianocarrizo.dynamusic.audio.stream;
 
-enum SampleWidth {
+public enum SampleWidth {
     BITS_16(16),
     BITS_24(24);
 
@@ -15,7 +15,7 @@ enum SampleWidth {
         this.bytes = bits / BITS_PER_BYTE;
     }
 
-    static boolean isSupported(int bits) {
+    public static boolean isSupported(int bits) {
         for (SampleWidth width : values()) {
             if (width.bits == bits) return true;
         }

@@ -42,8 +42,8 @@ public final class StreamingPlayback implements Playback {
         volume.addListener((observable, previous, next) -> worker.setVolume(next.doubleValue()));
         thread.setDaemon(true);
         thread.setPriority(THREAD_PRIORITY);
-        thread.start();
         fx.execute(this::deliverReady);
+        thread.start();
     }
 
     boolean awaitTermination(long millis) throws InterruptedException {
