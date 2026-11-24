@@ -486,6 +486,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
         sessionConfig.adoptAmbianceIntroductionFrom(cfg);
         sessionConfig.adoptAudioCacheLimitFrom(cfg);
         sessionConfig.adoptStreamingEngineFrom(cfg);
+        sessionConfig.adoptSkippedUpdateVersionFrom(cfg);
         audioSettingsController.applySaved();
 
         String lastImgDir = cfg.getLastImageFolderPath();

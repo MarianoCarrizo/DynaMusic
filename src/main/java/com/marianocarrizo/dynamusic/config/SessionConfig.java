@@ -76,6 +76,7 @@ public class SessionConfig {
     private Boolean streamingEngine;
 
     private Boolean exclusiveOutput;
+    private String skippedUpdateVersion;
 
     public SessionConfig() {}
 
@@ -128,6 +129,18 @@ public class SessionConfig {
     public void adoptStreamingEngineFrom(SessionConfig other) {
         streamingEngine = other.streamingEngine;
         exclusiveOutput = other.exclusiveOutput;
+    }
+
+    public String getSkippedUpdateVersion() {
+        return skippedUpdateVersion;
+    }
+
+    public void setSkippedUpdateVersion(String version) {
+        skippedUpdateVersion = version;
+    }
+
+    public void adoptSkippedUpdateVersionFrom(SessionConfig other) {
+        skippedUpdateVersion = other.skippedUpdateVersion;
     }
 
     public List<Scene> getScenes() {

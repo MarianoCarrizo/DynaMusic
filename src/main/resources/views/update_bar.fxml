@@ -15,4 +15,6 @@
     <Region HBox.hgrow="ALWAYS"/>
     <Button fx:id="btnUpdateNow" text="Install now" onAction="#onInstallUpdateNow" styleClass="btn-primary"/>
     <Button fx:id="btnUpdateOnClose" text="On close" onAction="#onInstallUpdateOnClose" styleClass="btn-secondary"/>
+    <Button fx:id="btnUpdateNotNow" text="Not now" onAction="#onUpdateNotNow" styleClass="btn-secondary"/>
+    <Button fx:id="btnUpdateSkip" text="Skip this version" onAction="#onSkipUpdateVersion" styleClass="btn-secondary"/>
 </HBox>

@@ -423,4 +423,47 @@ class SessionConfigTest {
         assertFalse(cfg.isStreamingEngineEnabled());
         assertTrue(cfg.isExclusiveOutputEnabled());
     }
+
+    @Test
+    void noUpdateIsSkippedForAFreshConfig() {
+        assertNull(new SessionConfig().getSkippedUpdateVersion());
+    }
+
+    @Test
+    void noUpdateIsSkippedWhenTheSessionPredatesIt() {
+        SessionConfig loaded = new Gson().fromJson("{\"masterVolume\":0.5}", SessionConfig.class);
+
+        assertNull(loaded.getSkippedUpdateVersion());
+    }
+
+    @Test
+    void theSkippedUpdateVersionSurvivesAJsonRoundTrip() {
+        SessionConfig cfg = new SessionConfig();
+        cfg.setSkippedUpdateVersion("2.1.0");
+
+        SessionConfig loaded = new Gson().fromJson(new Gson().toJson(cfg), SessionConfig.class);
+
+        assertEquals("2.1.0", loaded.getSkippedUpdateVersion());
+    }
+
+    @Test
+    void settingNullClearsTheSkippedUpdateVersion() {
+        SessionConfig cfg = new SessionConfig();
+        cfg.setSkippedUpdateVersion("2.1.0");
+
+        cfg.setSkippedUpdateVersion(null);
+
+        assertNull(cfg.getSkippedUpdateVersion());
+    }
+
+    @Test
+    void adoptingCopiesTheLoadedSkippedUpdateVersionIntoTheLiveConfig() {
+        SessionConfig loaded = new SessionConfig();
+        loaded.setSkippedUpdateVersion("2.1.0");
+        SessionConfig live = new SessionConfig();
+
+        live.adoptSkippedUpdateVersionFrom(loaded);
+
+        assertEquals("2.1.0", live.getSkippedUpdateVersion());
+    }
 }

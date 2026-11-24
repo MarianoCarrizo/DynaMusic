@@ -70,11 +70,11 @@ public final class UpdateManager {
         return m.matches() ? Version.parse(m.group(1)) : Optional.empty();
     }
 
-    public void checkAsync(Consumer<ReadyUpdate> onReady) {
+    public void checkAsync(Predicate<Version> offer, Consumer<ReadyUpdate> onReady) {
         if (!isEnabled() || !started.compareAndSet(false, true)) return;
         Thread t = new Thread(() -> {
             try {
-                runCheck(onReady, newClient());
+                runCheck(offer, onReady, newClient());
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             } catch (Throwable e) {
@@ -92,13 +92,13 @@ public final class UpdateManager {
                 .build();
     }
 
-    void runCheck(Consumer<ReadyUpdate> onReady, HttpClient client) throws IOException, InterruptedException {
+    void runCheck(Predicate<Version> offer, Consumer<ReadyUpdate> onReady, HttpClient client) throws IOException, InterruptedException {
         Version running = current.orElseThrow();
         Path dir = updatesDir();
         Files.createDirectories(dir);
 
         ReadyUpdate pending = cleanAndFindPending(dir, running);
-        if (pending != null) onReady.accept(pending);
+        if (pending != null && offer.test(pending.version())) onReady.accept(pending);
 
         UpdateChecker.Lookup lookup;
         try {
@@ -109,7 +109,8 @@ public final class UpdateManager {
         Optional<ReleaseInfo> found = lookup.release();
         boolean nothingToDownload = found.isEmpty()
                 || !found.get().version().isNewerThan(running)
-                || (pending != null && !found.get().version().isNewerThan(pending.version()));
+                || (pending != null && !found.get().version().isNewerThan(pending.version()))
+                || !offer.test(found.get().version());
         if (nothingToDownload) return;
 
         ReleaseInfo rel = found.get();
@@ -212,7 +213,15 @@ public final class UpdateManager {
         return false;
     }
 
-    public void installOnClose(ReadyUpdate update) {
+    public void choose(UpdateChoice choice, ReadyUpdate update) {
+        if (choice.armsInstaller()) {
+            installOnClose(update);
+        } else {
+            installOnClose = null;
+        }
+    }
+
+    private void installOnClose(ReadyUpdate update) {
         installOnClose = update;
         if (hookRegistered.compareAndSet(false, true)) {
             Runtime.getRuntime().addShutdownHook(new Thread(this::launchPendingInstaller, "update-install-on-exit"));
