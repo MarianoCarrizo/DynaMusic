@@ -366,4 +366,52 @@ class StreamingPlaybackTest {
 
         assertEquals(0.3, playback.getVolume(), 0.0);
     }
+
+    @Test
+    void pauseReleasesTheDeviceAndResumeReacquiresIt() throws Exception {
+        open(constantPcm(TOTAL_FRAMES * 4, CONSTANT_SAMPLE));
+        playback.play();
+        await(() -> sink.starts() == 1);
+
+        playback.pause();
+        await(() -> sink.suspends() == 1);
+        playback.play();
+
+        await(() -> sink.starts() == 2);
+        assertEquals(0, errors.get());
+    }
+
+    @Test
+    void stopReleasesTheDevice() throws Exception {
+        open(constantPcm(TOTAL_FRAMES * 4, CONSTANT_SAMPLE));
+        playback.play();
+        await(() -> sink.starts() == 1);
+
+        playback.stop();
+
+        await(() -> sink.suspends() == 1);
+        assertEquals(0, errors.get());
+    }
+
+    @Test
+    void seekingWhilePausedReleasesTheDevice() throws Exception {
+        open(constantPcm(TOTAL_FRAMES * 4, CONSTANT_SAMPLE));
+
+        playback.seek(Duration.seconds(1));
+
+        await(() -> sink.suspends() == 1);
+        assertEquals(0, sink.starts());
+    }
+
+    @Test
+    void seekingWhilePlayingKeepsPlayingWithoutAReleaseOfTheDevice() throws Exception {
+        open(constantPcm(TOTAL_FRAMES * 4, CONSTANT_SAMPLE));
+        playback.play();
+        await(() -> sink.starts() == 1);
+
+        playback.seek(Duration.seconds(1));
+
+        await(() -> sink.starts() == 2);
+        assertEquals(0, sink.suspends());
+    }
 }

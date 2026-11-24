@@ -4,6 +4,7 @@ import com.marianocarrizo.dynamusic.audio.AudioFormat;
 import com.marianocarrizo.dynamusic.audio.AudioPrep;
 import com.marianocarrizo.dynamusic.audio.PcmProbe;
 import com.marianocarrizo.dynamusic.audio.PreparedAudio;
+import com.marianocarrizo.dynamusic.audio.stream.OutputArbiter;
 import java.io.File;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -32,13 +33,15 @@ public final class PlaybackRouter {
         this.fx = fx;
     }
 
-    public static PlaybackRouter standard(AudioPrep prep, BooleanSupplier streamingEnabled, Executor fx) {
+    public static PlaybackRouter standard(AudioPrep prep, BooleanSupplier streamingEnabled,
+            BooleanSupplier exclusiveEnabled, Executor fx) {
         Executor background = Executors.newFixedThreadPool(OPEN_THREADS, runnable -> {
             Thread thread = new Thread(runnable, OPEN_THREAD_NAME);
             thread.setDaemon(true);
             return thread;
         });
-        return new PlaybackRouter(streamingEnabled, prep::prepare, LineStreamOpener.standard(), background, fx);
+        return new PlaybackRouter(streamingEnabled, prep::prepare,
+                LineStreamOpener.standard(exclusiveEnabled, OutputArbiter.process()), background, fx);
     }
 
     public boolean streams(File file) {

@@ -14,6 +14,7 @@ public final class FakePcmSink implements PcmSink {
     private volatile int flushes;
     private volatile int drains;
     private volatile int closes;
+    private volatile int suspends;
     private volatile int writeAttempts;
     private volatile CountDownLatch writeGate;
 
@@ -57,6 +58,10 @@ public final class FakePcmSink implements PcmSink {
         return drains;
     }
 
+    public int suspends() {
+        return suspends;
+    }
+
     public int closes() {
         return closes;
     }
@@ -97,6 +102,11 @@ public final class FakePcmSink implements PcmSink {
     @Override
     public void drain() {
         drains++;
+    }
+
+    @Override
+    public void suspend() {
+        suspends++;
     }
 
     @Override

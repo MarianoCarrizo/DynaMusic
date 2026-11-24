@@ -1,5 +1,7 @@
 package com.marianocarrizo.dynamusic.audio.wasapi;
 
+import com.marianocarrizo.dynamusic.audio.stream.OutputRoute;
+import com.marianocarrizo.dynamusic.audio.stream.OutputStatus;
 import com.marianocarrizo.dynamusic.audio.stream.OutputUnavailableException;
 import com.marianocarrizo.dynamusic.audio.stream.PcmSink;
 import java.util.Arrays;
@@ -37,6 +39,11 @@ public final class WasapiExclusiveSink implements PcmSink {
     @Override
     public AudioFormat format() {
         return format;
+    }
+
+    @Override
+    public OutputStatus status() {
+        return OutputStatus.of(OutputRoute.EXCLUSIVE, format);
     }
 
     @Override
@@ -109,6 +116,7 @@ public final class WasapiExclusiveSink implements PcmSink {
         return position.position();
     }
 
+    @Override
     public void suspend() {
         flush();
         releaseStream();

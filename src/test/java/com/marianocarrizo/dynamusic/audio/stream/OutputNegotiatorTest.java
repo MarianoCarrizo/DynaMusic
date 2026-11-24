@@ -134,4 +134,58 @@ class OutputNegotiatorTest {
             }
         }
     }
+
+    private static OutputNegotiator withExclusive(Predicate<AudioFormat> exclusive, Predicate<AudioFormat> line) {
+        return new OutputNegotiator(exclusive, line, FFMPEG);
+    }
+
+    @Test
+    void exclusiveIsOfferedBeforeTheExactFormat() {
+        AudioFormat source = source(24, 96_000, 2);
+
+        OutputChoice choice = withExclusive(format -> true, device(24, 192_000)).negotiate(source);
+
+        assertEquals(OutputPlan.EXCLUSIVE, choice.plan());
+        assertEquals(source, choice.sinkFormat());
+    }
+
+    @Test
+    void aRejectedExclusiveFormatFallsToExact() {
+        OutputChoice choice = withExclusive(format -> false, device(24, 192_000)).negotiate(source(24, 96_000, 2));
+
+        assertEquals(OutputPlan.EXACT, choice.plan());
+    }
+
+    @Test
+    void sixteenBitSourcesCanGoExclusive() {
+        OutputChoice choice = withExclusive(format -> true, device(24, 48_000)).negotiate(source(16, 44_100, 2));
+
+        assertEquals(OutputPlan.EXCLUSIVE, choice.plan());
+        assertFormat(choice.sinkFormat(), 16, 44_100, 2);
+    }
+
+    @Test
+    void anExclusiveRejectionDegradesThroughTheWholeLadderWithoutThrowing() {
+        OutputChoice choice = withExclusive(format -> false, device(16, 48_000)).negotiate(source(24, 96_000, 2));
+
+        assertEquals(OutputPlan.RESAMPLED, choice.plan());
+    }
+
+    @Test
+    void unsupportedDepthsAndSurroundSourcesAreNeverProbedForExclusive() {
+        OutputNegotiator negotiator = withExclusive(format -> {
+            throw new AssertionError("probed " + format);
+        }, device(32, 96_000));
+
+        assertEquals(OutputPlan.EXACT, negotiator.negotiate(source(8, 44_100, 2)).plan());
+        assertEquals(OutputPlan.EXACT, negotiator.negotiate(source(32, 44_100, 2)).plan());
+        assertTrue(negotiator.negotiate(source(24, 96_000, 6)).plan() != OutputPlan.EXCLUSIVE);
+    }
+
+    @Test
+    void theTwoArgumentConstructorNeverOffersExclusive() {
+        OutputChoice choice = new OutputNegotiator(device(24, 96_000), FFMPEG).negotiate(source(24, 96_000, 2));
+
+        assertEquals(OutputPlan.EXACT, choice.plan());
+    }
 }

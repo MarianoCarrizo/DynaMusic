@@ -100,7 +100,7 @@ final class StreamWorker implements Runnable {
                 play = wantPlaying;
                 if (seek != NO_SEEK) generation = seekGeneration;
             }
-            if (seek != NO_SEEK) applySeek(seek);
+            if (seek != NO_SEEK) applySeek(seek, play);
             if (play != running) switchRunning(play);
             if (play && !ended) pump();
         }
@@ -118,8 +118,9 @@ final class StreamWorker implements Runnable {
         return !closing;
     }
 
-    private void applySeek(long frame) throws IOException {
+    private void applySeek(long frame, boolean play) throws IOException {
         output.seek(frame);
+        if (!play) output.release();
         source.seekToFrame(frame);
         resumeFrame = NO_SEEK;
         running = false;

@@ -99,6 +99,7 @@ public class MusicService {
     private final AudioServices audio;
     private final PlaybackRouter engines;
     private volatile boolean streamingEnabled;
+    private volatile boolean exclusiveEnabled;
     private final PendingLoads pending = new PendingLoads(System::currentTimeMillis);
     private final PauseTransition expiryRefresh = new PauseTransition(
             Duration.millis(PendingLoads.LOADING_TIMEOUT_MILLIS + PendingLoads.EXPIRY_REFRESH_MARGIN_MILLIS));
@@ -147,7 +148,8 @@ public class MusicService {
 
     public MusicService(AudioServices audio) {
         this.audio = audio;
-        this.engines = PlaybackRouter.standard(audio.prep(), () -> streamingEnabled, Platform::runLater);
+        this.engines = PlaybackRouter.standard(audio.prep(), () -> streamingEnabled, () -> exclusiveEnabled,
+                Platform::runLater);
         this.players = new HashMap<>();
         this.trackFiles = new EnumMap<>(TrackType.class);
         this.trackGains = new EnumMap<>(TrackType.class);
@@ -274,6 +276,10 @@ public class MusicService {
 
     public void setStreamingEngineEnabled(boolean enabled) {
         streamingEnabled = enabled;
+    }
+
+    public void setExclusiveOutputEnabled(boolean enabled) {
+        exclusiveEnabled = enabled;
     }
 
     private void hold(Playback player, PlaybackPlan plan) {

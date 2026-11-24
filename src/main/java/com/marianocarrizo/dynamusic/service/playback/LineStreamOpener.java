@@ -1,16 +1,25 @@
 package com.marianocarrizo.dynamusic.service.playback;
 
+import com.marianocarrizo.dynamusic.audio.stream.ExclusiveFallbackSink;
 import com.marianocarrizo.dynamusic.audio.stream.LinePcmSink;
+import com.marianocarrizo.dynamusic.audio.stream.OutputArbiter;
 import com.marianocarrizo.dynamusic.audio.stream.OutputChoice;
 import com.marianocarrizo.dynamusic.audio.stream.OutputNegotiator;
 import com.marianocarrizo.dynamusic.audio.stream.OutputPlan;
 import com.marianocarrizo.dynamusic.audio.stream.PcmSink;
 import com.marianocarrizo.dynamusic.audio.stream.PcmSource;
 import com.marianocarrizo.dynamusic.audio.stream.PcmStream;
+import com.marianocarrizo.dynamusic.audio.stream.SharedLines;
+import com.marianocarrizo.dynamusic.audio.wasapi.ExclusiveSupport;
+import com.marianocarrizo.dynamusic.audio.wasapi.NativeWasapi;
+import com.marianocarrizo.dynamusic.audio.wasapi.WasapiApi;
+import com.marianocarrizo.dynamusic.audio.wasapi.WasapiExclusiveSink;
 import com.marianocarrizo.dynamusic.service.FfmpegLocator;
 import java.io.File;
 import java.io.IOException;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
+import java.util.function.Predicate;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.LineUnavailableException;
 
@@ -35,20 +44,42 @@ public final class LineStreamOpener implements StreamOpener {
 
     private final SourceFactory sources;
     private final SinkFactory sinks;
+    private final SinkFactory exclusiveSinks;
     private final ResampleFactory resamplers;
     private final OutputNegotiator negotiator;
 
     LineStreamOpener(SourceFactory sources, SinkFactory sinks, ResampleFactory resamplers,
             OutputNegotiator negotiator) {
+        this(sources, sinks, sinks, resamplers, negotiator);
+    }
+
+    LineStreamOpener(SourceFactory sources, SinkFactory sinks, SinkFactory exclusiveSinks,
+            ResampleFactory resamplers, OutputNegotiator negotiator) {
         this.sources = sources;
         this.sinks = sinks;
+        this.exclusiveSinks = exclusiveSinks;
         this.resamplers = resamplers;
         this.negotiator = negotiator;
     }
 
-    public static LineStreamOpener standard() {
-        return new LineStreamOpener(StreamSources::open, LinePcmSink::open, StreamSources::resample,
-                new OutputNegotiator(LinePcmSink::supports, FfmpegLocator::awaitAvailability));
+    public static LineStreamOpener standard(BooleanSupplier exclusiveEnabled, OutputArbiter arbiter) {
+        WasapiApi wasapi = new NativeWasapi();
+        SinkFactory exclusive = format -> new ExclusiveFallbackSink(new WasapiExclusiveSink(wasapi, format),
+                SharedLines.system(), arbiter);
+        return new LineStreamOpener(StreamSources::open, LinePcmSink::open, exclusive, StreamSources::resample,
+                new OutputNegotiator(exclusiveOffer(exclusiveEnabled, arbiter, wasapi), LinePcmSink::supports,
+                        FfmpegLocator::awaitAvailability));
+    }
+
+    static Predicate<AudioFormat> exclusiveOffer(BooleanSupplier enabled, OutputArbiter arbiter, WasapiApi wasapi) {
+        return format -> {
+            if (!enabled.getAsBoolean() || arbiter.sharedInUse()) return false;
+            try {
+                return wasapi.probe(format) == ExclusiveSupport.SUPPORTED;
+            } catch (RuntimeException unavailable) {
+                return false;
+            }
+        };
     }
 
     @Override
@@ -63,11 +94,16 @@ public final class LineStreamOpener implements StreamOpener {
             }
             PcmSource playable = playableSource(file, source, choice.get());
             source = playable;
-            return Optional.of(new PcmStream(playable, sinks.open(choice.get().sinkFormat())));
+            return Optional.of(new PcmStream(playable, sinkFor(choice.get())));
         } catch (IOException | LineUnavailableException | RuntimeException failure) {
             closeQuietly(source);
             return Optional.empty();
         }
+    }
+
+    private PcmSink sinkFor(OutputChoice choice) throws LineUnavailableException {
+        SinkFactory factory = choice.plan() == OutputPlan.EXCLUSIVE ? exclusiveSinks : sinks;
+        return factory.open(choice.sinkFormat());
     }
 
     private Optional<OutputChoice> choiceFor(AudioFormat sourceFormat) {
