@@ -1,6 +1,7 @@
 package com.marianocarrizo.dynamusic.audio.stream;
 
 import java.util.function.Consumer;
+import java.util.function.Function;
 import javax.sound.sampled.AudioFormat;
 
 public final class ExclusiveFallbackSink implements PcmSink {
@@ -8,20 +9,22 @@ public final class ExclusiveFallbackSink implements PcmSink {
     public static final long DEFAULT_CLAIM_MILLIS = 1000;
 
     private final PcmSink exclusive;
-    private final SharedLines lines;
+    private final Function<AudioFormat, PcmSink> sharedFactory;
     private final OutputArbiter arbiter;
     private final long claimMillis;
     private PcmSink active;
     private long positionBase;
     private boolean started;
 
-    public ExclusiveFallbackSink(PcmSink exclusive, SharedLines lines, OutputArbiter arbiter) {
-        this(exclusive, lines, arbiter, DEFAULT_CLAIM_MILLIS);
+    public ExclusiveFallbackSink(PcmSink exclusive, Function<AudioFormat, PcmSink> sharedFactory,
+            OutputArbiter arbiter) {
+        this(exclusive, sharedFactory, arbiter, DEFAULT_CLAIM_MILLIS);
     }
 
-    public ExclusiveFallbackSink(PcmSink exclusive, SharedLines lines, OutputArbiter arbiter, long claimMillis) {
+    public ExclusiveFallbackSink(PcmSink exclusive, Function<AudioFormat, PcmSink> sharedFactory,
+            OutputArbiter arbiter, long claimMillis) {
         this.exclusive = exclusive;
-        this.lines = lines;
+        this.sharedFactory = sharedFactory;
         this.arbiter = arbiter;
         this.claimMillis = claimMillis;
         this.active = exclusive;
@@ -77,7 +80,10 @@ public final class ExclusiveFallbackSink implements PcmSink {
     @Override
     public void suspend() {
         started = false;
-        if (active != exclusive) return;
+        if (active != exclusive) {
+            active.suspend();
+            return;
+        }
         try {
             exclusive.suspend();
             arbiter.releaseExclusive(this);
@@ -139,6 +145,6 @@ public final class ExclusiveFallbackSink implements PcmSink {
     }
 
     private PcmSink openShared() {
-        return JavaSoundOpening.open(lines, exclusive.format());
+        return sharedFactory.apply(exclusive.format());
     }
 }

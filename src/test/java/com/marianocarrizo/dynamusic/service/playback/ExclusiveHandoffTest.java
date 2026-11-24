@@ -8,6 +8,7 @@ import com.marianocarrizo.dynamusic.audio.stream.ExclusiveFallbackSink;
 import com.marianocarrizo.dynamusic.audio.stream.FakeExclusiveSink;
 import com.marianocarrizo.dynamusic.audio.stream.FakePcmSource;
 import com.marianocarrizo.dynamusic.audio.stream.FakeSharedLines;
+import com.marianocarrizo.dynamusic.audio.stream.JavaSoundOpening;
 import com.marianocarrizo.dynamusic.audio.stream.OutputArbiter;
 import com.marianocarrizo.dynamusic.audio.stream.PcmFormats;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -38,7 +39,8 @@ class ExclusiveHandoffTest {
 
     private void openPlayback() {
         exclusive.paceWritesBy(PACE_MILLIS);
-        ExclusiveFallbackSink sink = new ExclusiveFallbackSink(exclusive, lines, arbiter, CLAIM_MILLIS);
+        ExclusiveFallbackSink sink = new ExclusiveFallbackSink(exclusive, shared -> JavaSoundOpening.open(lines, shared), arbiter,
+                CLAIM_MILLIS);
         playback = new StreamingPlayback(new FakePcmSource(FORMAT, new byte[TOTAL_FRAMES * FRAME_BYTES]), sink,
                 Runnable::run);
         playback.setOnError(errors::incrementAndGet);

@@ -75,7 +75,8 @@ public final class LineStreamOpener implements StreamOpener {
     public static LineStreamOpener standard(BooleanSupplier exclusiveEnabled, OutputArbiter arbiter) {
         NativeWasapi wasapi = new NativeWasapi();
         SinkFactory exclusive = format -> new ExclusiveFallbackSink(new WasapiExclusiveSink(wasapi, format),
-                SharedLines.system(), arbiter);
+                shared -> new JavaSoundFallbackSink(new WasapiSharedSink(wasapi, shared), SharedLines.system()),
+                arbiter);
         SinkFactory wasapiShared = format -> new JavaSoundFallbackSink(new WasapiSharedSink(wasapi, format),
                 SharedLines.system());
         return new LineStreamOpener(StreamSources::open, LinePcmSink::open, exclusive, wasapiShared,

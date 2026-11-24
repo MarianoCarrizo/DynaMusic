@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
+import java.util.List;
 import javax.sound.sampled.AudioFormat;
 import org.junit.jupiter.api.Test;
 
@@ -17,12 +19,23 @@ class ExclusiveFallbackSinkTest {
 
     private final OutputArbiter arbiter = new OutputArbiter();
     private final FakeSharedLines lines = new FakeSharedLines();
+    private final List<FakeExclusiveSink> sharedSinks = new ArrayList<>();
     private FakeExclusiveSink exclusive = new FakeExclusiveSink(HI_RES);
-    private ExclusiveFallbackSink sink = new ExclusiveFallbackSink(exclusive, lines, arbiter, SHORT_MILLIS);
+    private ExclusiveFallbackSink sink = new ExclusiveFallbackSink(exclusive, format -> JavaSoundOpening.open(lines,
+            format), arbiter, SHORT_MILLIS);
 
     private void useFormat(AudioFormat format) {
         exclusive = new FakeExclusiveSink(format);
-        sink = new ExclusiveFallbackSink(exclusive, lines, arbiter, SHORT_MILLIS);
+        sink = new ExclusiveFallbackSink(exclusive, shared -> JavaSoundOpening.open(lines, shared), arbiter,
+                SHORT_MILLIS);
+    }
+
+    private void useSharedFactory() {
+        sink = new ExclusiveFallbackSink(exclusive, format -> {
+            FakeExclusiveSink opened = new FakeExclusiveSink(format);
+            sharedSinks.add(opened);
+            return opened;
+        }, arbiter, SHORT_MILLIS);
     }
 
     @Test
@@ -127,6 +140,35 @@ class ExclusiveFallbackSinkTest {
         lines.last().playFrames(30);
 
         assertEquals(530, sink.framePosition());
+    }
+
+    @Test
+    void aMoodHandoffContinuesOnTheSinkTheFactoryProvides() {
+        useSharedFactory();
+        sink.start();
+        exclusive.playFrames(200);
+        arbiter.sharedStarting(new Object(), SHORT_MILLIS);
+
+        sink.write(BLOCK, 0, BLOCK.length);
+        sharedSinks.get(0).playFrames(15);
+
+        assertEquals(1, sharedSinks.size());
+        assertEquals(HI_RES, sharedSinks.get(0).format());
+        assertEquals(1, sharedSinks.get(0).starts());
+        assertEquals(1, sharedSinks.get(0).writes());
+        assertEquals(215, sink.framePosition());
+        assertTrue(lines.opened().isEmpty());
+    }
+
+    @Test
+    void suspendIsForwardedToTheSharedSinkAfterTheFallback() {
+        useSharedFactory();
+        exclusive.failStartWith(new OutputUnavailableException("device in use"));
+        sink.start();
+
+        sink.suspend();
+
+        assertEquals(1, sharedSinks.get(0).suspends());
     }
 
     @Test
