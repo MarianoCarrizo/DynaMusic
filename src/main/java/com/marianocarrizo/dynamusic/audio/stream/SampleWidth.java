@@ -15,6 +15,13 @@ enum SampleWidth {
         this.bytes = bits / BITS_PER_BYTE;
     }
 
+    static boolean isSupported(int bits) {
+        for (SampleWidth width : values()) {
+            if (width.bits == bits) return true;
+        }
+        return false;
+    }
+
     static SampleWidth ofBits(int bits) {
         for (SampleWidth width : values()) {
             if (width.bits == bits) return width;
