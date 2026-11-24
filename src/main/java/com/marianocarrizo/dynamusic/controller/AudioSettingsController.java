@@ -28,6 +28,7 @@ public final class AudioSettingsController {
 
     void applySaved() {
         host.musicService().setStreamingEngineEnabled(host.session().isStreamingEngineEnabled());
+        host.musicService().setExclusiveOutputEnabled(host.session().isExclusiveOutputEnabled());
         applyLimit(host.session().getAudioCacheLimit(), () -> { });
     }
 
@@ -36,7 +37,14 @@ public final class AudioSettingsController {
         AudioCache cache = host.musicService().audio().cache();
         AudioSettingsDialog.show(host.window(), host.session().getAudioCacheLimit(), cache::usedBytes,
                 this::chooseLimit, this::clear,
-                StreamingEngineSection.create(host.session().isStreamingEngineEnabled(), this::toggleStreaming));
+                StreamingEngineSection.create(host.session().isStreamingEngineEnabled(),
+                        host.session().isExclusiveOutputEnabled(), this::toggleStreaming, this::toggleExclusive));
+    }
+
+    private void toggleExclusive(boolean enabled) {
+        host.session().setExclusiveOutputEnabled(enabled);
+        host.saveSession();
+        host.musicService().setExclusiveOutputEnabled(enabled);
     }
 
     private void toggleStreaming(boolean enabled) {
