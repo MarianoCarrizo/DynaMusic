@@ -13,11 +13,11 @@ final class LibraryScanner {
 
     static final int MAX_DEPTH = 12;
 
-    private final String filter;
+    private final LibraryFilter filter;
     private final BooleanSupplier cancelled;
     private final VisitedFolders visited = new VisitedFolders();
 
-    LibraryScanner(String filter, BooleanSupplier cancelled) {
+    LibraryScanner(LibraryFilter filter, BooleanSupplier cancelled) {
         this.filter = filter;
         this.cancelled = cancelled;
     }
@@ -26,33 +26,31 @@ final class LibraryScanner {
         TreeItem<File> root = new TreeItem<>(rootFolder);
         root.setExpanded(true);
         visited.firstVisit(rootFolder);
-        populate(root, rootFolder, 0);
+        populate(root, rootFolder, 0, filter);
         return root;
     }
 
-    private void populate(TreeItem<File> parent, File folder, int depth) {
+    private void populate(TreeItem<File> parent, File folder, int depth, LibraryFilter active) {
         if (cancelled.getAsBoolean()) return;
         File[] entries = folder.listFiles();
         if (entries == null) return;
         Arrays.sort(entries, Comparator.comparing(File::isFile).thenComparing(f -> f.getName().toLowerCase()));
         for (File entry : entries) {
             if (entry.isDirectory()) {
-                addFolder(parent, entry, depth + 1);
-            } else if (matches(entry)) {
+                addFolder(parent, entry, depth + 1, active);
+            } else if (AudioFileCollector.isAudioFile(entry) && active.matches(entry.getName())) {
                 parent.getChildren().add(new TreeItem<>(entry));
             }
         }
     }
 
-    private void addFolder(TreeItem<File> parent, File folder, int depth) {
+    private void addFolder(TreeItem<File> parent, File folder, int depth, LibraryFilter active) {
         if (depth > MAX_DEPTH || Files.isSymbolicLink(folder.toPath()) || !visited.firstVisit(folder)) return;
+        boolean folderMatched = !active.isEmpty() && active.matches(folder.getName());
         TreeItem<File> item = new TreeItem<>(folder);
-        populate(item, folder, depth);
-        if (!item.getChildren().isEmpty()) parent.getChildren().add(item);
-    }
-
-    private boolean matches(File entry) {
-        return AudioFileCollector.isAudioFile(entry)
-                && (filter.isEmpty() || entry.getName().toLowerCase().contains(filter));
+        populate(item, folder, depth, folderMatched ? LibraryFilter.NONE : active);
+        if (item.getChildren().isEmpty()) return;
+        item.setExpanded(!active.isEmpty() && !folderMatched);
+        parent.getChildren().add(item);
     }
 }
