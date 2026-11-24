@@ -42,7 +42,14 @@ public final class PlaybackRouter {
     }
 
     public boolean streams(File file) {
-        return EngineChoice.couldStream(streamingEnabled.getAsBoolean(), file);
+        return choose(streamingEnabled.getAsBoolean(), PlaybackUse.LISTEN, file) == EngineChoice.STREAMING;
+    }
+
+    public CompletableFuture<Boolean> streamsAsync(File file) {
+        if (!EngineChoice.couldStream(streamingEnabled.getAsBoolean(), file)) {
+            return CompletableFuture.completedFuture(false);
+        }
+        return CompletableFuture.supplyAsync(() -> streams(file), background);
     }
 
     public CompletableFuture<PlaybackPlan> plan(File file, PlaybackUse use) {
@@ -54,13 +61,19 @@ public final class PlaybackRouter {
 
     private Optional<PlaybackPlan> streaming(File file, PlaybackUse use, boolean enabled) {
         try {
-            Optional<AudioFormat> format = AudioFormat.fromFile(file);
-            EngineChoice choice = EngineChoice.of(enabled, use, file,
-                    () -> format.flatMap(known -> PcmProbe.read(file, known)));
-            if (choice != EngineChoice.STREAMING) return Optional.empty();
+            if (choose(enabled, use, file) != EngineChoice.STREAMING) return Optional.empty();
             return opener.open(file).map(stream -> new StreamingPlan(stream, fx));
         } catch (RuntimeException unavailable) {
             return Optional.empty();
+        }
+    }
+
+    private static EngineChoice choose(boolean enabled, PlaybackUse use, File file) {
+        try {
+            Optional<AudioFormat> format = AudioFormat.fromFile(file);
+            return EngineChoice.of(enabled, use, file, () -> format.flatMap(known -> PcmProbe.read(file, known)));
+        } catch (RuntimeException unreadable) {
+            return EngineChoice.JAVAFX;
         }
     }
 

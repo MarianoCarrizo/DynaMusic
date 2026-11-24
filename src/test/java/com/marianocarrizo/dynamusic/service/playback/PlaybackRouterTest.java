@@ -135,11 +135,27 @@ class PlaybackRouterTest {
     }
 
     @Test
-    void streamsAnswersFromTheSettingAndFormatOnly() {
+    void streamsAnswersFromTheSettingAndTheProbe() {
         PlaybackRouter router = router();
 
         assertTrue(router.streams(flacFixture()));
         enabled.set(false);
         assertEquals(false, router.streams(flacFixture()));
+    }
+
+    @Test
+    void streamsIsFalseForAStreamableExtensionTheProbeRejects() throws IOException {
+        Path broken = dir.resolve("broken.flac");
+        Files.write(broken, new byte[64]);
+
+        assertEquals(false, router().streams(broken.toFile()));
+        assertEquals(false, router().streamsAsync(broken.toFile()).join());
+    }
+
+    @Test
+    void streamsAsyncAgreesWithTheProbeForAStreamableFile() {
+        assertTrue(router().streamsAsync(flacFixture()).join());
+        enabled.set(false);
+        assertEquals(false, router().streamsAsync(flacFixture()).join());
     }
 }

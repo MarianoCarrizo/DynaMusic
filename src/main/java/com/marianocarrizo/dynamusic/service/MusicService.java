@@ -106,6 +106,7 @@ public class MusicService {
     private int playlistPendingTicket = PendingLoads.NO_TICKET;
     private int consecutivePlaylistFailures;
     private CompletableFuture<PlaybackPlan> playlistPrep = CompletableFuture.completedFuture(null);
+    private int prefetchTicket;
 
     // =========================================================================
     // T-07: Campos del modo playlist
@@ -864,8 +865,13 @@ public class MusicService {
     }
 
     public void prefetch(File next) {
-        if (engines.streams(next)) audio.prefetcher().cancel();
-        else audio.prefetcher().schedule(next, playlistPrep);
+        final int ticket = ++prefetchTicket;
+        final CompletableFuture<PlaybackPlan> afterCurrent = playlistPrep;
+        engines.streamsAsync(next).whenComplete((streams, error) -> Platform.runLater(() -> {
+            if (ticket != prefetchTicket) return;
+            if (Boolean.TRUE.equals(streams)) audio.prefetcher().cancel();
+            else audio.prefetcher().schedule(next, afterCurrent);
+        }));
     }
 
     public AudioServices audio() {
