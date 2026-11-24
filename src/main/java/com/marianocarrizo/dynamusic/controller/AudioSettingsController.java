@@ -8,7 +8,7 @@ import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.stage.Window;
 
-public final class CacheSettingsController {
+public final class AudioSettingsController {
 
     interface Host {
         SessionConfig session();
@@ -26,15 +26,23 @@ public final class CacheSettingsController {
         this.host = host;
     }
 
-    void applySavedLimit() {
+    void applySaved() {
+        host.musicService().setStreamingEngineEnabled(host.session().isStreamingEngineEnabled());
         applyLimit(host.session().getAudioCacheLimit(), () -> { });
     }
 
     @FXML
     private void onOpen() {
         AudioCache cache = host.musicService().audio().cache();
-        CacheSettingsDialog.show(host.window(), host.session().getAudioCacheLimit(), cache::usedBytes,
-                this::chooseLimit, this::clear);
+        AudioSettingsDialog.show(host.window(), host.session().getAudioCacheLimit(), cache::usedBytes,
+                this::chooseLimit, this::clear,
+                StreamingEngineSection.create(host.session().isStreamingEngineEnabled(), this::toggleStreaming));
+    }
+
+    private void toggleStreaming(boolean enabled) {
+        host.session().setStreamingEngineEnabled(enabled);
+        host.saveSession();
+        host.musicService().setStreamingEngineEnabled(enabled);
     }
 
     private void chooseLimit(CacheLimit limit, Runnable afterwards) {

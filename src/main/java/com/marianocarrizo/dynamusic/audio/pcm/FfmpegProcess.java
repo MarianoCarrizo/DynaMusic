@@ -30,6 +30,17 @@ public final class FfmpegProcess {
         LIVE.clear();
     }
 
+    public static Process start(List<String> command) throws IOException {
+        Process process = new ProcessBuilder(command).start();
+        LIVE.add(process);
+        return process;
+    }
+
+    public static void release(Process process) {
+        process.destroyForcibly();
+        LIVE.remove(process);
+    }
+
     static void run(List<String> command, long timeoutSeconds, StdoutSink sink)
             throws IOException, InterruptedException {
         Process process = new ProcessBuilder(command).start();

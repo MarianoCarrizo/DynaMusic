@@ -2,16 +2,18 @@ package com.marianocarrizo.dynamusic.service;
 
 import com.marianocarrizo.dynamusic.audio.AudioFormat;
 import com.marianocarrizo.dynamusic.audio.AudioServices;
-import com.marianocarrizo.dynamusic.audio.PreparedAudio;
 import com.marianocarrizo.dynamusic.audio.TrackQualityStore;
 import com.marianocarrizo.dynamusic.audio.UnplayableAudioException;
 import com.marianocarrizo.dynamusic.config.SessionConfigManager;
 import com.marianocarrizo.dynamusic.enums.TrackType;
 import com.marianocarrizo.dynamusic.model.NowPlayingSource;
+import com.marianocarrizo.dynamusic.service.playback.Playback;
+import com.marianocarrizo.dynamusic.service.playback.PlaybackPlan;
+import com.marianocarrizo.dynamusic.service.playback.PlaybackRouter;
+import com.marianocarrizo.dynamusic.service.playback.PlaybackStatus;
+import com.marianocarrizo.dynamusic.service.playback.PlaybackUse;
 import com.marianocarrizo.dynamusic.tags.TrackTagStore;
 import javafx.application.Platform;
-import javafx.scene.media.Media;
-import javafx.scene.media.MediaPlayer;
 import javafx.util.Duration;
 
 import javafx.animation.Interpolator;
@@ -57,7 +59,7 @@ public class MusicService {
     // =========================================================================
 
     // Mapa principal de reproductores por estado de ánimo
-    private final Map<TrackType, MediaPlayer> players;
+    private final Map<TrackType, Playback> players;
 
     // Nombres de archivo por tipo, para actualizar el label "ahora sonando"
     private final Map<TrackType, File> trackFiles;
@@ -75,14 +77,14 @@ public class MusicService {
     private boolean previewLoopEnabled;
     private BiConsumer<Duration, Duration> activeProgressListener = (current, total) -> { };
     private Runnable onPlaybackChanged = () -> { };
-    private MediaPlayer fadingOutPlayer;
+    private Playback fadingOutPlayer;
     private File previewFile;
     private File playlistFile;
     private File onDemandFile;
     private String onDemandTitle;
 
     // Reproductor dedicado a preescucha — nunca entra al mapa 'players'
-    private MediaPlayer previewPlayer;
+    private Playback previewPlayer;
     private final AudioFocus audioFocus =
             new AudioFocus(() -> previewPlayer != null, this::pausePreviewPlayer, this::pauseModePlayers);
 
@@ -95,13 +97,16 @@ public class MusicService {
     private final TrackTagStore tags = new TrackTagStore(AudioFormat::tagFormatOf, Platform::runLater);
     private final TrackQualityStore quality = new TrackQualityStore(Platform::runLater);
     private final AudioServices audio;
+    private final PlaybackRouter engines;
+    private volatile boolean streamingEnabled;
     private final PendingLoads pending = new PendingLoads(System::currentTimeMillis);
     private final PauseTransition expiryRefresh = new PauseTransition(
             Duration.millis(PendingLoads.LOADING_TIMEOUT_MILLIS + PendingLoads.EXPIRY_REFRESH_MARGIN_MILLIS));
-    private final Map<MediaPlayer, File> heldFiles = new IdentityHashMap<>();
+    private final Map<Playback, File> heldFiles = new IdentityHashMap<>();
     private int playlistPendingTicket = PendingLoads.NO_TICKET;
     private int consecutivePlaylistFailures;
-    private CompletableFuture<PreparedAudio> playlistPrep = CompletableFuture.completedFuture(null);
+    private CompletableFuture<PlaybackPlan> playlistPrep = CompletableFuture.completedFuture(null);
+    private int prefetchTicket;
 
     // =========================================================================
     // T-07: Campos del modo playlist
@@ -111,7 +116,7 @@ public class MusicService {
     private PlaybackMode mode = PlaybackMode.MOOD;
 
     // Reproductor único del modo playlist — un solo MediaPlayer activo a la vez
-    private MediaPlayer playlistPlayer = null;
+    private Playback playlistPlayer = null;
 
     // Ganancia RMS de la pista actual del playlist (para restaurar después del fade)
     private double playlistGain = 1.0;
@@ -122,7 +127,7 @@ public class MusicService {
     // Ganancia RMS raw de la preescucha activa (necesaria para live-reapply del volumen maestro)
     private double previewGain = 1.0;
 
-    private MediaPlayer onDemandPlayer = null;
+    private Playback onDemandPlayer = null;
     private double onDemandGain = 1.0;
     private boolean onDemandLoop = false;
     private int onDemandSeq = 0;
@@ -142,6 +147,7 @@ public class MusicService {
 
     public MusicService(AudioServices audio) {
         this.audio = audio;
+        this.engines = PlaybackRouter.standard(audio.prep(), () -> streamingEnabled, Platform::runLater);
         this.players = new HashMap<>();
         this.trackFiles = new EnumMap<>(TrackType.class);
         this.trackGains = new EnumMap<>(TrackType.class);
@@ -266,12 +272,18 @@ public class MusicService {
         notifyPlaybackChanged();
     }
 
-    private void hold(MediaPlayer player, File playable) {
-        audio.cache().pin(playable);
-        heldFiles.put(player, playable);
+    public void setStreamingEngineEnabled(boolean enabled) {
+        streamingEnabled = enabled;
     }
 
-    private void disposePlayer(MediaPlayer player) {
+    private void hold(Playback player, PlaybackPlan plan) {
+        plan.held().ifPresent(playable -> {
+            audio.cache().pin(playable);
+            heldFiles.put(player, playable);
+        });
+    }
+
+    private void disposePlayer(Playback player) {
         File held = heldFiles.remove(player);
         if (held != null) audio.cache().unpin(held);
         player.dispose();
@@ -290,18 +302,18 @@ public class MusicService {
         return cause instanceof UnplayableAudioException ? cause.getMessage() : DEFAULT_FAILURE_MESSAGE;
     }
 
-    private void observeStatus(MediaPlayer player) {
+    private void observeStatus(Playback player) {
         player.statusProperty().addListener((obs, oldStatus, newStatus) -> {
-            if (newStatus != MediaPlayer.Status.PLAYING && player == fadingOutPlayer) fadingOutPlayer = null;
+            if (newStatus != PlaybackStatus.PLAYING && player == fadingOutPlayer) fadingOutPlayer = null;
             notifyPlaybackChanged();
         });
     }
 
-    private boolean isSounding(MediaPlayer player) {
-        return player != null && player != fadingOutPlayer && player.getStatus() == MediaPlayer.Status.PLAYING;
+    private boolean isSounding(Playback player) {
+        return player != null && player != fadingOutPlayer && player.getStatus() == PlaybackStatus.PLAYING;
     }
 
-    private MediaPlayer activePlayer() {
+    private Playback activePlayer() {
         if (audioFocus.previewSoundedLast()) return previewPlayer;
         return switch (mode) {
             case MOOD -> currentTrack == null ? null : players.get(currentTrack);
@@ -310,11 +322,11 @@ public class MusicService {
         };
     }
 
-    private void emitProgress(MediaPlayer player) {
+    private void emitProgress(Playback player) {
         if (player == activePlayer()) reportProgress(player);
     }
 
-    private void reportProgress(MediaPlayer player) {
+    private void reportProgress(Playback player) {
         if (player == null || pending.isActive()) return;
         Duration total = player.getTotalDuration();
         if (total != null && !total.isUnknown()) activeProgressListener.accept(player.getCurrentTime(), total);
@@ -328,14 +340,9 @@ public class MusicService {
      * Adjunta el listener de espectro de audio a un reproductor.
      * Es seguro llamar desde cualquier hilo.
      */
-    private void attachSpectrumListener(MediaPlayer player) {
+    private void attachSpectrumListener(Playback player) {
         audioAnalyzer.reset();
-        player.setAudioSpectrumInterval(0.025);
-        player.setAudioSpectrumNumBands(AudioAnalyzer.NUM_BANDS);
-        player.setAudioSpectrumThreshold(-75);
-        player.setAudioSpectrumListener((timestamp, duration, magnitudes, phases) -> {
-            audioAnalyzer.process(magnitudes, timestamp);
-        });
+        player.attachSpectrum(audioAnalyzer);
     }
 
     // =========================================================================
@@ -363,18 +370,18 @@ public class MusicService {
             // desconectar el listener de espectro
             cancelActiveFade();
             if (currentTrack != null && players.containsKey(currentTrack)) {
-                MediaPlayer moodPlayer = players.get(currentTrack);
-                if (moodPlayer.getStatus() == MediaPlayer.Status.PLAYING) {
+                Playback moodPlayer = players.get(currentTrack);
+                if (moodPlayer.getStatus() == PlaybackStatus.PLAYING) {
                     moodPlayer.pause();
                 }
-                moodPlayer.setAudioSpectrumListener(null);
+                moodPlayer.detachSpectrum();
             }
         } else {
             // Saliendo del modo PLAYLIST: cancelar fade, detener y liberar el reproductor
             cancelActiveFade();
             if (playlistPlayer != null) {
                 playlistPlayer.stop();
-                playlistPlayer.setAudioSpectrumListener(null); // T-16
+                playlistPlayer.detachSpectrum();
                 disposePlayer(playlistPlayer);
                 playlistPlayer = null;
             }
@@ -429,7 +436,7 @@ public class MusicService {
                 ? beginPending(NowPlayingSource.MOOD, type, file, null) : PendingLoads.NO_TICKET;
 
         requestMetadata(file);
-        audio.prep().prepare(file).whenComplete((prepared, error) -> Platform.runLater(() -> {
+        engines.plan(file, PlaybackUse.MOOD).whenComplete((plan, error) -> Platform.runLater(() -> {
             if (loadSeq.getOrDefault(type, 0) != seq) {
                 finishPending(pendingTicket);
                 return;
@@ -440,23 +447,23 @@ public class MusicService {
                 if (onFailed != null) onFailed.run();
                 return;
             }
-            openMoodPlayer(type, file, prepared, seq, pendingTicket, onLoaded, onFailed);
+            openMoodPlayer(type, file, plan, seq, pendingTicket, onLoaded, onFailed);
         }));
     }
 
-    private void openMoodPlayer(TrackType type, File file, PreparedAudio prepared, int seq, int pendingTicket,
+    private void openMoodPlayer(TrackType type, File file, PlaybackPlan plan, int seq, int pendingTicket,
                                 Runnable onLoaded, Runnable onFailed) {
-        final double gain = prepared.gain();
-        final MediaPlayer player;
+        final double gain = plan.gain();
+        final Playback player;
         try {
-            player = new MediaPlayer(new Media(prepared.playable().toURI().toString()));
+            player = plan.open();
         } catch (RuntimeException ex) {
             System.err.println("No se pudo abrir la pista " + type + ": " + ex.getMessage());
             failPending(pendingTicket, ex);
             if (onFailed != null) onFailed.run();
             return;
         }
-        hold(player, prepared.playable());
+        hold(player, plan);
 
         player.setVolume(effectiveGain(gain));
         observeStatus(player);
@@ -492,13 +499,13 @@ public class MusicService {
                 return;
             }
             boolean resumePlayback = false;
-            MediaPlayer replaced = players.put(type, player);
+            Playback replaced = players.put(type, player);
             if (replaced != null) {
                 if (type == currentTrack) {
                     cancelActiveFade();
-                    resumePlayback = replaced.getStatus() == MediaPlayer.Status.PLAYING;
+                    resumePlayback = replaced.getStatus() == PlaybackStatus.PLAYING;
                 }
-                replaced.setAudioSpectrumListener(null);
+                replaced.detachSpectrum();
                 replaced.stop();
                 disposePlayer(replaced);
             }
@@ -518,7 +525,7 @@ public class MusicService {
     public void unloadTrack(TrackType type) {
         if (type == null) return;
         loadSeq.merge(type, 1, Integer::sum);
-        MediaPlayer removed = players.remove(type);
+        Playback removed = players.remove(type);
         trackFiles.remove(type);
         trackGains.remove(type);
         if (removed == null) return;
@@ -526,7 +533,7 @@ public class MusicService {
             cancelActiveFade();
             currentTrack = null;
         }
-        removed.setAudioSpectrumListener(null);
+        removed.detachSpectrum();
         removed.stop();
         disposePlayer(removed);
         notifyPlaybackChanged();
@@ -541,9 +548,9 @@ public class MusicService {
         if (type == null || type == currentTrack || !players.containsKey(type)) return;
         cancelActiveFade();
         if (currentTrack != null && players.containsKey(currentTrack)) {
-            MediaPlayer old = players.get(currentTrack);
+            Playback old = players.get(currentTrack);
             old.pause();
-            old.setAudioSpectrumListener(null);
+            old.detachSpectrum();
         }
         currentTrack = type;
         attachSpectrumListener(players.get(type));
@@ -571,14 +578,14 @@ public class MusicService {
 
         Duration currentTime = Duration.ZERO;
         if (currentTrack != null) {
-            MediaPlayer oldPlayer = players.get(currentTrack);
+            Playback oldPlayer = players.get(currentTrack);
             currentTime = oldPlayer.getCurrentTime();
             oldPlayer.pause();
-            oldPlayer.setAudioSpectrumListener(null);
+            oldPlayer.detachSpectrum();
         }
 
         currentTrack = newTrack;
-        MediaPlayer nextPlayer = players.get(newTrack);
+        Playback nextPlayer = players.get(newTrack);
         attachSpectrumListener(nextPlayer);
         nextPlayer.seek(currentTime);
         nextPlayer.play();
@@ -608,14 +615,15 @@ public class MusicService {
 
         final int pendingTicket = beginPending(NowPlayingSource.PREVIEW, null, file, null);
         requestMetadata(file);
-        audio.prep().prepare(file).whenComplete((prepared, error) -> Platform.runLater(
-                () -> openPreviewPlayer(file, prepared, error, ticket, pendingTicket)));
+        engines.plan(file, PlaybackUse.LISTEN).whenComplete((plan, error) -> Platform.runLater(
+                () -> openPreviewPlayer(file, plan, error, ticket, pendingTicket)));
         return true;
     }
 
-    private void openPreviewPlayer(File file, PreparedAudio prepared, Throwable error, PreviewTicket ticket,
+    private void openPreviewPlayer(File file, PlaybackPlan plan, Throwable error, PreviewTicket ticket,
                                    int pendingTicket) {
         if (audioFocus.readinessOf(ticket) == PreviewReadiness.DISCARD) {
+            if (error == null) plan.discard();
             finishPending(pendingTicket);
             return;
         }
@@ -625,10 +633,9 @@ public class MusicService {
             return;
         }
         try {
-            Media media = new Media(prepared.playable().toURI().toString());
-            MediaPlayer player = new MediaPlayer(media);
-            hold(player, prepared.playable());
-            previewGain = prepared.gain();
+            Playback player = plan.open();
+            hold(player, plan);
+            previewGain = plan.gain();
             player.setVolume(effectiveGain(previewGain));
 
             player.setOnEndOfMedia(() -> Platform.runLater(() -> {
@@ -699,7 +706,7 @@ public class MusicService {
         if (mode != PlaybackMode.MOOD) return; // guard T-08
         cancelActiveFade();
         if (currentTrack == null || !players.containsKey(currentTrack)) return;
-        MediaPlayer player = players.get(currentTrack);
+        Playback player = players.get(currentTrack);
         double savedVolume = player.getVolume();
         fadingOutPlayer = player;
         activeFade = new Timeline(
@@ -727,7 +734,7 @@ public class MusicService {
         audioFocus.claimForMode();
         cancelActiveFade();
         if (currentTrack == null || !players.containsKey(currentTrack)) return;
-        MediaPlayer player = players.get(currentTrack);
+        Playback player = players.get(currentTrack);
         double targetVolume = effectiveGain(trackGains.getOrDefault(currentTrack, 1.0));
         player.setVolume(0.0);
         player.play();
@@ -801,7 +808,7 @@ public class MusicService {
     }
 
     public boolean isPreviewPlaying() {
-        return previewPlayer != null && previewPlayer.getStatus() == MediaPlayer.Status.PLAYING;
+        return previewPlayer != null && previewPlayer.getStatus() == PlaybackStatus.PLAYING;
     }
 
     public boolean isPreviewLoaded() {
@@ -846,39 +853,47 @@ public class MusicService {
         playlistPendingTicket = beginPending(NowPlayingSource.PLAYLIST, null, file, null);
 
         requestMetadata(file);
-        playlistPrep = audio.prep().prepare(file);
-        playlistPrep.whenComplete((prepared, error) -> Platform.runLater(() -> {
+        playlistPrep = engines.plan(file, PlaybackUse.LISTEN);
+        playlistPrep.whenComplete((plan, error) -> Platform.runLater(() -> {
             if (error != null) {
                 System.err.println("No se pudo cargar la pista de playlist: " + error.getMessage());
                 failPlaylistLoad(seq, error);
                 return;
             }
-            openPlaylistPlayer(file, prepared.playable(), prepared.gain(), seq);
+            openPlaylistPlayer(file, plan, seq);
         }));
     }
 
     public void prefetch(File next) {
-        audio.prefetcher().schedule(next, playlistPrep);
+        final int ticket = ++prefetchTicket;
+        final CompletableFuture<PlaybackPlan> afterCurrent = playlistPrep;
+        engines.streamsAsync(next).whenComplete((streams, error) -> Platform.runLater(() -> {
+            if (ticket != prefetchTicket) return;
+            if (Boolean.TRUE.equals(streams)) audio.prefetcher().cancel();
+            else audio.prefetcher().schedule(next, afterCurrent);
+        }));
     }
 
     public AudioServices audio() {
         return audio;
     }
 
-    private void openPlaylistPlayer(File file, File playable, double gain, int seq) {
+    private void openPlaylistPlayer(File file, PlaybackPlan plan, int seq) {
+        final double gain = plan.gain();
         if (!playlistLoads.isCurrent(seq) || mode != PlaybackMode.PLAYLIST) {
+            plan.discard();
             if (playlistLoads.isCurrent(seq)) finishPending(playlistPendingTicket);
             return;
         }
-        final MediaPlayer player;
+        final Playback player;
         try {
-            player = new MediaPlayer(new Media(playable.toURI().toString()));
+            player = plan.open();
         } catch (RuntimeException ex) {
             System.err.println("Could not open playlist track: " + ex.getMessage());
             failPlaylistLoad(seq, ex);
             return;
         }
-        hold(player, playable);
+        hold(player, plan);
         player.setVolume(effectiveGain(gain));
         observeStatus(player);
         player.currentTimeProperty().addListener((obs, oldVal, newVal) -> emitProgress(player));
@@ -891,7 +906,7 @@ public class MusicService {
         player.setOnReady(() -> commitPlaylistPlayer(player, file, gain, seq));
     }
 
-    private void commitPlaylistPlayer(MediaPlayer player, File file, double gain, int seq) {
+    private void commitPlaylistPlayer(Playback player, File file, double gain, int seq) {
         if (!playlistLoads.isCurrent(seq) || mode != PlaybackMode.PLAYLIST) {
             disposePlayer(player);
             if (playlistLoads.isCurrent(seq)) finishPending(playlistPendingTicket);
@@ -909,7 +924,7 @@ public class MusicService {
         notifyPlaybackChanged();
     }
 
-    private void handlePlaylistPlayerError(MediaPlayer player, int seq) {
+    private void handlePlaylistPlayerError(Playback player, int seq) {
         System.err.println("Playlist playback error: " + player.getError());
         if (player == playlistPlayer) {
             if (mode == PlaybackMode.PLAYLIST && onPlaylistTrackFailed != null) onPlaylistTrackFailed.run();
@@ -934,7 +949,7 @@ public class MusicService {
 
     private void releasePlaylistPlayer() {
         if (playlistPlayer == null) return;
-        playlistPlayer.setAudioSpectrumListener(null);
+        playlistPlayer.detachSpectrum();
         playlistPlayer.stop();
         disposePlayer(playlistPlayer);
         playlistPlayer = null;
@@ -949,7 +964,7 @@ public class MusicService {
         audioFocus.claimForMode();
         cancelActiveFade();
         if (playlistPlayer != null
-                && playlistPlayer.getStatus() != MediaPlayer.Status.PLAYING) {
+                && playlistPlayer.getStatus() != PlaybackStatus.PLAYING) {
             playlistPlayer.play();
         }
     }
@@ -961,11 +976,11 @@ public class MusicService {
     public void playlistPause() {
         if (mode != PlaybackMode.PLAYLIST) return;
         if (playlistPlayer == null) return;
-        if (playlistPlayer.getStatus() != MediaPlayer.Status.PLAYING) return;
+        if (playlistPlayer.getStatus() != PlaybackStatus.PLAYING) return;
 
         cancelActiveFade();
         final double savedGain = playlistGain;
-        final MediaPlayer fading = playlistPlayer;
+        final Playback fading = playlistPlayer;
         fadingOutPlayer = fading;
         activeFade = new Timeline(
             new KeyFrame(
@@ -1030,7 +1045,7 @@ public class MusicService {
 
     private void disposeOnDemandPlayer() {
         if (onDemandPlayer != null) {
-            onDemandPlayer.setAudioSpectrumListener(null);
+            onDemandPlayer.detachSpectrum();
             onDemandPlayer.stop();
             disposePlayer(onDemandPlayer);
             onDemandPlayer = null;
@@ -1047,13 +1062,14 @@ public class MusicService {
         final int pendingTicket = beginPending(NowPlayingSource.ON_DEMAND, null, file, title);
 
         requestMetadata(file);
-        audio.prep().prepare(file).whenComplete((prepared, error) -> Platform.runLater(
-                () -> openOnDemandPlayer(file, title, onStarted, prepared, error, seq, pendingTicket)));
+        engines.plan(file, PlaybackUse.LISTEN).whenComplete((plan, error) -> Platform.runLater(
+                () -> openOnDemandPlayer(file, title, onStarted, plan, error, seq, pendingTicket)));
     }
 
-    private void openOnDemandPlayer(File file, String title, Runnable onStarted, PreparedAudio prepared,
+    private void openOnDemandPlayer(File file, String title, Runnable onStarted, PlaybackPlan plan,
                                     Throwable error, int seq, int pendingTicket) {
         if (seq != onDemandSeq) {
+            if (error == null) plan.discard();
             finishPending(pendingTicket);
             return;
         }
@@ -1062,16 +1078,16 @@ public class MusicService {
             failPending(pendingTicket, error);
             return;
         }
-        final double gain = prepared.gain();
-        final MediaPlayer player;
+        final double gain = plan.gain();
+        final Playback player;
         try {
-            player = new MediaPlayer(new Media(prepared.playable().toURI().toString()));
+            player = plan.open();
         } catch (RuntimeException ex) {
             System.err.println("Could not open on-demand track: " + ex.getMessage());
             failPending(pendingTicket, ex);
             return;
         }
-        hold(player, prepared.playable());
+        hold(player, plan);
 
         observeStatus(player);
         player.currentTimeProperty().addListener((obs, o, nv) -> emitProgress(player));
@@ -1153,7 +1169,7 @@ public class MusicService {
 
     public void seekCurrentTrack(double fraction) {
         if (currentTrack != null && players.containsKey(currentTrack)) {
-            MediaPlayer player = players.get(currentTrack);
+            Playback player = players.get(currentTrack);
             Duration total = player.getTotalDuration();
             if (total != null && !total.isUnknown())
                 player.seek(total.multiply(fraction));
