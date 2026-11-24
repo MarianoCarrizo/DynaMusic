@@ -27,12 +27,12 @@ final class ThemedDialog {
         return alert.showAndWait().filter(b -> b == confirm).isPresent();
     }
 
-    static void theme(Dialog<?> dialog, Window owner) {
+    static void theme(Dialog<?> dialog, Window owner, ButtonType closeType) {
         var dialogPane = dialog.getDialogPane();
         var css = ThemedDialog.class.getResource(STYLESHEET);
         if (css != null) dialogPane.getStylesheets().add(css.toExternalForm());
         dialogPane.getStyleClass().add("main-container");
-        Button close = (Button) dialogPane.lookupButton(ButtonType.CLOSE);
+        Button close = (Button) dialogPane.lookupButton(closeType);
         if (close != null) close.getStyleClass().add("btn-primary");
         if (owner != null) dialog.initOwner(owner);
         copyIcons(owner, dialog);

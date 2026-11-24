@@ -179,6 +179,17 @@
 .check-box {
     -fx-text-fill: #e0e0e0;
 }
+.check-box:disabled {
+    -fx-opacity: 0.6;
+}
+.dialog-pane.main-container {
+    -fx-background-color: #1e1e24 !important;
+    -fx-border-color: #2d2d35 !important;
+    -fx-border-width: 1px !important;
+}
+.dialog-pane > .button-bar > .container {
+    -fx-background-color: transparent;
+}
 .check-box .box {
     -fx-background-color: #3a3a43;
     -fx-background-radius: 0;
