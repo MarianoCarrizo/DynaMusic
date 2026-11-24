@@ -317,4 +317,57 @@ class SessionConfigTest {
 
         assertEquals(CacheLimit.DEFAULT, cfg.getAudioCacheLimit());
     }
+
+    @Test
+    void streamingEngineIsOffForAFreshConfig() {
+        assertFalse(new SessionConfig().isStreamingEngineEnabled());
+    }
+
+    @Test
+    void streamingEngineIsOffWhenTheSessionPredatesIt() {
+        SessionConfig loaded = new Gson().fromJson("{\"masterVolume\":0.5}", SessionConfig.class);
+
+        assertFalse(loaded.isStreamingEngineEnabled());
+    }
+
+    @Test
+    void streamingEngineSurvivesAJsonRoundTrip() {
+        SessionConfig cfg = new SessionConfig();
+        cfg.setStreamingEngineEnabled(true);
+
+        SessionConfig loaded = new Gson().fromJson(new Gson().toJson(cfg), SessionConfig.class);
+
+        assertTrue(loaded.isStreamingEngineEnabled());
+    }
+
+    @Test
+    void streamingEngineCanBeTurnedBackOff() {
+        SessionConfig cfg = new SessionConfig();
+        cfg.setStreamingEngineEnabled(true);
+
+        cfg.setStreamingEngineEnabled(false);
+
+        assertFalse(new Gson().fromJson(new Gson().toJson(cfg), SessionConfig.class).isStreamingEngineEnabled());
+    }
+
+    @Test
+    void adoptingCopiesTheLoadedStreamingEngineIntoTheLiveConfig() {
+        SessionConfig loaded = new SessionConfig();
+        loaded.setStreamingEngineEnabled(true);
+        SessionConfig live = new SessionConfig();
+
+        live.adoptStreamingEngineFrom(loaded);
+
+        assertTrue(live.isStreamingEngineEnabled());
+    }
+
+    @Test
+    void savingOtherSettingsDoesNotResetTheStreamingEngine() {
+        SessionConfig cfg = new SessionConfig();
+        cfg.setStreamingEngineEnabled(true);
+
+        cfg.setAudioCacheLimit(CacheLimit.GB_1);
+
+        assertTrue(cfg.isStreamingEngineEnabled());
+    }
 }

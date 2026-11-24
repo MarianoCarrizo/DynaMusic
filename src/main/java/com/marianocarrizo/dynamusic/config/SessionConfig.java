@@ -73,6 +73,8 @@ public class SessionConfig {
 
     private String audioCacheLimit;
 
+    private Boolean streamingEngine;
+
     public SessionConfig() {}
 
     public static SessionConfig firstRun() {
@@ -103,6 +105,18 @@ public class SessionConfig {
 
     public void adoptAudioCacheLimitFrom(SessionConfig other) {
         audioCacheLimit = other.audioCacheLimit;
+    }
+
+    public boolean isStreamingEngineEnabled() {
+        return Boolean.TRUE.equals(streamingEngine);
+    }
+
+    public void setStreamingEngineEnabled(boolean enabled) {
+        streamingEngine = enabled;
+    }
+
+    public void adoptStreamingEngineFrom(SessionConfig other) {
+        streamingEngine = other.streamingEngine;
     }
 
     public List<Scene> getScenes() {
