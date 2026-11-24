@@ -33,7 +33,6 @@ public final class FfmpegProcess {
     public static Process start(List<String> command) throws IOException {
         Process process = new ProcessBuilder(command).start();
         LIVE.add(process);
-        Thread.ofVirtual().start(() -> drain(process.getErrorStream(), new TailBuffer(STDERR_TAIL_BYTES)));
         return process;
     }
 

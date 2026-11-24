@@ -3,14 +3,23 @@ package com.marianocarrizo.dynamusic.audio.stream;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 
 final class FakeFfmpegProcess extends Process {
 
     private final InputStream stdout;
+    private final int exit;
+    private final byte[] stderr;
     private boolean destroyed;
 
     FakeFfmpegProcess(byte[] output) {
+        this(output, 0, "");
+    }
+
+    FakeFfmpegProcess(byte[] output, int exit, String stderr) {
         this.stdout = new ByteArrayInputStream(output);
+        this.exit = exit;
+        this.stderr = stderr.getBytes(StandardCharsets.UTF_8);
     }
 
     boolean destroyed() {
@@ -29,7 +38,7 @@ final class FakeFfmpegProcess extends Process {
 
     @Override
     public InputStream getErrorStream() {
-        return InputStream.nullInputStream();
+        return new ByteArrayInputStream(stderr);
     }
 
     @Override
@@ -39,7 +48,7 @@ final class FakeFfmpegProcess extends Process {
 
     @Override
     public int exitValue() {
-        return 0;
+        return exit;
     }
 
     @Override

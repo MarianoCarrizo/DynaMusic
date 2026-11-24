@@ -3,6 +3,7 @@ package com.marianocarrizo.dynamusic.audio.stream;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -109,6 +110,21 @@ class FfmpegResampleSourceTest {
 
         assertTrue(processes.get(0).destroyed());
         assertEquals(PcmSource.END_OF_STREAM, source.read(new byte[16]));
+    }
+
+    @Test
+    void nonZeroExitAtEndOfOutputFailsWithTheStderrTail() throws Exception {
+        FfmpegResampleSource.Launcher failing = command -> {
+            FakeFfmpegProcess process = new FakeFfmpegProcess(ramp(40), 1, "Invalid data found");
+            processes.add(process);
+            return process;
+        };
+        try (FfmpegResampleSource source = new FfmpegResampleSource("ffmpeg", INPUT, TARGET, TOTAL_FRAMES, failing)) {
+            Thread.sleep(100);
+            IOException failure = assertThrows(IOException.class, () -> FlacFixtures.readAll(source));
+            assertTrue(failure.getMessage().contains("Invalid data found"), failure.getMessage());
+            assertTrue(failure.getMessage().contains("1"), failure.getMessage());
+        }
     }
 
     @Test
