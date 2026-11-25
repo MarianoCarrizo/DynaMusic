@@ -176,9 +176,6 @@ public final class BrowsePanelController {
             @Override public void play(Album album, int start) {
                 host.playContext(album.title(), filesOf(album), start);
             }
-            @Override public void enqueue(Album album, QueuePlacement placement) {
-                host.enqueue(filesOf(album), placement);
-            }
         };
     }
 }

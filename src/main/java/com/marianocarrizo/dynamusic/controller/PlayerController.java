@@ -60,7 +60,6 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
 
     @FXML private MoodPanelController moodPanelController;
     @FXML private LiveAuraController liveAuraController;
-    @FXML private QueuePanelController queuePanelController;
 
     @FXML private NowPlayingBarController nowPlayingBarController;
 
@@ -100,7 +99,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
     private final NowPlayingTracker nowPlayingTracker = new NowPlayingTracker(
             musicService::playbackState, playlistManager::getActivePlaylistName, nowPlaying);
     private final PlaylistPlayback playlistPlayback = new PlaylistPlayback(
-            musicService, playlistManager, this::enterMode, this::refreshPlaylistView, modeShell::isListen);
+            musicService, playlistManager, this::enterMode, this::refreshPlaylistView);
     private final ActiveTransport transport = new ActiveTransport(musicService, playlistPlayback::startCurrent, () -> !modeShell.isListen());
     private final RepeatSettings repeatSettings = new RepeatSettings(
             mode -> musicService.setLoop(mode.repeatsTrack()), playlistManager::setRepeat,
@@ -126,7 +125,6 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
         libraryPanelController.attach(this, modeShell.modeProperty());
         playlistPanelController.attach(this);
         nowPlayingBarController.attach(this);
-        queuePanelController.attach(playlistPlayback);
         nowPlayingTracker.sync();
         liveAuraController.refresh();
         modeShell.install(mainRoot, modeTabPane, modeSwitchController, () -> updateWindowMood(moodPanelController.activeMood()));
@@ -355,7 +353,6 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
     @Override public SessionConfig session() { return sessionConfig; }
     @Override public ObservableBooleanValue moodActionsVisible() { return modeShell.sessionActiveProperty(); }
 
-    @Override public void enqueue(List<File> files, QueuePlacement placement) { playlistPlayback.enqueue(files, placement); }
     @Override public void playContext(String label, List<File> tracks, int start) { playlistPlayback.playContext(label, tracks, start); }
     @Override public MusicService musicService() { return musicService; }
 

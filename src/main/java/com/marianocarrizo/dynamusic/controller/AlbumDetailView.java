@@ -58,14 +58,7 @@ final class AlbumDetailView extends VBox {
         Button play = new Button("Play album");
         play.getStyleClass().add("btn-primary");
         play.setOnAction(e -> actions.play(album, 0));
-        Button playNext = new Button("Play next");
-        playNext.getStyleClass().add("btn-secondary");
-        playNext.setOnAction(e -> actions.enqueue(album, QueuePlacement.NEXT));
-        Button addToQueue = new Button("Add to queue");
-        addToQueue.getStyleClass().add("btn-secondary");
-        addToQueue.setOnAction(e -> actions.enqueue(album, QueuePlacement.END));
-        HBox buttons = new HBox(SPACING, play, playNext, addToQueue);
-        VBox text = new VBox(4, title, subtitle, buttons);
+        VBox text = new VBox(4, title, subtitle, play);
         text.setAlignment(Pos.CENTER_LEFT);
         HBox header = new HBox(12, cover, text);
         header.setAlignment(Pos.CENTER_LEFT);

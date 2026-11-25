@@ -92,8 +92,6 @@
 
                 <fx:include fx:id="liveAura" source="live_aura.fxml"/>
 
-                <fx:include fx:id="queuePanel" source="queue_panel.fxml"/>
-
             </VBox>
         </SplitPane>
 
