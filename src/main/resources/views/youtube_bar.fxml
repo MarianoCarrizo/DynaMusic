@@ -4,7 +4,7 @@
 
 <VBox xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.marianocarrizo.dynamusic.controller.YouTubeBarController"
-      spacing="10">
+      spacing="10" styleClass="session-only">
     <HBox spacing="8" alignment="CENTER_LEFT">
         <TextField fx:id="txtYoutubeUrl" HBox.hgrow="ALWAYS" maxWidth="Infinity"
                    promptText="Paste YouTube URL..."/>

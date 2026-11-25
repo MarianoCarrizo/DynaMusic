@@ -36,6 +36,10 @@ final class Endpoint implements AutoCloseable {
         return arena;
     }
 
+    String id() {
+        return device.id(arena);
+    }
+
     AudioClient activateClient() {
         return device.activateClient(arena);
     }

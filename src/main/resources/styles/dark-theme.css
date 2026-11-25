@@ -765,3 +765,69 @@
     -fx-font-size: 12px;
     -fx-font-style: italic;
 }
+
+.mode-switch {
+    -fx-padding: 0 0 0 12px;
+}
+.mode-switch-button {
+    -fx-background-color: #2a2a32;
+    -fx-text-fill: #b0b0b8;
+    -fx-border-color: #4f4f5c;
+    -fx-border-width: 1px;
+    -fx-background-radius: 0px;
+    -fx-border-radius: 0px;
+    -fx-font-size: 11px;
+    -fx-padding: 3px 14px;
+    -fx-cursor: hand;
+}
+.mode-switch-button:hover {
+    -fx-background-color: #3a3a43;
+    -fx-text-fill: #ffffff;
+}
+.mode-switch-button:selected {
+    -fx-background-color: -mood-accent;
+    -fx-border-color: -mood-accent;
+    -fx-text-fill: -mood-accent-text;
+    -fx-font-weight: bold;
+}
+.mode-switch-middle,
+.mode-switch-last {
+    -fx-border-width: 1px 1px 1px 0px;
+}
+
+.album-grid .list-cell:filled,
+.album-grid .list-cell:filled:hover,
+.album-grid .list-cell:filled:selected,
+.album-grid .list-cell:filled:selected:focused {
+    -fx-background-color: transparent;
+    -fx-padding: 6px 0 0 6px;
+}
+.album-tile {
+    -fx-cursor: hand;
+}
+.album-tile:hover .album-cover {
+    -fx-background-color: #23232b;
+    -fx-background-radius: 4px;
+}
+.album-cover-caption {
+    -fx-text-fill: #8a8f98;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+.album-tile-title {
+    -fx-text-fill: -mood-accent;
+}
+.album-tile-title {
+    -fx-text-fill: #e0e0e6;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+.album-tile-artist {
+    -fx-text-fill: #8a8f98;
+    -fx-font-size: 11px;
+}
+.album-detail-title {
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+}

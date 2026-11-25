@@ -1,10 +1,8 @@
 package com.marianocarrizo.dynamusic.audio.wasapi;
 
 import java.lang.foreign.Arena;
-import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
-import java.lang.invoke.MethodHandle;
 
 final class AudioClient {
 
@@ -36,8 +34,6 @@ final class AudioClient {
     private static final ComMethod IS_FORMAT_SUPPORTED = ComMethod.of(IS_FORMAT_SUPPORTED_SLOT, ValueLayout.JAVA_INT,
             ValueLayout.ADDRESS, ValueLayout.ADDRESS);
     private static final ComMethod GET_MIX_FORMAT = ComMethod.of(GET_MIX_FORMAT_SLOT, ValueLayout.ADDRESS);
-    private static final MethodHandle FREE_TASK_MEMORY = Win32Library.OLE32.bind("CoTaskMemFree",
-            FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     private static final ComMethod GET_DEVICE_PERIOD = ComMethod.of(GET_DEVICE_PERIOD_SLOT, ValueLayout.ADDRESS,
             ValueLayout.ADDRESS);
     private static final ComMethod START = ComMethod.of(START_SLOT);
@@ -74,7 +70,7 @@ final class AudioClient {
             MemorySegment header = mix.reinterpret(WaveFormat.CHANNELS_OFFSET + Short.BYTES);
             return header.get(ValueLayout.JAVA_SHORT_UNALIGNED, WaveFormat.CHANNELS_OFFSET);
         } finally {
-            NativeCall.invoke(FREE_TASK_MEMORY, mix);
+            TaskMemory.free(mix);
         }
     }
 

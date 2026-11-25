@@ -8,6 +8,7 @@ import com.marianocarrizo.dynamusic.model.Scene;
 import com.google.gson.Gson;
 import com.marianocarrizo.dynamusic.model.NowPlayingSource;
 import com.marianocarrizo.dynamusic.model.RepeatMode;
+import com.marianocarrizo.dynamusic.model.AppMode;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -465,5 +466,46 @@ class SessionConfigTest {
         live.adoptSkippedUpdateVersionFrom(loaded);
 
         assertEquals("2.1.0", live.getSkippedUpdateVersion());
+    }
+
+    @Test
+    void configWithoutASavedModeStartsInSession() {
+        SessionConfig cfg = new SessionConfig();
+        cfg.getActiveScene();
+
+        assertEquals(AppMode.SESSION, cfg.getAppMode());
+    }
+
+    @Test
+    void firstRunStartsInListen() {
+        assertEquals(AppMode.LISTEN, SessionConfig.firstRun().getAppMode());
+    }
+
+    @Test
+    void savedModeWinsOverTheDefaults() {
+        SessionConfig cfg = new SessionConfig();
+        cfg.addScene("Boss");
+        cfg.setAppMode(AppMode.LISTEN);
+
+        assertEquals(AppMode.LISTEN, cfg.getAppMode());
+    }
+
+    @Test
+    void appModeIsStoredAsLowercaseName() {
+        SessionConfig cfg = new SessionConfig();
+        cfg.setAppMode(AppMode.LISTEN);
+
+        assertTrue(new Gson().toJson(cfg).contains("\"appMode\":\"listen\""));
+    }
+
+    @Test
+    void adoptingAppModeCopiesTheSavedChoice() {
+        SessionConfig loaded = new SessionConfig();
+        loaded.setAppMode(AppMode.LISTEN);
+        SessionConfig live = new SessionConfig();
+
+        live.adoptAppModeFrom(loaded);
+
+        assertEquals(AppMode.LISTEN, live.getAppMode());
     }
 }

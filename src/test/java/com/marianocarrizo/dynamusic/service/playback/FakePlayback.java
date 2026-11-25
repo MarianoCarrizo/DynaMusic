@@ -21,6 +21,9 @@ final class FakePlayback implements Playback {
     private Runnable onError;
     private Duration total = Duration.UNKNOWN;
     private int spectrumAttachments;
+    private java.util.List<String> calls;
+    private String label = "";
+    private boolean releaseResult = true;
 
     FakePlayback(Executor executor) {
         this.executor = executor;
@@ -70,7 +73,23 @@ final class FakePlayback implements Playback {
 
     @Override
     public void dispose() {
+        if (calls != null) calls.add(label + ".dispose");
         status.set(PlaybackStatus.DISPOSED);
+    }
+
+    void recordCalls(java.util.List<String> log, String name) {
+        calls = log;
+        label = name;
+    }
+
+    void releaseTakes(boolean released) {
+        releaseResult = released;
+    }
+
+    @Override
+    public boolean awaitRelease(long millis) {
+        if (calls != null) calls.add(label + ".await<=" + millis);
+        return releaseResult;
     }
 
     @Override
@@ -119,6 +138,7 @@ final class FakePlayback implements Playback {
 
     @Override
     public void setVolume(double value) {
+        if (calls != null) calls.add(label + ".volume=" + value);
         volume.set(value);
     }
 

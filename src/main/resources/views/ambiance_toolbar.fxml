@@ -4,7 +4,7 @@
 
 <HBox xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.marianocarrizo.dynamusic.controller.AmbianceToolbarController"
-      spacing="8" alignment="CENTER_LEFT">
+      spacing="8" alignment="CENTER_LEFT" styleClass="session-only">
     <SplitMenuButton fx:id="btnToggleAmbiance" text="Show ambiance" onAction="#onToggleAmbiance"
                      styleClass="btn-menu"/>
 </HBox>

@@ -49,6 +49,7 @@ public final class PlaylistPanelController {
     }
 
 
+    private static final String SELECT_PROMPT = "Select playlist";
     private static final String EMPTY_LIST_HINT = "Drag tracks or folders here";
     private static final String DEFAULT_PLAYLIST_NAME = "New playlist";
     private static final String NAME_REJECTED_MESSAGE = "Name already exists or is blank.";
@@ -171,17 +172,20 @@ public final class PlaylistPanelController {
         if (refreshing) return;
         refreshing = true;
         try {
-            String current = cmbPlaylist.getValue();
+            String current = playlistManager.isTransientActive() ? null : cmbPlaylist.getValue();
             cmbPlaylist.getItems().setAll(
                 playlistManager.getPlaylists().stream()
                     .map(p -> p.getName())
                     .toList()
             );
             String active = playlistManager.getActivePlaylistName();
-            if (active != null && cmbPlaylist.getItems().contains(active))
+            cmbPlaylist.setPromptText(playlistManager.isTransientActive() ? active : SELECT_PROMPT);
+            if (active != null && !playlistManager.isTransientActive() && cmbPlaylist.getItems().contains(active))
                 cmbPlaylist.setValue(active);
             else if (current != null && cmbPlaylist.getItems().contains(current))
                 cmbPlaylist.setValue(current);
+            else if (playlistManager.isTransientActive())
+                cmbPlaylist.setValue(null);
 
             int selected = lstPlaylistTracks.getSelectionModel().getSelectedIndex();
             lstPlaylistTracks.getItems().setAll(
@@ -325,7 +329,7 @@ public final class PlaylistPanelController {
     private void addDroppedFiles(List<File> dropped, int slot) {
         collectInBackground(() -> AudioFileCollector.collectAll(dropped), tracks -> {
             if (tracks.isEmpty()) return;
-            String target = playlistManager.getActivePlaylistName();
+            String target = playlistManager.isTransientActive() ? null : playlistManager.getActivePlaylistName();
             if (target == null) target = playlistManager.ensurePlaylist(DEFAULT_PLAYLIST_NAME).getName();
             addTracks(target, tracks, slot, false);
         });
@@ -347,7 +351,7 @@ public final class PlaylistPanelController {
     }
 
     private void addTracks(String playlistName, List<File> tracks, int slot, boolean activate) {
-        String activeBefore = playlistManager.getActivePlaylistName();
+        String activeBefore = playlistManager.isTransientActive() ? null : playlistManager.getActivePlaylistName();
         boolean isActive = playlistName.equalsIgnoreCase(activeBefore);
         int selected = lstPlaylistTracks.getSelectionModel().getSelectedIndex();
         int added = playlistManager.insertTracks(playlistName, tracks, slot);
@@ -372,23 +376,25 @@ public final class PlaylistPanelController {
     }
 
     private void moveTrackToSlot(int from, int slot) {
-        String active = playlistManager.getActivePlaylistName();
-        if (active == null) return;
+        if (playlistManager.getActivePlaylistName() == null) return;
         int to = slot > from ? slot - 1 : slot;
         if (to == from) return;
-        playlistManager.reorderTrack(active, from, to);
+        playlistManager.reorderActive(from, to);
         refresh();
         lstPlaylistTracks.getSelectionModel().select(to);
-        persist();
+        persistUnlessTransient();
     }
 
     private void removeTrackAt(int index) {
-        String active = playlistManager.getActivePlaylistName();
-        if (active == null || index < 0) return;
-        playlistManager.removeTrack(active, index);
+        if (playlistManager.getActivePlaylistName() == null || index < 0) return;
+        playlistManager.removeActive(index);
         refresh();
         selectTrackRow(Math.min(index, lstPlaylistTracks.getItems().size() - 1));
-        persist();
+        persistUnlessTransient();
+    }
+
+    private void persistUnlessTransient() {
+        if (!playlistManager.isTransientActive()) persist();
     }
 
     private void persist() {

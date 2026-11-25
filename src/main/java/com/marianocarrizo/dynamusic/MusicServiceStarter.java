@@ -119,6 +119,10 @@ public class MusicServiceStarter extends Application {
         // Captura de teclado numérico - 1, 2, 3, 4
         PlayerController controller = loader.getController();
         controller.setHostServices(getHostServices());
+        stage.setOnCloseRequest(e -> {
+            e.consume();
+            controller.shutdownApp();
+        });
 
         // Sondeo de ffmpeg: se inyecta ANTES de applySession para que la restauración
         // del boomerang sepa si ffmpeg está disponible antes de intentar un re-bake

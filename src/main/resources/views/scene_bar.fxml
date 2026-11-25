@@ -4,7 +4,7 @@
 
 <HBox xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.marianocarrizo.dynamusic.controller.SceneBarController"
-      spacing="8" alignment="CENTER_LEFT">
+      spacing="8" alignment="CENTER_LEFT" styleClass="session-only">
     <Label text="Scene" minWidth="-Infinity" styleClass="lbl-session-title"/>
     <ComboBox fx:id="cmbScene" minWidth="100" prefWidth="180"/>
     <Button fx:id="btnEditScene" text="Edit scene" minWidth="-Infinity" onAction="#onEditScene" styleClass="btn-secondary"/>

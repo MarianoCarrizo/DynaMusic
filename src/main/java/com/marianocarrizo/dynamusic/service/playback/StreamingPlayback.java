@@ -60,6 +60,17 @@ public final class StreamingPlayback implements Playback {
     }
 
     @Override
+    public boolean awaitRelease(long millis) {
+        if (millis <= 0) return !thread.isAlive();
+        try {
+            return awaitTermination(millis);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    @Override
     public void play() {
         if (!isUsable()) return;
         status.set(PlaybackStatus.PLAYING);

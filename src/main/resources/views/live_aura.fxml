@@ -5,7 +5,7 @@
 
 <VBox xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.marianocarrizo.dynamusic.controller.LiveAuraController"
-      spacing="6" styleClass="playback-panel">
+      spacing="6" styleClass="playback-panel, session-only">
     <Label fx:id="lblLiveAura" text="LIVE AURA" styleClass="lbl-panel-title"/>
     <HBox fx:id="livePresetBox" spacing="6" alignment="CENTER"/>
     <HBox spacing="8" alignment="CENTER_LEFT">

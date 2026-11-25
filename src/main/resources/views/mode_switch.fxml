@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.ToggleButton?>
+<?import javafx.scene.control.ToggleGroup?>
+<?import javafx.scene.layout.HBox?>
+
+<HBox xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.marianocarrizo.dynamusic.controller.ModeSwitchController"
+      spacing="0" alignment="CENTER" styleClass="mode-switch">
+    <fx:define>
+        <ToggleGroup fx:id="modeGroup"/>
+    </fx:define>
+    <ToggleButton fx:id="listenButton" text="Listen" toggleGroup="$modeGroup"
+                  styleClass="mode-switch-button, mode-switch-first"/>
+    <ToggleButton fx:id="sessionButton" text="Session" toggleGroup="$modeGroup"
+                  styleClass="mode-switch-button, mode-switch-last"/>
+</HBox>

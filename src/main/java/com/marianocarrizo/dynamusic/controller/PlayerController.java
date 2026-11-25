@@ -10,13 +10,16 @@ import com.marianocarrizo.dynamusic.model.RepeatMode;
 import com.marianocarrizo.dynamusic.model.Playlist;
 import com.marianocarrizo.dynamusic.model.PlaylistItem;
 import com.marianocarrizo.dynamusic.model.Scene;
+import com.marianocarrizo.dynamusic.service.AppShutdown;
 import com.marianocarrizo.dynamusic.service.MusicService;
 import com.marianocarrizo.dynamusic.service.PlaylistManager;
 import com.marianocarrizo.dynamusic.service.UpdateManager;
+import com.marianocarrizo.dynamusic.service.playback.PlaybackShutdown;
 import javafx.animation.Animation;
 import javafx.animation.PauseTransition;
 import javafx.application.HostServices;
 import javafx.application.Platform;
+import javafx.beans.value.ObservableBooleanValue;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
@@ -53,6 +56,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
     @FXML private SceneBarController sceneBarController;
     @FXML private AmbianceToolbarController ambianceToolbarController;
     @FXML private AudioSettingsController audioSettingsController;
+    @FXML private ModeSwitchController modeSwitchController;
 
     @FXML private MoodPanelController moodPanelController;
     @FXML private LiveAuraController liveAuraController;
@@ -74,12 +78,18 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
     private final SessionConfig sessionConfig = new SessionConfig();
     private final AmbianceCoordinator ambiance = new AmbianceCoordinator(
             sessionConfig, () -> manager.save(sessionConfig), this::liveSlot, this::refreshSceneEditorBackground);
+    private final ModeShell modeShell = new ModeShell(musicService, ambiance, sessionConfig, () -> manager.save(sessionConfig));
     private SceneEditorController sceneEditor;
     private LibraryVisibility libraryVisibility;
 
     private boolean applyingSession = false;
 
     private final PauseTransition saveDebounce = new PauseTransition(Duration.millis(400));
+    private final AppShutdown appShutdown = new AppShutdown(List.of(
+            musicService::stopOutputWatch,
+            new PlaybackShutdown(musicService::playersForShutdown)::run,
+            () -> { if (saveDebounce.getStatus() == Animation.Status.RUNNING) manager.save(sessionConfig); },
+            () -> UpdateManager.get().launchPendingInstaller(), AppShutdown::exit));
 
     private final MoodTrackLoader trackLoader = new MoodTrackLoader(
             musicService, sessionConfig, () -> manager.save(sessionConfig),
@@ -91,7 +101,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
             musicService::playbackState, playlistManager::getActivePlaylistName, nowPlaying);
     private final PlaylistPlayback playlistPlayback = new PlaylistPlayback(
             musicService, playlistManager, this::enterMode, this::refreshPlaylistView);
-    private final ActiveTransport transport = new ActiveTransport(musicService, playlistPlayback::startCurrent);
+    private final ActiveTransport transport = new ActiveTransport(musicService, playlistPlayback::startCurrent, () -> !modeShell.isListen());
     private final RepeatSettings repeatSettings = new RepeatSettings(
             mode -> musicService.setLoop(mode.repeatsTrack()), playlistManager::setRepeat,
             mode -> musicService.setOnDemandLoop(mode.repeatsTrack()),
@@ -113,11 +123,12 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
         audioSettingsController.attach(this);
         liveAuraController.attach(this);
         moodPanelController.attach(this);
-        libraryPanelController.attach(this);
+        libraryPanelController.attach(this, modeShell.modeProperty());
         playlistPanelController.attach(this);
         nowPlayingBarController.attach(this);
         nowPlayingTracker.sync();
         liveAuraController.refresh();
+        modeShell.install(mainRoot, modeTabPane, modeSwitchController, () -> updateWindowMood(moodPanelController.activeMood()));
 
         saveDebounce.setOnFinished(e -> manager.save(sessionConfig));
 
@@ -125,7 +136,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
 
         if (modeTabPane != null) {
             modeTabPane.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
-                if (applyingSession || newTab == null) return;
+                if (applyingSession || newTab == null || !modeShell.tabsFollowSession()) return;
                 boolean isPlaylist = newTab == playlistsTab;
                 sessionConfig.setActiveMode(isPlaylist ? "playlist" : "mood");
                 manager.save(sessionConfig);
@@ -137,7 +148,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
 
         Platform.runLater(() -> {
             updateWindowMood(moodPanelController.activeMood());
-            if (sessionConfig.isAmbianceIntroduced()) ambiance.open();
+            if (sessionConfig.isAmbianceIntroduced()) modeShell.whenSession(ambiance::open);
         });
     }
 
@@ -165,7 +176,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
     }
 
     private boolean shouldStartPlaylist() {
-        return modeTabPane.getSelectionModel().getSelectedItem() == playlistsTab
+        return (modeShell.isListen() || modeTabPane.getSelectionModel().getSelectedItem() == playlistsTab)
                 && musicService.activeSource() == NowPlayingSource.MOOD
                 && !musicService.isPlaying();
     }
@@ -210,7 +221,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
     }
 
     public boolean moodKeysEnabled() {
-        return MoodShortcuts.enabled(modeTabPane.getSelectionModel().getSelectedItem(), moodsTab);
+        return MoodShortcuts.enabled(sessionConfig.getAppMode(), modeTabPane.getSelectionModel().getSelectedItem(), moodsTab);
     }
 
     private void restoreRepeatModes(SessionConfig saved) {
@@ -287,7 +298,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
 
     private void updateWindowMood(TrackType type) {
         if (mainRoot == null) return;
-        mainRoot.setId(WindowAccent.rootId(musicService.getPlaybackMode(), type));
+        mainRoot.setId(WindowAccent.rootId(sessionConfig.getAppMode(), musicService.getPlaybackMode(), type));
         if (sceneEditor != null) sceneEditor.refreshAccent();
     }
 
@@ -341,7 +352,9 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
     }
 
     @Override public SessionConfig session() { return sessionConfig; }
+    @Override public ObservableBooleanValue moodActionsVisible() { return modeShell.sessionActiveProperty(); }
 
+    @Override public void playContext(String label, List<File> tracks, int start) { playlistPlayback.playContext(label, tracks, start); }
     @Override public MusicService musicService() { return musicService; }
 
     @Override public AmbianceCoordinator ambiance() { return ambiance; }
@@ -483,6 +496,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
         sessionConfig.adoptAudioCacheLimitFrom(cfg);
         sessionConfig.adoptStreamingEngineFrom(cfg);
         sessionConfig.adoptSkippedUpdateVersionFrom(cfg);
+        sessionConfig.adoptAppModeFrom(cfg);
         audioSettingsController.applySaved();
 
         String lastImgDir = cfg.getLastImageFolderPath();
@@ -494,7 +508,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
         sessionConfig.setAmbianceScreenIndex(screenIdx);
         Platform.runLater(() -> ambianceToolbarController.restoreScreen(screenIdx));
 
-        libraryPanelController.restoreFolder(cfg.getLastFolderPath());
+        libraryPanelController.restoreFolder(cfg.getLastFolderPath(), cfg.getLibraryRoot());
         sessionConfig.setLibraryCollapsed(cfg.isLibraryCollapsed());
         sessionConfig.setLibraryDividerPosition(cfg.getLibraryDividerPosition());
         libraryVisibility.setDividerPosition(cfg.getLibraryDividerPosition());
@@ -518,6 +532,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
             playlistPanelController.refresh();
             applyingSession = false;
         }
+        modeShell.restore();
 
         Platform.runLater(() -> {
             nowPlayingBarController.restoreVolume(cfg.getMasterVolume());
@@ -543,13 +558,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
     @Override
     public void shutdownApp() {
         if (sceneEditor != null) sceneEditor.dispose();
-        if (saveDebounce.getStatus() == Animation.Status.RUNNING) {
-            saveDebounce.stop();
-            manager.save(sessionConfig);
-        }
-        UpdateManager.get().launchPendingInstaller();
-        Platform.exit();
-        System.exit(0);
+        appShutdown.run();
     }
 
     @FXML

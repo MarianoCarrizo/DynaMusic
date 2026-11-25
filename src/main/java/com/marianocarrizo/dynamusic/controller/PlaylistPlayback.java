@@ -5,6 +5,7 @@ import com.marianocarrizo.dynamusic.service.PlaylistManager;
 import javafx.application.Platform;
 
 import java.io.File;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 
@@ -23,6 +24,12 @@ final class PlaylistPlayback {
         this.refreshView = refreshView;
         musicService.setOnPlaylistEnd(() -> Platform.runLater(this::advanceAfterEnd));
         musicService.setOnPlaylistTrackFailed(() -> Platform.runLater(this::skipFailedTrack));
+    }
+
+    void playContext(String label, List<File> tracks, int start) {
+        playlistManager.playTransient(label, tracks, start);
+        startCurrent();
+        refreshView.run();
     }
 
     void play(File file) {

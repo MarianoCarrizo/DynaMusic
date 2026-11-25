@@ -28,6 +28,7 @@
                 </image>
             </ImageView>
             <Label text="DynaMusic" styleClass="window-title"/>
+            <fx:include fx:id="modeSwitch" source="mode_switch.fxml"/>
             <Region HBox.hgrow="ALWAYS" />
             <fx:include fx:id="audioSettings" source="audio_settings_button.fxml"/>
             <Button text="—" onAction="#onMinimizeWindow" styleClass="btn-window-control"/>
@@ -69,7 +70,7 @@
                 <!-- T-10: TabPane que agrupa los modos Moods y Playlists -->
                 <TabPane fx:id="modeTabPane" VBox.vgrow="ALWAYS" tabClosingPolicy="UNAVAILABLE">
 
-                    <Tab fx:id="moodsTab" text="Moods">
+                    <Tab fx:id="moodsTab" text="Moods" styleClass="session-only">
                         <content>
                             <fx:include fx:id="moodPanel" source="mood_panel.fxml"/>
                         </content>

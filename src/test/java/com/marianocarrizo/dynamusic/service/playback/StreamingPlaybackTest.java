@@ -382,10 +382,13 @@ class StreamingPlaybackTest {
     @Test
     void pauseReleasesTheDeviceAndResumeReacquiresIt() throws Exception {
         open(constantPcm(TOTAL_FRAMES * 4, CONSTANT_SAMPLE));
+        CountDownLatch gate = new CountDownLatch(1);
+        sink.blockWrites(gate);
         playback.play();
-        await(() -> sink.starts() == 1);
+        await(() -> sink.writeAttempts() >= 1);
 
         playback.pause();
+        gate.countDown();
         await(() -> sink.suspends() == 1);
         playback.play();
 
@@ -396,10 +399,13 @@ class StreamingPlaybackTest {
     @Test
     void stopReleasesTheDevice() throws Exception {
         open(constantPcm(TOTAL_FRAMES * 4, CONSTANT_SAMPLE));
+        CountDownLatch gate = new CountDownLatch(1);
+        sink.blockWrites(gate);
         playback.play();
-        await(() -> sink.starts() == 1);
+        await(() -> sink.writeAttempts() >= 1);
 
         playback.stop();
+        gate.countDown();
 
         await(() -> sink.suspends() == 1);
         assertEquals(0, errors.get());

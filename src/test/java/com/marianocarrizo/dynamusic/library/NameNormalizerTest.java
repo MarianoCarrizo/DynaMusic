@@ -1,4 +1,4 @@
-package com.marianocarrizo.dynamusic.controller;
+package com.marianocarrizo.dynamusic.library;
 
 import org.junit.jupiter.api.Test;
 

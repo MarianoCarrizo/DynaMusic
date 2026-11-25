@@ -4,7 +4,10 @@ import com.marianocarrizo.dynamusic.audio.AudioFormat;
 import com.marianocarrizo.dynamusic.audio.AudioServices;
 import com.marianocarrizo.dynamusic.audio.TrackQualityStore;
 import com.marianocarrizo.dynamusic.audio.UnplayableAudioException;
+import com.marianocarrizo.dynamusic.audio.stream.DefaultOutputDevice;
+import com.marianocarrizo.dynamusic.audio.stream.OutputDeviceWatcher;
 import com.marianocarrizo.dynamusic.audio.stream.OutputStatus;
+import com.marianocarrizo.dynamusic.audio.wasapi.NativeDefaultOutputDevice;
 import com.marianocarrizo.dynamusic.config.SessionConfigManager;
 import com.marianocarrizo.dynamusic.enums.TrackType;
 import com.marianocarrizo.dynamusic.model.NowPlayingSource;
@@ -25,10 +28,13 @@ import javafx.animation.PauseTransition;
 import javafx.animation.Timeline;
 
 import java.io.File;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.function.BiConsumer;
@@ -113,6 +119,7 @@ public class MusicService {
     private int prefetchTicket;
     private static final double OUTPUT_SWITCH_DEBOUNCE_MILLIS = 150;
     private final PauseTransition outputSwitch = new PauseTransition(Duration.millis(OUTPUT_SWITCH_DEBOUNCE_MILLIS));
+    private final OutputDeviceWatcher deviceWatcher;
 
     // =========================================================================
     // T-07: Campos del modo playlist
@@ -152,7 +159,13 @@ public class MusicService {
     }
 
     public MusicService(AudioServices audio) {
+        this(audio, NativeDefaultOutputDevice.system());
+    }
+
+    MusicService(AudioServices audio, DefaultOutputDevice outputDevice) {
         this.audio = audio;
+        this.deviceWatcher = OutputDeviceWatcher.every(outputDevice,
+                () -> Platform.runLater(this::scheduleOutputSwitch));
         this.engines = PlaybackRouter.standard(audio.prep(), () -> streamingEnabled, () -> exclusiveEnabled,
                 Platform::runLater);
         this.players = new HashMap<>();
@@ -165,6 +178,11 @@ public class MusicService {
         tags.onLoaded(this::notifyPlaybackChanged);
         expiryRefresh.setOnFinished(event -> notifyPlaybackChanged());
         outputSwitch.setOnFinished(event -> reopenActiveListen());
+        deviceWatcher.start();
+    }
+
+    public void stopOutputWatch() {
+        deviceWatcher.stop();
     }
 
     public TrackTagStore tags() {
@@ -337,6 +355,16 @@ public class MusicService {
         File held = heldFiles.remove(player);
         if (held != null) audio.cache().unpin(held);
         player.dispose();
+    }
+
+    public List<Playback> playersForShutdown() {
+        cancelActiveFade();
+        Set<Playback> live = Collections.newSetFromMap(new IdentityHashMap<>());
+        live.addAll(players.values());
+        for (Playback player : new Playback[] {playlistPlayer, onDemandPlayer, previewPlayer, fadingOutPlayer}) {
+            if (player != null) live.add(player);
+        }
+        return List.copyOf(live);
     }
 
     private void failPending(int ticket, Throwable error) {

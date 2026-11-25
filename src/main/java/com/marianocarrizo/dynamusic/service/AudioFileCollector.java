@@ -78,7 +78,7 @@ public final class AudioFileCollector {
         return Integer.compare(a.getNameCount(), b.getNameCount());
     }
 
-    static int compareNatural(String a, String b) {
+    public static int compareNatural(String a, String b) {
         String left = a.toLowerCase(Locale.ROOT);
         String right = b.toLowerCase(Locale.ROOT);
         int i = 0;
