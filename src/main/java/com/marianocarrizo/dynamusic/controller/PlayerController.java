@@ -86,6 +86,7 @@ public class PlayerController implements SceneHost, UpdateBarController.Host, Sc
 
     private final PauseTransition saveDebounce = new PauseTransition(Duration.millis(400));
     private final AppShutdown appShutdown = new AppShutdown(List.of(
+            musicService::stopOutputWatch,
             new PlaybackShutdown(musicService::playersForShutdown)::run,
             () -> { if (saveDebounce.getStatus() == Animation.Status.RUNNING) manager.save(sessionConfig); },
             () -> UpdateManager.get().launchPendingInstaller(), AppShutdown::exit));

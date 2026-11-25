@@ -4,7 +4,10 @@ import com.marianocarrizo.dynamusic.audio.AudioFormat;
 import com.marianocarrizo.dynamusic.audio.AudioServices;
 import com.marianocarrizo.dynamusic.audio.TrackQualityStore;
 import com.marianocarrizo.dynamusic.audio.UnplayableAudioException;
+import com.marianocarrizo.dynamusic.audio.stream.DefaultOutputDevice;
+import com.marianocarrizo.dynamusic.audio.stream.OutputDeviceWatcher;
 import com.marianocarrizo.dynamusic.audio.stream.OutputStatus;
+import com.marianocarrizo.dynamusic.audio.wasapi.NativeDefaultOutputDevice;
 import com.marianocarrizo.dynamusic.config.SessionConfigManager;
 import com.marianocarrizo.dynamusic.enums.TrackType;
 import com.marianocarrizo.dynamusic.model.NowPlayingSource;
@@ -116,6 +119,7 @@ public class MusicService {
     private int prefetchTicket;
     private static final double OUTPUT_SWITCH_DEBOUNCE_MILLIS = 150;
     private final PauseTransition outputSwitch = new PauseTransition(Duration.millis(OUTPUT_SWITCH_DEBOUNCE_MILLIS));
+    private final OutputDeviceWatcher deviceWatcher;
 
     // =========================================================================
     // T-07: Campos del modo playlist
@@ -155,7 +159,13 @@ public class MusicService {
     }
 
     public MusicService(AudioServices audio) {
+        this(audio, NativeDefaultOutputDevice.system());
+    }
+
+    MusicService(AudioServices audio, DefaultOutputDevice outputDevice) {
         this.audio = audio;
+        this.deviceWatcher = OutputDeviceWatcher.every(outputDevice,
+                () -> Platform.runLater(this::scheduleOutputSwitch));
         this.engines = PlaybackRouter.standard(audio.prep(), () -> streamingEnabled, () -> exclusiveEnabled,
                 Platform::runLater);
         this.players = new HashMap<>();
@@ -168,6 +178,11 @@ public class MusicService {
         tags.onLoaded(this::notifyPlaybackChanged);
         expiryRefresh.setOnFinished(event -> notifyPlaybackChanged());
         outputSwitch.setOnFinished(event -> reopenActiveListen());
+        deviceWatcher.start();
+    }
+
+    public void stopOutputWatch() {
+        deviceWatcher.stop();
     }
 
     public TrackTagStore tags() {
